@@ -8,12 +8,11 @@
  * Tokens and the task→event map live in the platform's state store, NOT in the backup-able app data.
  */
 import type { AppData, CalendarEvent, CalendarSettings, CalendarStatus, GoogleCalendarInfo, Task } from './types'
-import { DEFAULT_SETTINGS } from './types'
 import { GoogleAuthError, GoogleCalendarClient, emailFromIdToken, refreshAccessToken, revokeToken, type GCalendar, type GEvent, type GoogleTokens } from './gcal'
 import { parseIcs } from './ics'
 import { taskDescription, taskEventWindow } from './calendar-links'
-import { startOfDay, DAY } from './dates'
-import { newTask, uid } from './tasks'
+import { startOfDay, endOfDay, DAY } from './dates'
+import { newTask } from './tasks'
 import { translate } from './i18n'
 
 export const TASK_CALENDAR_NAME = 'Hyper Do'
@@ -21,27 +20,6 @@ const SYNC_INTERVAL_MS = 10 * 60_000
 const MAX_CALENDARS = 15
 /** Events this far ahead become tasks automatically (rolling window). */
 const IMPORT_DAYS = 7
-
-export function normalizeCalendarSettings(c?: Partial<CalendarSettings> | null): CalendarSettings {
-  const d = DEFAULT_SETTINGS.calendar
-  const g: Partial<CalendarSettings['google']> = c?.google ?? {}
-  return {
-    showEvents: c?.showEvents ?? d.showEvents,
-    autoImport: c?.autoImport ?? d.autoImport,
-    google: {
-      // an empty stored value falls back to a client baked into the build (VITE_GOOGLE_CLIENT_ID)
-      clientId: typeof g.clientId === 'string' && g.clientId ? g.clientId : d.google.clientId,
-      clientSecret: typeof g.clientSecret === 'string' && g.clientSecret ? g.clientSecret : d.google.clientSecret,
-      pushTasks: g.pushTasks ?? false,
-      hiddenCalendarIds: Array.isArray(g.hiddenCalendarIds) ? g.hiddenCalendarIds.filter((x): x is string => typeof x === 'string') : [],
-    },
-    feeds: Array.isArray(c?.feeds)
-      ? c.feeds
-          .filter((f) => f && typeof f.url === 'string')
-          .map((f) => ({ id: f.id || uid(), name: f.name ?? '', url: f.url, color: f.color || '#38bdf8', enabled: f.enabled ?? true }))
-      : [],
-  }
-}
 
 export interface CalendarSyncHost {
   getData(): AppData
@@ -455,10 +433,7 @@ export class CalendarSync {
 
   /** Due time of an imported task: all-day events are due at 23:59 of that day (same convention as quick add "today"). */
   private static importDue(e: CalendarEvent): number {
-    if (!e.allDay) return e.start
-    const d = new Date(e.start)
-    d.setHours(23, 59, 0, 0)
-    return d.getTime()
+    return e.allDay ? endOfDay(e.start) : e.start
   }
 
   private importEvents() {

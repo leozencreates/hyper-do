@@ -2,11 +2,11 @@ import { app, BrowserWindow, ipcMain, Notification, Tray, Menu, nativeImage, she
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { DEFAULT_SETTINGS, type AppData } from '../src/lib/types'
+import type { AppData } from '../src/lib/types'
 import { buildNotification, collectDueReminders, syncCounters } from '../src/lib/reminder'
 import { translate } from '../src/lib/i18n'
-import { normalizeTask } from '../src/lib/tasks'
-import { CalendarSync, normalizeCalendarSettings } from '../src/lib/calsync'
+import { normalizeData, parseAppData } from '../src/lib/data'
+import { CalendarSync } from '../src/lib/calsync'
 import { TelegramBot } from './telegram'
 import { googleLoginDesktop } from './calendar'
 
@@ -27,15 +27,9 @@ const dataFile = () => path.join(app.getPath('userData'), 'hyperdo-data.json')
 
 function loadData(): AppData {
   try {
-    const raw = fs.readFileSync(dataFile(), 'utf8')
-    const parsed = JSON.parse(raw) as Partial<AppData>
-    const settings = { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) }
-    return {
-      tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : [],
-      settings: { ...settings, calendar: normalizeCalendarSettings(settings.calendar) },
-    }
+    return parseAppData(fs.readFileSync(dataFile(), 'utf8'))
   } catch {
-    return { tasks: [], settings: { ...DEFAULT_SETTINGS } }
+    return normalizeData(null)
   }
 }
 
@@ -47,7 +41,7 @@ function saveData(d: AppData) {
   fs.renameSync(tmp, file) // atomik yazma: yarım dosya kalmaz
 }
 
-let data: AppData = { tasks: [], settings: { ...DEFAULT_SETTINGS } }
+let data: AppData = normalizeData(null)
 let win: BrowserWindow | null = null
 let tray: Tray | null = null
 let quitting = false
@@ -56,18 +50,32 @@ let quitting = false
 // bekleyen görevler kısa süre içinde tekrar hatırlatılır.
 const lastNotified = new Map<string, number>()
 
+/**
+ * Yeni veriyi uygular: hatırlatma sayaçlarını eşler, diske yazar, dil değiştiyse tepsi menüsünü yeniler.
+ * Arayüzden gelen kayıt geri yansıtılmaz (yoldaki daha yeni düzenlemeleri ezmesin); diğer kaynaklar
+ * (Telegram, takvim içe aktarma) pencereye bildirilir.
+ */
+function commit(next: AppData, opts: { fromRenderer?: boolean } = {}) {
+  syncCounters(data.tasks, next.tasks, lastNotified)
+  const langChanged = next.settings.language !== data.settings.language
+  data = next
+  saveData(data)
+  if (langChanged) buildTrayMenu()
+  if (!opts.fromRenderer) win?.webContents.send('tidi:data-changed', data)
+}
+
+/** Ayarlar değişmiş olabilir: Telegram botunu ve takvim motorunu yeni duruma göre uyar. */
+function afterSave() {
+  telegram.sync()
+  calendar.onDataSaved()
+}
+
 // ---- Takvim senkronu: Google + ICS akışları. Token ve görev→etkinlik eşlemesi ayrı dosyada tutulur
 //      (yedeğe girmez): userData/hyperdo-calendar.json ----
 const calendarFile = () => path.join(app.getPath('userData'), 'hyperdo-calendar.json')
 const calendar = new CalendarSync({
   getData: () => data,
-  mutate(fn) {
-    const next = fn(data)
-    syncCounters(data.tasks, next.tasks, lastNotified)
-    data = next
-    saveData(data)
-    win?.webContents.send('tidi:data-changed', data)
-  },
+  mutate: (fn) => commit(fn(data)),
   loadState() {
     try {
       return fs.readFileSync(calendarFile(), 'utf8')
@@ -92,13 +100,8 @@ const calendar = new CalendarSync({
 const telegram = new TelegramBot({
   getData: () => data,
   mutate(fn) {
-    const next = fn(data)
-    syncCounters(data.tasks, next.tasks, lastNotified)
-    data = next
-    saveData(data)
-    win?.webContents.send('tidi:data-changed', data)
-    telegram.sync()
-    calendar.onDataSaved()
+    commit(fn(data))
+    afterSave()
   },
 })
 
@@ -223,13 +226,8 @@ function tick() {
 // ---- IPC ----
 ipcMain.handle('tidi:load', () => data)
 ipcMain.handle('tidi:save', (_e, incoming: AppData) => {
-  syncCounters(data.tasks, incoming.tasks, lastNotified)
-  const langChanged = incoming.settings.language !== data.settings.language
-  data = incoming
-  saveData(data)
-  if (langChanged) buildTrayMenu()
-  telegram.sync()
-  calendar.onDataSaved()
+  commit(incoming, { fromRenderer: true })
+  afterSave()
 })
 ipcMain.handle('tidi:telegram-test', () => telegram.test())
 

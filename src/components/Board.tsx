@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import type { Status, Task } from '../lib/types'
-import { STATUSES } from '../lib/tasks'
+import { STATUSES, type Status, type Task } from '../lib/types'
 import { formatDue, isOverdue } from '../lib/dates'
 import { useLang, useT } from '../lib/useT'
 

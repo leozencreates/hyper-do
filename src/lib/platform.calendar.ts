@@ -5,6 +5,7 @@
  */
 import { CalendarSync } from './calsync'
 import { buildAuthUrl, exchangeCode, pkcePair, randomToken } from './gcal'
+import { createEmitter } from './emitter'
 import type { AppData, CalendarApi, CalendarEvent, CalendarStatus } from './types'
 
 const STATE_KEY = 'hyperdo-calendar'
@@ -16,8 +17,8 @@ export function webRedirectUri(): string {
 }
 
 export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: AppData) => AppData) => void, opts: { googleSupported: boolean }) {
-  const evListeners = new Set<(e: CalendarEvent[]) => void>()
-  const stListeners = new Set<(s: CalendarStatus) => void>()
+  const events = createEmitter<CalendarEvent[]>()
+  const status = createEmitter<CalendarStatus>()
 
   const sync = new CalendarSync({
     getData,
@@ -36,8 +37,8 @@ export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: A
         /* quota */
       }
     },
-    onEvents: (e) => evListeners.forEach((cb) => cb(e)),
-    onStatus: (s) => stListeners.forEach((cb) => cb(s)),
+    onEvents: events.emit,
+    onStatus: status.emit,
     googleSupported: opts.googleSupported,
   })
 
@@ -95,14 +96,8 @@ export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: A
     async syncNow() {
       await sync.sync()
     },
-    onEvents(cb) {
-      evListeners.add(cb)
-      return () => evListeners.delete(cb)
-    },
-    onStatus(cb) {
-      stListeners.add(cb)
-      return () => stListeners.delete(cb)
-    },
+    onEvents: events.on,
+    onStatus: status.on,
   }
 
   return { api, sync, handleRedirect }

@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { CalendarFeed, Settings, Task } from '../lib/types'
 import type { CalendarState } from '../lib/useCalendar'
 import { platform } from '../lib/platform'
 import { uid } from '../lib/tasks'
 import { relativeMinutes } from '../lib/dates'
-import { downloadAllTasksIcs } from '../lib/calendar-links'
+import { downloadAllTasksIcs } from '../lib/download'
 import { webRedirectUri } from '../lib/platform.calendar'
+import { useNow } from '../lib/hooks'
 import { useLang, useT } from '../lib/useT'
+import Toggle from './Toggle'
 
 interface Props {
   settings: Settings
@@ -31,12 +33,7 @@ export default function CalendarSettings({ settings, tasks, cal, onChange }: Pro
 
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
-  const [tick, setTick] = useState(0)
-  useEffect(() => {
-    const h = setInterval(() => setTick((x) => x + 1), 30_000)
-    return () => clearInterval(h)
-  }, [])
-  void tick
+  const now = useNow(30_000) // keeps the "synced x min ago" line fresh
 
   const connect = async () => {
     if (!cal.api) return
@@ -48,7 +45,7 @@ export default function CalendarSettings({ settings, tasks, cal, onChange }: Pro
   }
 
   const googleError = g?.error === 'reconnect' ? t('cal_reconnect') : g?.error ? t('cal_error', { e: g.error }) : null
-  const syncLine = status?.syncing ? t('cal_syncing') : status?.syncedAt ? t('cal_synced', { t: relativeMinutes(Date.now() - status.syncedAt, lang) }) : t('cal_never')
+  const syncLine = status?.syncing ? t('cal_syncing') : status?.syncedAt ? t('cal_synced', { t: relativeMinutes(now - status.syncedAt, lang) }) : t('cal_never')
 
   return (
     <div className="cal-settings">
@@ -214,17 +211,5 @@ function AddFeed({ onAdd, nextColor }: { onAdd(f: CalendarFeed): void; nextColor
         {t('add')}
       </button>
     </div>
-  )
-}
-
-function Toggle({ checked, onChange, label, desc }: { checked: boolean; onChange(v: boolean): void; label: string; desc: string }) {
-  return (
-    <label className="toggle">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>
-        <b>{label}</b>
-        <small>{desc}</small>
-      </span>
-    </label>
   )
 }

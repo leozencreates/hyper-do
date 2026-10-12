@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Task } from '../lib/types'
-import { calendarLink, downloadTaskIcs, type LinkKind } from '../lib/calendar-links'
+import { calendarLink, type LinkKind } from '../lib/calendar-links'
+import { downloadTaskIcs } from '../lib/download'
 import { useT } from '../lib/useT'
 
 const LINKS: { kind: LinkKind; key: 'cal_link_google' | 'cal_link_outlook' | 'cal_link_office' | 'cal_link_yahoo'; icon: string }[] = [

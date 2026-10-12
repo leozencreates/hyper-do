@@ -2,54 +2,43 @@
  * Tarayıcı / PWA uyarlaması: localStorage + Web Notification.
  * Hatırlatmalar yalnızca sekme ya da ana ekrana eklenmiş uygulama açıkken gelir.
  */
-import { DEFAULT_SETTINGS, type AppData, type HyperDoApi } from './types'
+import type { AppData, HyperDoApi, NotifyPermission } from './types'
 import { buildNotification, collectDueReminders, syncCounters } from './reminder'
-import { detectLang, translate } from './i18n'
-import { normalizeCalendarSettings } from './calsync'
+import { translate } from './i18n'
+import { browserDefaultSettings, parseAppData, DATA_STORAGE_KEY } from './data'
+import { createEmitter } from './emitter'
 import { createBrowserCalendar } from './platform.calendar'
 
-const STORAGE_KEY = 'hyperdo-data'
-
-export function parseStored(raw: string | null): AppData {
-  const base: AppData = { tasks: [], settings: { ...DEFAULT_SETTINGS, language: detectLang() } }
-  if (!raw) return base
-  try {
-    const parsed = JSON.parse(raw) as Partial<AppData>
-    const settings = { ...base.settings, ...(parsed.settings ?? {}) }
-    return {
-      tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
-      settings: { ...settings, calendar: normalizeCalendarSettings(settings.calendar) },
-    }
-  } catch {
-    return base
-  }
-}
-
 export function createWebApi(): HyperDoApi {
-  let data: AppData = parseStored(null)
+  const defaults = browserDefaultSettings()
+  let data: AppData = parseAppData(null, defaults)
   const lastNotified = new Map<string, number>()
-  const focusListeners = new Set<(id: string) => void>()
-  const remindListeners = new Set<(id: string) => void>()
-  const dataListeners = new Set<(d: AppData) => void>()
+  const focus = createEmitter<string>()
+  const reminded = createEmitter<string>()
+  const changed = createEmitter<AppData>()
+
+  function persist() {
+    try {
+      localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(data))
+    } catch {
+      /* kota dolu vb. */
+    }
+  }
 
   /** Platform-side change (calendar import): save and tell the UI, like the Electron main process does. */
   function mutate(fn: (d: AppData) => AppData) {
     const next = fn(data)
     syncCounters(data.tasks, next.tasks, lastNotified)
     data = next
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    } catch {
-      /* kota */
-    }
-    dataListeners.forEach((cb) => cb(data))
+    persist()
+    changed.emit(data)
   }
 
   // Google login needs a real http(s) origin to redirect back to (not file://).
   const calendar = createBrowserCalendar(() => data, mutate, { googleSupported: location.protocol.startsWith('http') })
   const hasNotif = typeof Notification !== 'undefined'
 
-  const permission = (): ReturnType<HyperDoApi['permission']> => (hasNotif ? Notification.permission : 'unsupported')
+  const permission = (): NotifyPermission => (hasNotif ? Notification.permission : 'unsupported')
 
   function show(title: string, body: string, tag: string, onClick?: () => void) {
     if (permission() !== 'granted') return
@@ -70,8 +59,8 @@ export function createWebApi(): HyperDoApi {
     const hits = collectDueReminders(data.tasks, data.settings, lastNotified)
     for (const h of hits) {
       const { title, body } = buildNotification(h.task, h.overdue, data.settings)
-      show(title, body, 'hyperdo-' + h.task.id, () => focusListeners.forEach((cb) => cb(h.task.id)))
-      remindListeners.forEach((cb) => cb(h.task.id))
+      show(title, body, 'hyperdo-' + h.task.id, () => focus.emit(h.task.id))
+      reminded.emit(h.task.id)
       document.title = `🔔 ${h.task.title} – Hyper Do`
       setTimeout(() => (document.title = 'Hyper Do'), 15_000)
     }
@@ -79,7 +68,7 @@ export function createWebApi(): HyperDoApi {
 
   navigator.serviceWorker?.addEventListener('message', (e) => {
     const tag = e.data?.tag as string | undefined
-    if (tag?.startsWith('hyperdo-')) focusListeners.forEach((cb) => cb(tag.slice(8)))
+    if (tag?.startsWith('hyperdo-')) focus.emit(tag.slice(8))
   })
 
   setInterval(tick, 30_000)
@@ -93,7 +82,7 @@ export function createWebApi(): HyperDoApi {
     kind: 'web',
     async load() {
       try {
-        data = parseStored(localStorage.getItem(STORAGE_KEY))
+        data = parseAppData(localStorage.getItem(DATA_STORAGE_KEY), defaults)
       } catch {
         /* localStorage erişilemez */
       }
@@ -105,11 +94,7 @@ export function createWebApi(): HyperDoApi {
     async save(incoming) {
       syncCounters(data.tasks, incoming.tasks, lastNotified)
       data = incoming
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-      } catch {
-        /* kota dolu vb. */
-      }
+      persist()
       calendar.sync.onDataSaved()
     },
     calendar: calendar.api,
@@ -125,17 +110,8 @@ export function createWebApi(): HyperDoApi {
         return permission()
       }
     },
-    onFocusTask(cb) {
-      focusListeners.add(cb)
-      return () => focusListeners.delete(cb)
-    },
-    onReminded(cb) {
-      remindListeners.add(cb)
-      return () => remindListeners.delete(cb)
-    },
-    onDataChanged(cb) {
-      dataListeners.add(cb)
-      return () => dataListeners.delete(cb)
-    },
+    onFocusTask: focus.on,
+    onReminded: reminded.on,
+    onDataChanged: changed.on,
   }
 }

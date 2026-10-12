@@ -15,6 +15,7 @@
  */
 import type { Lang } from './i18n'
 import type { Priority } from './types'
+import { DAY, endOfDay, startOfDay } from './dates'
 
 export interface ParsedQuickAdd {
   title: string
@@ -69,7 +70,7 @@ export function parseQuickAdd(input: string, _lang: Lang, now = Date.now()): Par
       continue
     }
     if (TOMORROW.includes(w)) {
-      day = startOf(now + 86_400_000)
+      day = startOf(now + DAY)
       continue
     }
     if (w in WEEKDAYS) {
@@ -96,18 +97,17 @@ export function parseQuickAdd(input: string, _lang: Lang, now = Date.now()): Par
 
   if (day || time) {
     const d = day ?? startOf(now)
-    if (time) d.setHours(time.h, time.m, 0, 0)
-    else d.setHours(23, 59, 0, 0)
-    if (!day && time && d.getTime() <= now) d.setDate(d.getDate() + 1) // "18:00" ve saat geçmişse yarın
-    out.dueAt = d.getTime()
+    if (time) {
+      d.setHours(time.h, time.m, 0, 0)
+      if (!day && d.getTime() <= now) d.setDate(d.getDate() + 1) // "18:00" ve saat geçmişse yarın
+      out.dueAt = d.getTime()
+    } else {
+      out.dueAt = endOfDay(d.getTime())
+    }
   }
 
   out.title = kept.join(' ').trim()
   return out
 }
 
-function startOf(ts: number): Date {
-  const d = new Date(ts)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
+const startOf = (ts: number): Date => new Date(startOfDay(ts))

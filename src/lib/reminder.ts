@@ -4,6 +4,7 @@
  */
 import type { Settings, Task } from './types'
 import { funTitle, translate } from './i18n'
+import { priorityIcon } from './tasks'
 
 export interface ReminderHit {
   task: Task
@@ -56,10 +57,6 @@ export function syncCounters(prev: Task[], next: Task[], lastNotified: Map<strin
     if (p && p.snoozedUntil !== t.snoozedUntil) lastNotified.delete(t.id)
     if (!p) lastNotified.set(t.id, nowMs)
   }
-}
-
-function priorityIcon(p: Task['priority']) {
-  return p === 'high' ? '🔴' : p === 'medium' ? '🟠' : '🟢'
 }
 
 export function buildNotification(task: Task, overdue: boolean, settings: Settings, nowMs = Date.now()): { title: string; body: string } {

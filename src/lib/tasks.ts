@@ -2,13 +2,15 @@
  * Platformdan bağımsız görev yardımcıları (React içermez).
  * Electron ana süreci (Telegram botu) ve arayüz aynı mantığı kullanır.
  */
-import type { Settings, SortMode, Status, Task } from './types'
+import { STATUSES, type Priority, type Settings, type SortMode, type Status, type Task } from './types'
 import { nextOccurrence } from './dates'
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
 
-export const STATUSES: Status[] = ['todo', 'doing', 'waiting']
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
+const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 }
+
+/** Bildirim ve Telegram metinlerinde Ã¶ncelik iÅŸareti. */
+export const priorityIcon = (p: Priority) => (p === 'high' ? 'ğŸ”´' : p === 'medium' ? 'ğŸŸ ' : 'ğŸŸ¢')
 
 export function newTask(partial: Partial<Task>, settings: Settings): Task {
   const now = Date.now()

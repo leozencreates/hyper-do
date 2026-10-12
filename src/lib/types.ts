@@ -6,6 +6,15 @@ export type Recurrence = 'none' | 'daily' | 'weekdays' | 'weekly' | 'monthly'
 export type Status = 'todo' | 'doing' | 'waiting'
 export type SortMode = 'smart' | 'due' | 'priority' | 'created' | 'alpha' | 'manual'
 export type Theme = 'dark' | 'light' | 'system'
+/** Web/Android: bildirim izni durumu. Electron: her zaman 'granted'. */
+export type NotifyPermission = 'granted' | 'denied' | 'default' | 'unsupported'
+
+// Seçenek listeleri (arayüzdeki sıra ile)
+export const PRIORITIES: Priority[] = ['high', 'medium', 'low']
+export const RECURRENCES: Recurrence[] = ['none', 'daily', 'weekdays', 'weekly', 'monthly']
+export const STATUSES: Status[] = ['todo', 'doing', 'waiting']
+export const SORT_MODES: SortMode[] = ['smart', 'due', 'priority', 'created', 'alpha', 'manual']
+export const THEMES: Theme[] = ['dark', 'light', 'system']
 
 export interface Subtask {
   id: string
@@ -179,9 +188,8 @@ export interface HyperDoApi {
   load(): Promise<AppData>
   save(data: AppData): Promise<void>
   notifyTest(): Promise<void>
-  /** Web: bildirim izni durumu. Electron: her zaman 'granted'. */
-  permission(): 'granted' | 'denied' | 'default' | 'unsupported'
-  requestPermission(): Promise<'granted' | 'denied' | 'default' | 'unsupported'>
+  permission(): NotifyPermission
+  requestPermission(): Promise<NotifyPermission>
   onFocusTask(cb: (taskId: string) => void): () => void
   onReminded(cb: (taskId: string) => void): () => void
   /** Platform veriyi kendisi değiştirdiyse (Telegram komutu, takvimden içe aktarma) arayüzü günceller. */

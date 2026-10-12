@@ -1,5 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+/** Subscribes to a main → renderer channel; returns the unsubscribe function expected by HyperDoApi. */
+const listen =
+  <T>(channel: string) =>
+  (cb: (value: T) => void) => {
+    const h = (_: unknown, value: T) => cb(value)
+    ipcRenderer.on(channel, h)
+    return () => ipcRenderer.removeListener(channel, h)
+  }
+
 contextBridge.exposeInMainWorld('tidi', {
   kind: 'electron',
   load: () => ipcRenderer.invoke('tidi:load'),
@@ -8,21 +17,9 @@ contextBridge.exposeInMainWorld('tidi', {
   telegramTest: () => ipcRenderer.invoke('tidi:telegram-test'),
   permission: () => 'granted',
   requestPermission: async () => 'granted',
-  onFocusTask: (cb: (id: string) => void) => {
-    const h = (_: unknown, id: string) => cb(id)
-    ipcRenderer.on('tidi:focus-task', h)
-    return () => ipcRenderer.removeListener('tidi:focus-task', h)
-  },
-  onReminded: (cb: (id: string) => void) => {
-    const h = (_: unknown, id: string) => cb(id)
-    ipcRenderer.on('tidi:reminded', h)
-    return () => ipcRenderer.removeListener('tidi:reminded', h)
-  },
-  onDataChanged: (cb: (data: unknown) => void) => {
-    const h = (_: unknown, d: unknown) => cb(d)
-    ipcRenderer.on('tidi:data-changed', h)
-    return () => ipcRenderer.removeListener('tidi:data-changed', h)
-  },
+  onFocusTask: listen<string>('tidi:focus-task'),
+  onReminded: listen<string>('tidi:reminded'),
+  onDataChanged: listen<unknown>('tidi:data-changed'),
   // Takvim köprüsü: senkron ana süreçte çalışır (pencere kapalıyken de), arayüz yalnızca dinler.
   calendar: {
     status: () => ipcRenderer.invoke('tidi:cal-status'),
@@ -30,15 +27,7 @@ contextBridge.exposeInMainWorld('tidi', {
     connectGoogle: () => ipcRenderer.invoke('tidi:cal-connect'),
     disconnectGoogle: () => ipcRenderer.invoke('tidi:cal-disconnect'),
     syncNow: () => ipcRenderer.invoke('tidi:cal-sync'),
-    onEvents: (cb: (events: unknown) => void) => {
-      const h = (_: unknown, e: unknown) => cb(e)
-      ipcRenderer.on('tidi:cal-events', h)
-      return () => ipcRenderer.removeListener('tidi:cal-events', h)
-    },
-    onStatus: (cb: (status: unknown) => void) => {
-      const h = (_: unknown, s: unknown) => cb(s)
-      ipcRenderer.on('tidi:cal-status', h)
-      return () => ipcRenderer.removeListener('tidi:cal-status', h)
-    },
+    onEvents: listen<unknown>('tidi:cal-events'),
+    onStatus: listen<unknown>('tidi:cal-status'),
   },
 })

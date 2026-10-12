@@ -1,26 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DEFAULT_SETTINGS, type AppData, type Settings, type Task } from './types'
-import { normalizeCalendarSettings } from './calsync'
+import type { AppData, Settings, Task } from './types'
+import { normalizeData } from './data'
 import { platform } from './platform'
-
-import { normalizeTask } from './tasks'
-
-export { uid, newTask, completeTask } from './tasks'
-
-/** Diskten/ana süreçten gelen veriyi tamamlar (eski kayıtlarda eksik alanlar, varsayılan ayarlar). */
-export function normalizeData(d: AppData): AppData {
-  return {
-    tasks: (Array.isArray(d.tasks) ? d.tasks : []).map(normalizeTask),
-    settings: {
-      ...DEFAULT_SETTINGS,
-      ...d.settings,
-      quietHours: { ...DEFAULT_SETTINGS.quietHours, ...d.settings?.quietHours },
-      telegram: { ...DEFAULT_SETTINGS.telegram, ...d.settings?.telegram },
-      pomodoro: { ...DEFAULT_SETTINGS.pomodoro, ...d.settings?.pomodoro },
-      calendar: normalizeCalendarSettings(d.settings?.calendar),
-    },
-  }
-}
 
 export function useAppData() {
   const [data, setData] = useState<AppData | null>(null)
@@ -64,3 +45,5 @@ export function useAppData() {
 
   return { data, setTasks, setSettings, replaceData }
 }
+
+export type AppStore = ReturnType<typeof useAppData>

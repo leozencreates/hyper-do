@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import type { AppData, Settings, SortMode, Theme } from '../lib/types'
+import { useRef, useState } from 'react'
+import { SORT_MODES, THEMES, type AppData, type Settings, type SortMode } from '../lib/types'
 import { LANGS, type Lang } from '../lib/i18n'
 import { platform } from '../lib/platform'
 import { useT } from '../lib/useT'
 import type { CalendarState } from '../lib/useCalendar'
+import { dateStamp, downloadJson } from '../lib/download'
 import CalendarSettings from './CalendarSettings'
+import Modal from './Modal'
+import Toggle from './Toggle'
 
 interface Props {
   settings: Settings
@@ -15,126 +18,113 @@ interface Props {
   onClose(): void
 }
 
-const THEMES: Theme[] = ['dark', 'light', 'system']
-const SORTS: SortMode[] = ['smart', 'due', 'priority', 'created', 'alpha', 'manual']
-
 export default function SettingsPanel({ settings, data, cal, onChange, onImport, onClose }: Props) {
   const t = useT()
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...settings, [k]: v })
   const isElectron = platform.kind === 'electron'
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
-
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>{t('settings')}</h2>
-
-        <div className="field">
-          <span>{t('s_language')}</span>
-          <div className="seg">
-            {LANGS.map((l) => (
-              <button key={l.key} type="button" className={settings.language === l.key ? 'seg-btn active lang' : 'seg-btn'} onClick={() => set('language', l.key as Lang)}>
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="field">
-          <span>{t('s_theme')}</span>
-          <div className="seg">
-            {THEMES.map((th) => (
-              <button key={th} type="button" className={settings.theme === th ? 'seg-btn active lang' : 'seg-btn'} onClick={() => set('theme', th)}>
-                {t(`theme_${th}` as const)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <label className="field">
-          <span>{t('s_sort')}</span>
-          <select value={settings.sort} onChange={(e) => set('sort', e.target.value as SortMode)}>
-            {SORTS.map((s) => (
-              <option key={s} value={s}>
-                {t(`sort_${s}` as const)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span>{t('s_default_interval')}</span>
-          <select value={settings.defaultRemindEveryMin} onChange={(e) => set('defaultRemindEveryMin', Number(e.target.value))}>
-            {[5, 10, 15, 20, 30, 45, 60, 120].map((m) => (
-              <option key={m} value={m}>
-                {m < 60 ? t('minutes', { n: m }) : t('hours', { n: m / 60 })}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="field">
-          <span>{t('s_pomodoro')}</span>
-          <div className="row pomodoro-row">
-            <label className="pomo">
-              <small>{t('s_work')}</small>
-              <input type="number" min={5} max={180} value={settings.pomodoro.workMin} onChange={(e) => set('pomodoro', { ...settings.pomodoro, workMin: Math.max(1, Number(e.target.value) || 40) })} />
-            </label>
-            <label className="pomo">
-              <small>{t('s_break')}</small>
-              <input type="number" min={1} max={60} value={settings.pomodoro.breakMin} onChange={(e) => set('pomodoro', { ...settings.pomodoro, breakMin: Math.max(1, Number(e.target.value) || 5) })} />
-            </label>
-            <span className="hint">{t('s_pomodoro_d')}</span>
-          </div>
-        </div>
-
-        <Toggle checked={settings.funTitles} onChange={(v) => set('funTitles', v)} label={t('s_fun')} desc={t('s_fun_d')} />
-        <Toggle checked={settings.escalateOverdue} onChange={(v) => set('escalateOverdue', v)} label={t('s_escalate')} desc={t('s_escalate_d')} />
-        {isElectron && <Toggle checked={settings.flashWindow} onChange={(v) => set('flashWindow', v)} label={t('s_flash')} desc={t('s_flash_d')} />}
-        {isElectron && <Toggle checked={settings.showWindowOnRemind} onChange={(v) => set('showWindowOnRemind', v)} label={t('s_show')} desc={t('s_show_d')} />}
-        <Toggle
-          checked={settings.quietHours.enabled}
-          onChange={(v) => set('quietHours', { ...settings.quietHours, enabled: v })}
-          label={t('s_quiet')}
-          desc={t('s_quiet_d')}
-        />
-        {settings.quietHours.enabled && (
-          <div className="row indent">
-            <input type="time" value={settings.quietHours.from} onChange={(e) => set('quietHours', { ...settings.quietHours, from: e.target.value })} />
-            <span>→</span>
-            <input type="time" value={settings.quietHours.to} onChange={(e) => set('quietHours', { ...settings.quietHours, to: e.target.value })} />
-          </div>
-        )}
-
-        {isElectron && <TelegramSection settings={settings} onChange={onChange} />}
-
-        {cal.available && <CalendarSettings settings={settings} tasks={data.tasks} cal={cal} onChange={onChange} />}
-
-        <BackupSection data={data} onImport={onImport} />
-
-        <div className="field">
-          <span>{t('s_shortcuts')}</span>
-          <p className="hint">{t('s_shortcuts_d')}</p>
-        </div>
-
-        {platform.kind === 'web' && <p className="hint">{t('web_note')}</p>}
-        {platform.kind === 'capacitor' && <p className="hint">{t('android_note')}</p>}
-
-        <div className="modal-actions">
-          <button className="ghost" onClick={() => void platform.notifyTest()}>
-            {t('test_notif')}
-          </button>
-          <button className="primary" onClick={onClose}>
-            {t('ok')}
-          </button>
+    <Modal title={t('settings')} onClose={onClose}>
+      <div className="field">
+        <span>{t('s_language')}</span>
+        <div className="seg">
+          {LANGS.map((l) => (
+            <button key={l.key} type="button" className={settings.language === l.key ? 'seg-btn active lang' : 'seg-btn'} onClick={() => set('language', l.key as Lang)}>
+              {l.label}
+            </button>
+          ))}
         </div>
       </div>
-    </div>
+
+      <div className="field">
+        <span>{t('s_theme')}</span>
+        <div className="seg">
+          {THEMES.map((th) => (
+            <button key={th} type="button" className={settings.theme === th ? 'seg-btn active lang' : 'seg-btn'} onClick={() => set('theme', th)}>
+              {t(`theme_${th}` as const)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="field">
+        <span>{t('s_sort')}</span>
+        <select value={settings.sort} onChange={(e) => set('sort', e.target.value as SortMode)}>
+          {SORT_MODES.map((s) => (
+            <option key={s} value={s}>
+              {t(`sort_${s}` as const)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="field">
+        <span>{t('s_default_interval')}</span>
+        <select value={settings.defaultRemindEveryMin} onChange={(e) => set('defaultRemindEveryMin', Number(e.target.value))}>
+          {[5, 10, 15, 20, 30, 45, 60, 120].map((m) => (
+            <option key={m} value={m}>
+              {m < 60 ? t('minutes', { n: m }) : t('hours', { n: m / 60 })}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="field">
+        <span>{t('s_pomodoro')}</span>
+        <div className="row pomodoro-row">
+          <label className="pomo">
+            <small>{t('s_work')}</small>
+            <input type="number" min={5} max={180} value={settings.pomodoro.workMin} onChange={(e) => set('pomodoro', { ...settings.pomodoro, workMin: Math.max(1, Number(e.target.value) || 40) })} />
+          </label>
+          <label className="pomo">
+            <small>{t('s_break')}</small>
+            <input type="number" min={1} max={60} value={settings.pomodoro.breakMin} onChange={(e) => set('pomodoro', { ...settings.pomodoro, breakMin: Math.max(1, Number(e.target.value) || 5) })} />
+          </label>
+          <span className="hint">{t('s_pomodoro_d')}</span>
+        </div>
+      </div>
+
+      <Toggle checked={settings.funTitles} onChange={(v) => set('funTitles', v)} label={t('s_fun')} desc={t('s_fun_d')} />
+      <Toggle checked={settings.escalateOverdue} onChange={(v) => set('escalateOverdue', v)} label={t('s_escalate')} desc={t('s_escalate_d')} />
+      {isElectron && <Toggle checked={settings.flashWindow} onChange={(v) => set('flashWindow', v)} label={t('s_flash')} desc={t('s_flash_d')} />}
+      {isElectron && <Toggle checked={settings.showWindowOnRemind} onChange={(v) => set('showWindowOnRemind', v)} label={t('s_show')} desc={t('s_show_d')} />}
+      <Toggle
+        checked={settings.quietHours.enabled}
+        onChange={(v) => set('quietHours', { ...settings.quietHours, enabled: v })}
+        label={t('s_quiet')}
+        desc={t('s_quiet_d')}
+      />
+      {settings.quietHours.enabled && (
+        <div className="row indent">
+          <input type="time" value={settings.quietHours.from} onChange={(e) => set('quietHours', { ...settings.quietHours, from: e.target.value })} />
+          <span>→</span>
+          <input type="time" value={settings.quietHours.to} onChange={(e) => set('quietHours', { ...settings.quietHours, to: e.target.value })} />
+        </div>
+      )}
+
+      {isElectron && <TelegramSection settings={settings} onChange={onChange} />}
+
+      {cal.available && <CalendarSettings settings={settings} tasks={data.tasks} cal={cal} onChange={onChange} />}
+
+      <BackupSection data={data} onImport={onImport} />
+
+      <div className="field">
+        <span>{t('s_shortcuts')}</span>
+        <p className="hint">{t('s_shortcuts_d')}</p>
+      </div>
+
+      {platform.kind === 'web' && <p className="hint">{t('web_note')}</p>}
+      {platform.kind === 'capacitor' && <p className="hint">{t('android_note')}</p>}
+
+      <div className="modal-actions">
+        <button className="ghost" onClick={() => void platform.notifyTest()}>
+          {t('test_notif')}
+        </button>
+        <button className="primary" onClick={onClose}>
+          {t('ok')}
+        </button>
+      </div>
+    </Modal>
   )
 }
 
@@ -145,14 +135,7 @@ function BackupSection({ data, onImport }: { data: AppData; onImport(d: AppData)
   const [pending, setPending] = useState<AppData | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `hyperdo-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-  }
+  const exportJson = () => downloadJson(`hyperdo-backup-${dateStamp()}.json`, data)
 
   const pick = async (file: File | undefined) => {
     if (!file) return
@@ -247,17 +230,5 @@ function TelegramSection({ settings, onChange }: { settings: Settings; onChange(
         </div>
       )}
     </div>
-  )
-}
-
-function Toggle({ checked, onChange, label, desc }: { checked: boolean; onChange(v: boolean): void; label: string; desc: string }) {
-  return (
-    <label className="toggle">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>
-        <b>{label}</b>
-        <small>{desc}</small>
-      </span>
-    </label>
   )
 }

@@ -6,13 +6,13 @@
 import { App as CapApp } from '@capacitor/app'
 import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/local-notifications'
 import { Preferences } from '@capacitor/preferences'
-import { type AppData, type HyperDoApi } from './types'
+import type { AppData, HyperDoApi, NotifyPermission } from './types'
 import { buildNotification, planReminderTimes } from './reminder'
 import { translate } from './i18n'
-import { parseStored } from './platform.web'
+import { browserDefaultSettings, parseAppData, DATA_STORAGE_KEY } from './data'
+import { createEmitter } from './emitter'
 import { createBrowserCalendar } from './platform.calendar'
 
-const STORAGE_KEY = 'hyperdo-data'
 const PER_TASK_MAX = 48 // görev başına en fazla planlanan bildirim
 const TOTAL_MAX = 400 // Android alarm sınırının (500) altında kal
 const HORIZON_MS = 48 * 3_600_000 // 48 saat ileriye planla
@@ -26,20 +26,23 @@ function hashId(s: string): number {
 }
 
 export function createCapacitorApi(): HyperDoApi {
-  let data: AppData = parseStored(null)
-  const focusListeners = new Set<(id: string) => void>()
-  const remindListeners = new Set<(id: string) => void>()
-  const dataListeners = new Set<(d: AppData) => void>()
-  let perm: ReturnType<HyperDoApi['permission']> = 'default'
+  const defaults = browserDefaultSettings()
+  let data: AppData = parseAppData(null, defaults)
+  const focus = createEmitter<string>()
+  const reminded = createEmitter<string>()
+  const changed = createEmitter<AppData>()
+  let perm: NotifyPermission = 'default'
   let scheduling: Promise<void> | null = null
+
+  const persist = () => Preferences.set({ key: DATA_STORAGE_KEY, value: JSON.stringify(data) }).catch(() => {})
 
   // Google blocks OAuth inside Android WebViews, so only ICS feeds are offered here; CapacitorHttp lifts CORS for them.
   const calendar = createBrowserCalendar(
     () => data,
     (fn) => {
       data = fn(data)
-      void Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(data) }).catch(() => {})
-      dataListeners.forEach((cb) => cb(data))
+      void persist()
+      changed.emit(data)
       void reschedule()
     },
     { googleSupported: false },
@@ -96,12 +99,12 @@ export function createCapacitorApi(): HyperDoApi {
   // Bildirime dokunuldu → görevi vurgula
   LocalNotifications.addListener('localNotificationActionPerformed', (e) => {
     const id = e.notification.extra?.taskId as string | undefined
-    if (id) focusListeners.forEach((cb) => cb(id))
+    if (id) focus.emit(id)
   })
   // Uygulama açıkken bildirim geldi → listede vurgula
   LocalNotifications.addListener('localNotificationReceived', (n) => {
     const id = n.extra?.taskId as string | undefined
-    if (id) remindListeners.forEach((cb) => cb(id))
+    if (id) reminded.emit(id)
   })
   // Öne gelince planı tazele (geçen süre kadar ileriye uzat)
   CapApp.addListener('appStateChange', ({ isActive }) => {
@@ -112,8 +115,8 @@ export function createCapacitorApi(): HyperDoApi {
     kind: 'capacitor',
     async load() {
       try {
-        const { value } = await Preferences.get({ key: STORAGE_KEY })
-        data = parseStored(value)
+        const { value } = await Preferences.get({ key: DATA_STORAGE_KEY })
+        data = parseAppData(value, defaults)
       } catch {
         /* varsayılan */
       }
@@ -124,11 +127,7 @@ export function createCapacitorApi(): HyperDoApi {
     },
     async save(incoming) {
       data = incoming
-      try {
-        await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(data) })
-      } catch {
-        /* yoksay */
-      }
+      await persist()
       void reschedule()
       calendar.sync.onDataSaved()
     },
@@ -151,17 +150,8 @@ export function createCapacitorApi(): HyperDoApi {
       if (perm === 'granted') void reschedule()
       return perm
     },
-    onFocusTask(cb) {
-      focusListeners.add(cb)
-      return () => focusListeners.delete(cb)
-    },
-    onReminded(cb) {
-      remindListeners.add(cb)
-      return () => remindListeners.delete(cb)
-    },
-    onDataChanged(cb) {
-      dataListeners.add(cb)
-      return () => dataListeners.delete(cb)
-    },
+    onFocusTask: focus.on,
+    onReminded: reminded.on,
+    onDataChanged: changed.on,
   }
 }

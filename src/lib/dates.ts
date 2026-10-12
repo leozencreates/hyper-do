@@ -9,6 +9,22 @@ export function startOfDay(ts: number): number {
   return d.getTime()
 }
 
+/**
+ * 23:59 of the day containing `ts`: the due time of "whole day" tasks
+ * (quick add "today", imported all-day events). See also `isEndOfDay`.
+ */
+export function endOfDay(ts: number): number {
+  const d = new Date(ts)
+  d.setHours(23, 59, 0, 0)
+  return d.getTime()
+}
+
+/** True for a due time produced by `endOfDay`; such tasks are mirrored to calendars as all-day events. */
+export function isEndOfDay(ts: number): boolean {
+  const d = new Date(ts)
+  return d.getHours() === 23 && d.getMinutes() === 59
+}
+
 export function isToday(ts: number, now = Date.now()): boolean {
   return startOfDay(ts) === startOfDay(now)
 }

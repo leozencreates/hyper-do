@@ -8,7 +8,7 @@
  * Harici kütüphane yok; Node 18+ global fetch yeter.
  */
 import type { AppData, Task } from '../src/lib/types'
-import { completeTask, newTask, openTasksSorted } from '../src/lib/tasks'
+import { completeTask, newTask, openTasksSorted, priorityIcon } from '../src/lib/tasks'
 import { translate, type Key } from '../src/lib/i18n'
 import { formatDue } from '../src/lib/dates'
 
@@ -28,8 +28,6 @@ interface InlineButton {
   text: string
   callback_data: string
 }
-
-const priorityIcon = (p: Task['priority']) => (p === 'high' ? '🔴' : p === 'medium' ? '🟠' : '🟢')
 
 export class TelegramBot {
   private host: TelegramHost
@@ -222,11 +220,17 @@ export class TelegramBot {
   private async handleCallback(q: NonNullable<TgUpdate['callback_query']>) {
     const chat = q.message ? String(q.message.chat.id) : ''
     const ack = (text?: string) => this.api('answerCallbackQuery', { callback_query_id: q.id, text }).catch(() => {})
-    if (!q.data || chat !== this.linkedChat) return ack()
+    if (!q.data || chat !== this.linkedChat) {
+      await ack()
+      return
+    }
 
     const [action, id, extra] = q.data.split(':')
     const task = this.host.getData().tasks.find((x) => x.id === id)
-    if (!task) return ack(this.t('tg_bad_index'))
+    if (!task) {
+      await ack(this.t('tg_bad_index'))
+      return
+    }
 
     let result = ''
     if (action === 'done') {

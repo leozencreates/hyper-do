@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useAppData, newTask, completeTask } from './lib/store'
-import { duplicateTask, matchesQuery, reorderTasks, sortTasks } from './lib/tasks'
-import { parseQuickAdd } from './lib/parse'
-import type { SortMode, Status, Task } from './lib/types'
-import { isOverdue, isToday, isThisWeek, DAY } from './lib/dates'
+import { useAppData, type AppStore } from './lib/store'
+import { newTask } from './lib/tasks'
+import { matchesQuery, sortTasks } from './lib/tasks'
+import { SORT_MODES, type AppData, type SortMode, type Task } from './lib/types'
+import { endOfDay, isOverdue, isToday, isThisWeek } from './lib/dates'
 import { platform } from './lib/platform'
 import { LangContext, useT } from './lib/useT'
 import { LANGS, type Lang } from './lib/i18n'
+import { useNow } from './lib/hooks'
+import { useTaskActions } from './lib/useTaskActions'
+import { useCalendar } from './lib/useCalendar'
 import TaskItem from './components/TaskItem'
 import TaskEditor from './components/TaskEditor'
 import FocusBanner from './components/FocusBanner'
@@ -15,11 +18,12 @@ import QuickAdd from './components/QuickAdd'
 import Board from './components/Board'
 import CalendarStrip from './components/CalendarStrip'
 import { HyperFocusBar, useHyperFocus } from './components/HyperFocus'
-import { useCalendar } from './lib/useCalendar'
 
 type View = 'today' | 'week' | 'all' | 'board' | 'done'
 const VIEW_KEYS: View[] = ['today', 'week', 'all', 'board', 'done']
-const SORTS: SortMode[] = ['smart', 'due', 'priority', 'created', 'alpha', 'manual']
+
+/** Time-dependent UI (overdue, "today") refreshes this often without user interaction. */
+const CLOCK_MS = 30_000
 
 export default function App() {
   const store = useAppData()
@@ -31,12 +35,15 @@ export default function App() {
   )
 }
 
-type MainProps = ReturnType<typeof useAppData> & { data: NonNullable<ReturnType<typeof useAppData>['data']> }
+type MainProps = AppStore & { data: AppData }
 
 function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
   const t = useT()
-  const hf = useHyperFocus(data.settings.pomodoro, data.settings.language)
+  const { tasks, settings } = data
+  const hf = useHyperFocus(settings.pomodoro, settings.language)
   const cal = useCalendar()
+  const now = useNow(CLOCK_MS)
+  const actions = useTaskActions({ tasks, settings, setTasks, setSettings })
   const [view, setView] = useState<View>(() => {
     const v = new URLSearchParams(location.search).get('view') as View | null
     return v && VIEW_KEYS.includes(v) ? v : 'today'
@@ -47,13 +54,10 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [highlight, setHighlight] = useState<string | null>(null)
   const [perm, setPerm] = useState(platform.permission())
-  const [undo, setUndo] = useState<{ task: Task; index: number } | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const quickRef = useRef<HTMLInputElement>(null)
-
-  const { tasks, settings } = data
 
   // Bildirime tıklanınca ilgili görevi vurgula
   useEffect(() => {
@@ -103,20 +107,12 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
     return () => window.removeEventListener('keydown', h)
   }, [editing, showSettings, settings])
 
-  // Geri alma bildirimi 6 sn sonra kaybolur
-  useEffect(() => {
-    if (!undo) return
-    const h = setTimeout(() => setUndo(null), 6000)
-    return () => clearTimeout(h)
-  }, [undo])
-
   const allTags = useMemo(() => {
     const s = new Set<string>()
     tasks.forEach((x) => x.tags.forEach((y) => s.add(y)))
     return [...s].sort()
   }, [tasks])
 
-  const now = Date.now()
   const filtered = useMemo(() => {
     let list = tasks
     if (view === 'done') list = list.filter((x) => x.completedAt !== null)
@@ -136,79 +132,21 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
   }, [filtered, view, settings.sort, now])
 
   const focusTask = tasks.find((x) => x.focused && x.completedAt === null) ?? null
+  const hfTask = hf.session?.taskId ? (tasks.find((x) => x.id === hf.session!.taskId) ?? null) : focusTask
   const openCount = tasks.filter((x) => x.completedAt === null).length
   const overdueCount = tasks.filter((x) => x.completedAt === null && isOverdue(x.dueAt, now)).length
   const doneToday = tasks.filter((x) => x.completedAt !== null && isToday(x.completedAt, now)).length
   const doneCount = tasks.length - openCount
 
-  const update = (id: string, patch: Partial<Task>) => setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, ...patch } : x)))
-  const remove = (id: string) => {
-    const index = tasks.findIndex((x) => x.id === id)
-    if (index < 0) return
-    setUndo({ task: tasks[index], index })
-    setTasks((ts) => ts.filter((x) => x.id !== id))
-  }
-  const undoDelete = () => {
-    if (!undo) return
-    const { task, index } = undo
-    setTasks((ts) => {
-      const out = [...ts]
-      out.splice(Math.min(index, out.length), 0, task)
-      return out
-    })
-    setUndo(null)
-  }
-  const complete = (id: string) => setTasks((ts) => completeTask(ts, id))
-  const reopen = (id: string) => update(id, { completedAt: null })
-  const setFocus = (id: string, on: boolean) => setTasks((ts) => ts.map((x) => ({ ...x, focused: x.id === id ? on : false })))
-  const snooze = (id: string, minutes: number) => update(id, { snoozedUntil: Date.now() + minutes * 60_000 })
-  const toggleSub = (task: Task, sid: string) => update(task.id, { subtasks: task.subtasks.map((s) => (s.id === sid ? { ...s, done: !s.done } : s)) })
-  const duplicate = (id: string) => setTasks((ts) => duplicateTask(ts, id, t('copy_suffix')))
-  const postpone = (task: Task) => {
-    if (task.dueAt === null) return
-    const base = Math.max(task.dueAt, now)
-    update(task.id, { dueAt: base + DAY, snoozedUntil: null })
-  }
   const clearDone = () => {
-    setTasks((ts) => ts.filter((x) => x.completedAt === null))
+    actions.clearDone()
     setConfirmClear(false)
   }
 
-  /** Hızlı ekleme: doğal dil ayrıştırılır ("yarın 18:00 fatura #ev !1 @30dk"). */
-  const quickAdd = (text: string, status: Status = 'todo') => {
-    const p = parseQuickAdd(text, settings.language)
-    if (!p.title) return
-    const nt = newTask(
-      {
-        title: p.title,
-        dueAt: p.dueAt ?? (view === 'today' ? endOfToday() : null),
-        priority: p.priority ?? 'medium',
-        tags: p.tags,
-        remindEveryMin: p.remindEveryMin ?? settings.defaultRemindEveryMin,
-        status,
-        order: Math.min(0, ...tasks.map((x) => x.order)) - 1000, // en üste
-      },
-      settings,
-    )
-    setTasks((ts) => [nt, ...ts])
-  }
-
-  /** Pano: kartı başka sütuna / sıraya taşı. "Bitti" sütununa bırakmak görevi tamamlar. */
-  const move = (id: string, to: Status | 'done', beforeId: string | null) => {
-    setTasks((ts) => {
-      const task = ts.find((x) => x.id === id)
-      if (!task) return ts
-      if (to === 'done') return task.completedAt !== null ? ts : completeTask(ts, id)
-      const reopened = task.completedAt !== null ? ts.map((x) => (x.id === id ? { ...x, completedAt: null } : x)) : ts
-      return reorderTasks(reopened, id, beforeId, to)
-    })
-  }
-
-  /** Liste görünümünde sürükleyerek sıralama; sıralama otomatik "Elle" moduna geçer. */
+  /** Liste görünümünde sürükleyerek sıralama. */
   const dropOn = (beforeId: string | null) => {
     if (!dragId) return
-    setTasks((ts) => reorderTasks(ts, dragId, beforeId))
-    if (settings.sort !== 'manual') setSettings((s) => ({ ...s, sort: 'manual' }))
+    actions.reorder(dragId, beforeId)
     setDragId(null)
   }
 
@@ -278,14 +216,14 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
           </div>
         )}
 
-        <HyperFocusBar hf={hf} task={hf.session?.taskId ? (data.tasks.find((x) => x.id === hf.session!.taskId) ?? null) : focusTask ?? null} />
+        <HyperFocusBar hf={hf} task={hfTask} />
 
         {focusTask && view !== 'board' && (
           <FocusBanner
             task={focusTask}
-            onComplete={() => complete(focusTask.id)}
-            onUnfocus={() => setFocus(focusTask.id, false)}
-            onToggleSub={(sid) => toggleSub(focusTask, sid)}
+            onComplete={() => actions.complete(focusTask.id)}
+            onUnfocus={() => actions.setFocus(focusTask.id, false)}
+            onToggleSub={(sid) => actions.toggleSub(focusTask, sid)}
             onHyperFocus={hf.session ? undefined : () => hf.start(focusTask.id)}
           />
         )}
@@ -313,7 +251,7 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
             />
             {view !== 'board' && view !== 'done' && (
               <select className="sort" value={settings.sort} title={t('sort_label')} onChange={(e) => setSettings((s) => ({ ...s, sort: e.target.value as SortMode }))}>
-                {SORTS.map((s) => (
+                {SORT_MODES.map((s) => (
                   <option key={s} value={s}>
                     {t(`sort_${s}` as const)}
                   </option>
@@ -343,7 +281,9 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
           </div>
         </header>
 
-        {view !== 'done' && view !== 'board' && <QuickAdd ref={quickRef} onAdd={(text) => quickAdd(text)} />}
+        {view !== 'done' && view !== 'board' && (
+          <QuickAdd ref={quickRef} onAdd={(text) => actions.quickAdd(text, { defaultDueAt: view === 'today' ? endOfDay(now) : null })} />
+        )}
 
         {cal.available && settings.calendar.showEvents && (view === 'today' || view === 'week') && !query.trim() && (
           <CalendarStrip
@@ -358,10 +298,10 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
             tasks={filtered}
             highlight={highlight}
             onOpen={setEditing}
-            onComplete={complete}
-            onReopen={reopen}
-            onMove={move}
-            onAdd={(status, text) => quickAdd(text, status)}
+            onComplete={actions.complete}
+            onReopen={actions.reopen}
+            onMove={actions.move}
+            onAdd={(status, text) => actions.quickAdd(text, { status })}
           />
         ) : visible.length === 0 ? (
           <div className="empty">{view === 'done' ? t('empty_done') : t('empty_open')}</div>
@@ -372,15 +312,15 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
                 key={x.id}
                 task={x}
                 highlighted={highlight === x.id}
-                onComplete={() => complete(x.id)}
-                onReopen={() => reopen(x.id)}
+                onComplete={() => actions.complete(x.id)}
+                onReopen={() => actions.reopen(x.id)}
                 onEdit={() => setEditing(x)}
-                onFocus={() => setFocus(x.id, !x.focused)}
-                onSnooze={(m) => snooze(x.id, m)}
-                onToggleSub={(sid) => toggleSub(x, sid)}
-                onDelete={() => remove(x.id)}
-                onDuplicate={() => duplicate(x.id)}
-                onPostpone={() => postpone(x)}
+                onFocus={() => actions.setFocus(x.id, !x.focused)}
+                onSnooze={(m) => actions.snooze(x.id, m)}
+                onToggleSub={(sid) => actions.toggleSub(x, sid)}
+                onDelete={() => actions.remove(x.id)}
+                onDuplicate={() => actions.duplicate(x.id)}
+                onPostpone={() => actions.postpone(x)}
                 drag={
                   view !== 'done'
                     ? {
@@ -397,10 +337,10 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
         )}
       </main>
 
-      {undo && (
+      {actions.undo && (
         <div className="toast">
-          <span>{t('deleted_toast')}: {undo.task.title}</span>
-          <button className="mini" onClick={undoDelete}>
+          <span>{t('deleted_toast')}: {actions.undo.task.title}</span>
+          <button className="mini" onClick={actions.undoDelete}>
             ↶ {t('undo')}
           </button>
         </div>
@@ -412,7 +352,7 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
           allTags={allTags}
           onCancel={() => setEditing(null)}
           onSave={(nt) => {
-            setTasks((ts) => (ts.some((x) => x.id === nt.id) ? ts.map((x) => (x.id === nt.id ? nt : x)) : [nt, ...ts]))
+            actions.save(nt)
             setEditing(null)
           }}
         />
@@ -433,10 +373,4 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
       )}
     </div>
   )
-}
-
-function endOfToday() {
-  const d = new Date()
-  d.setHours(23, 59, 0, 0)
-  return d.getTime()
 }
