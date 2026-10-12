@@ -55,6 +55,7 @@ export default function CalendarSettings({ settings, tasks, cal, onChange }: Pro
       <div className="field">
         <span>{t('cal_section')}</span>
       </div>
+      <Toggle checked={c.autoImport} onChange={(v) => setCal({ autoImport: v })} label={t('s_cal_import')} desc={t('s_cal_import_d')} />
       <Toggle checked={c.showEvents} onChange={(v) => setCal({ showEvents: v })} label={t('s_cal_show')} desc={t('s_cal_show_d')} />
 
       {/* ---- Google ---- */}

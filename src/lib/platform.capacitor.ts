@@ -27,12 +27,23 @@ function hashId(s: string): number {
 
 export function createCapacitorApi(): HyperDoApi {
   let data: AppData = parseStored(null)
-  // Google blocks OAuth inside Android WebViews, so only ICS feeds are offered here; CapacitorHttp lifts CORS for them.
-  const calendar = createBrowserCalendar(() => data, { googleSupported: false })
   const focusListeners = new Set<(id: string) => void>()
   const remindListeners = new Set<(id: string) => void>()
+  const dataListeners = new Set<(d: AppData) => void>()
   let perm: ReturnType<HyperDoApi['permission']> = 'default'
   let scheduling: Promise<void> | null = null
+
+  // Google blocks OAuth inside Android WebViews, so only ICS feeds are offered here; CapacitorHttp lifts CORS for them.
+  const calendar = createBrowserCalendar(
+    () => data,
+    (fn) => {
+      data = fn(data)
+      void Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(data) }).catch(() => {})
+      dataListeners.forEach((cb) => cb(data))
+      void reschedule()
+    },
+    { googleSupported: false },
+  )
 
   async function refreshPermission() {
     try {
@@ -147,6 +158,10 @@ export function createCapacitorApi(): HyperDoApi {
     onReminded(cb) {
       remindListeners.add(cb)
       return () => remindListeners.delete(cb)
+    },
+    onDataChanged(cb) {
+      dataListeners.add(cb)
+      return () => dataListeners.delete(cb)
     },
   }
 }

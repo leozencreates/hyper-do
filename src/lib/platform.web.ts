@@ -27,11 +27,26 @@ export function parseStored(raw: string | null): AppData {
 
 export function createWebApi(): HyperDoApi {
   let data: AppData = parseStored(null)
-  // Google login needs a real http(s) origin to redirect back to (not file://).
-  const calendar = createBrowserCalendar(() => data, { googleSupported: location.protocol.startsWith('http') })
   const lastNotified = new Map<string, number>()
   const focusListeners = new Set<(id: string) => void>()
   const remindListeners = new Set<(id: string) => void>()
+  const dataListeners = new Set<(d: AppData) => void>()
+
+  /** Platform-side change (calendar import): save and tell the UI, like the Electron main process does. */
+  function mutate(fn: (d: AppData) => AppData) {
+    const next = fn(data)
+    syncCounters(data.tasks, next.tasks, lastNotified)
+    data = next
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    } catch {
+      /* kota */
+    }
+    dataListeners.forEach((cb) => cb(data))
+  }
+
+  // Google login needs a real http(s) origin to redirect back to (not file://).
+  const calendar = createBrowserCalendar(() => data, mutate, { googleSupported: location.protocol.startsWith('http') })
   const hasNotif = typeof Notification !== 'undefined'
 
   const permission = (): ReturnType<HyperDoApi['permission']> => (hasNotif ? Notification.permission : 'unsupported')
@@ -117,6 +132,10 @@ export function createWebApi(): HyperDoApi {
     onReminded(cb) {
       remindListeners.add(cb)
       return () => remindListeners.delete(cb)
+    },
+    onDataChanged(cb) {
+      dataListeners.add(cb)
+      return () => dataListeners.delete(cb)
     },
   }
 }

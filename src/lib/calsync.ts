@@ -13,17 +13,21 @@ import { GoogleAuthError, GoogleCalendarClient, emailFromIdToken, refreshAccessT
 import { parseIcs } from './ics'
 import { taskDescription, taskEventWindow } from './calendar-links'
 import { startOfDay, DAY } from './dates'
-import { uid } from './tasks'
+import { newTask, uid } from './tasks'
+import { translate } from './i18n'
 
 export const TASK_CALENDAR_NAME = 'Hyper Do'
 const SYNC_INTERVAL_MS = 10 * 60_000
 const MAX_CALENDARS = 15
+/** Events this far ahead become tasks automatically (rolling window). */
+const IMPORT_DAYS = 7
 
 export function normalizeCalendarSettings(c?: Partial<CalendarSettings> | null): CalendarSettings {
   const d = DEFAULT_SETTINGS.calendar
   const g: Partial<CalendarSettings['google']> = c?.google ?? {}
   return {
     showEvents: c?.showEvents ?? d.showEvents,
+    autoImport: c?.autoImport ?? d.autoImport,
     google: {
       // an empty stored value falls back to a client baked into the build (VITE_GOOGLE_CLIENT_ID)
       clientId: typeof g.clientId === 'string' && g.clientId ? g.clientId : d.google.clientId,
@@ -41,6 +45,8 @@ export function normalizeCalendarSettings(c?: Partial<CalendarSettings> | null):
 
 export interface CalendarSyncHost {
   getData(): AppData
+  /** Replaces the app data (saves it and refreshes the UI). Used to add/update imported tasks. */
+  mutate(fn: (d: AppData) => AppData): void
   loadState(): string | null
   saveState(json: string): void
   onEvents(events: CalendarEvent[]): void
@@ -60,10 +66,18 @@ interface GoogleState {
   pushed: Record<string, PushedEntry>
 }
 
+interface ImportedEntry {
+  taskId: string
+  start: number
+  title: string
+}
+
 interface PersistedState {
   google: GoogleState
   events: CalendarEvent[]
   syncedAt: number | null
+  /** event importKey → task created from it (kept even if the user deletes the task, so it is not re-imported) */
+  imported: Record<string, ImportedEntry>
 }
 
 const emptyGoogle = (): GoogleState => ({ refreshToken: '', email: '', taskCalendarId: '', pushed: {} })
@@ -74,7 +88,7 @@ function taskFp(t: Task): string {
 }
 
 function settingsFp(s: CalendarSettings): string {
-  return JSON.stringify([s.feeds.map((f) => [f.id, f.url, f.enabled, f.name, f.color]), s.google.hiddenCalendarIds, s.google.pushTasks])
+  return JSON.stringify([s.feeds.map((f) => [f.id, f.url, f.enabled, f.name, f.color]), s.google.hiddenCalendarIds, s.google.pushTasks, s.autoImport])
 }
 
 function localDate(ts: number): string {
@@ -117,6 +131,7 @@ export class CalendarSync {
   private queue: Promise<void> = Promise.resolve()
   private lastSettingsFp = ''
   private lastTasksFp = ''
+  private importing = false
 
   constructor(private host: CalendarSyncHost) {
     this.state = this.load()
@@ -125,15 +140,16 @@ export class CalendarSync {
   // ---------- state ----------
 
   private load(): PersistedState {
-    const base: PersistedState = { google: emptyGoogle(), events: [], syncedAt: null }
+    const base: PersistedState = { google: emptyGoogle(), events: [], syncedAt: null, imported: {} }
     try {
       const raw = this.host.loadState()
       if (!raw) return base
       const p = JSON.parse(raw) as Partial<PersistedState>
       return {
         google: { ...emptyGoogle(), ...(p.google ?? {}), pushed: p.google?.pushed ?? {} },
-        events: Array.isArray(p.events) ? p.events : [],
+        events: Array.isArray(p.events) ? p.events.filter((e) => typeof e.importKey === 'string') : [],
         syncedAt: p.syncedAt ?? null,
+        imported: p.imported ?? {},
       }
     } catch {
       return base
@@ -214,6 +230,7 @@ export class CalendarSync {
 
   /** Call after every data save. Settings change → full sync, task change → push only (both debounced). */
   onDataSaved() {
+    if (this.importing) return
     const sfp = settingsFp(this.settings)
     const tfp = this.tasksFp()
     if (sfp !== this.lastSettingsFp) {
@@ -270,6 +287,7 @@ export class CalendarSync {
     this.rawCalendars = []
     this.googleError = null
     this.state.events = this.state.events.filter((e) => e.source !== 'google')
+    for (const k of Object.keys(this.state.imported)) if (k.startsWith('google:')) delete this.state.imported[k]
     this.persist()
     this.emitStatus()
     this.emitEvents()
@@ -312,6 +330,7 @@ export class CalendarSync {
       try {
         await this.pullGoogle()
         await this.pullFeeds()
+        this.importEvents()
         await this.pushTasks()
       } finally {
         this.state.syncedAt = Date.now()
@@ -373,6 +392,7 @@ export class CalendarSync {
     const e = parseGDate(ev.end)
     return {
       id: `google:${cal.id}:${ev.id}`,
+      importKey: `google:${cal.id}:${ev.id}`, // recurring instances already have unique ids on Google
       source: 'google',
       calendarId: cal.id,
       calendarName: cal.name,
@@ -402,16 +422,99 @@ export class CalendarSync {
           const evs = parseIcs(text, start, end)
           const name = f.name.trim() || hostname(url)
           for (const e of evs) {
-            out.push({ id: `feed:${f.id}:${e.uid}:${e.start}`, source: 'feed', calendarId: f.id, calendarName: name, color: f.color, title: e.title, start: e.start, end: e.end, allDay: e.allDay, location: e.location, url: e.url })
+            if (e.description?.includes('— Hyper Do')) continue // our own mirrored task coming back through a feed
+            out.push({
+              id: `feed:${f.id}:${e.uid}:${e.start}`,
+              importKey: e.recurring ? `feed:${f.id}:${e.uid}:${e.start}` : `feed:${f.id}:${e.uid}`,
+              source: 'feed',
+              calendarId: f.id,
+              calendarName: name,
+              color: f.color,
+              title: e.title,
+              start: e.start,
+              end: e.end,
+              allDay: e.allDay,
+              location: e.location,
+              url: e.url,
+            })
           }
           status[f.id] = { error: null, count: evs.length }
         } catch (e) {
-          status[f.id] = { error: (e as Error)?.message || String(e), count: 0 }
+          // keep the last successful result of this feed so a transient network error does not wipe its events/tasks
+          const cached = this.state.events.filter((x) => x.source === 'feed' && x.calendarId === f.id)
+          out.push(...cached)
+          status[f.id] = { error: (e as Error)?.message || String(e), count: cached.length }
         }
       }),
     )
     this.feedStatus = status
     this.state.events = [...this.state.events.filter((e) => e.source !== 'feed'), ...out]
+  }
+
+  // ---------- import events → tasks ----------
+
+  /** Due time of an imported task: all-day events are due at 23:59 of that day (same convention as quick add "today"). */
+  private static importDue(e: CalendarEvent): number {
+    if (!e.allDay) return e.start
+    const d = new Date(e.start)
+    d.setHours(23, 59, 0, 0)
+    return d.getTime()
+  }
+
+  private importEvents() {
+    const data = this.host.getData()
+    if (!data.settings.calendar.autoImport) return
+    const now = Date.now()
+    const windowStart = startOfDay(now)
+    const windowEnd = windowStart + IMPORT_DAYS * DAY
+    const lang = data.settings.language
+    const tag = translate(lang, 'cal_tag')
+    const imported = this.state.imported
+
+    // forget old entries (events long gone) so the map does not grow forever
+    for (const [k, v] of Object.entries(imported)) if (v.start < now - 60 * DAY) delete imported[k]
+
+    const candidates = this.state.events.filter((e) => e.start >= windowStart && e.start < windowEnd && e.end > now)
+    const byId = new Map(data.tasks.map((t) => [t.id, t]))
+    const added: Task[] = []
+    const updates = new Map<string, Partial<Task>>()
+
+    for (const e of candidates) {
+      const prev = imported[e.importKey]
+      if (!prev) {
+        const notes = [e.location, e.calendarName, e.url].filter(Boolean).join('\n')
+        const task = newTask(
+          { title: e.title, dueAt: CalendarSync.importDue(e), notes, tags: [tag], calendarEventId: e.importKey, order: now + added.length },
+          data.settings,
+        )
+        added.push(task)
+        imported[e.importKey] = { taskId: task.id, start: e.start, title: e.title }
+        continue
+      }
+      // Event moved or renamed → follow it, unless the user already finished or renamed the task.
+      const task = byId.get(prev.taskId)
+      if (!task || task.completedAt !== null) continue
+      const patch: Partial<Task> = {}
+      if (prev.start !== e.start) patch.dueAt = CalendarSync.importDue(e)
+      if (prev.title !== e.title && task.title === prev.title) patch.title = e.title
+      if (Object.keys(patch).length) {
+        updates.set(task.id, patch)
+        imported[e.importKey] = { taskId: task.id, start: e.start, title: e.title }
+      }
+    }
+
+    if (!added.length && !updates.size) return
+    this.persist()
+    this.importing = true // the save triggered by mutate() is ours, not a user change that needs a push
+    try {
+      this.host.mutate((d) => ({
+        ...d,
+        tasks: [...added, ...d.tasks.map((t) => (updates.has(t.id) ? { ...t, ...updates.get(t.id), snoozedUntil: null } : t))],
+      }))
+    } finally {
+      this.importing = false
+      this.lastTasksFp = this.tasksFp()
+    }
   }
 
   // ---------- push tasks → Google ----------
@@ -465,7 +568,8 @@ export class CalendarSync {
       }
       const calId = await this.ensureTaskCalendar(api)
       const desired = new Map<string, Task>()
-      for (const t of this.host.getData().tasks) if (t.completedAt === null && t.dueAt !== null && t.title.trim()) desired.set(t.id, t)
+      // tasks that came from a calendar are not mirrored back (they already exist as events)
+      for (const t of this.host.getData().tasks) if (t.completedAt === null && t.dueAt !== null && t.title.trim() && !t.calendarEventId) desired.set(t.id, t)
 
       for (const [taskId, p] of Object.entries(g.pushed)) {
         if (desired.has(taskId)) continue

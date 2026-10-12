@@ -61,6 +61,13 @@ const lastNotified = new Map<string, number>()
 const calendarFile = () => path.join(app.getPath('userData'), 'hyperdo-calendar.json')
 const calendar = new CalendarSync({
   getData: () => data,
+  mutate(fn) {
+    const next = fn(data)
+    syncCounters(data.tasks, next.tasks, lastNotified)
+    data = next
+    saveData(data)
+    win?.webContents.send('tidi:data-changed', data)
+  },
   loadState() {
     try {
       return fs.readFileSync(calendarFile(), 'utf8')

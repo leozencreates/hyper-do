@@ -46,7 +46,7 @@ Most to-do apps notify you once and go quiet. Hyper Do doesn't. Until you comple
 - ⌨️ **Shortcuts** — `N` new task, `/` search, `1-5` switch views, `Esc` close.
 - 🔕 **Snooze** — 15 min / 30 min / 1 h / 3 h, plus quiet hours.
 - 📲 **Telegram bot** — reminders also arrive on your phone via Telegram. Use the inline buttons ("Done / Snooze 30 min / Focus") or just type to the bot to add tasks.
-- 📅 **Calendar connections** — Google Calendar two-way (see your events in Today / This week, mirror due tasks into a "Hyper Do" calendar), any other calendar via its ICS/webcal link (Outlook, iCloud, Nextcloud…), one-click "Add to calendar" per task (Google, Outlook.com, Office 365, Yahoo, .ics) and a full .ics export.
+- 📅 **Calendar connections** — connect Google Calendar or any ICS/webcal link (Outlook, iCloud, Nextcloud…) and upcoming events turn into tasks automatically, so meetings get nagged like everything else. Google is two-way: due tasks can be mirrored into a "Hyper Do" calendar. Plus one-click "Add to calendar" per task (Google, Outlook.com, Office 365, Yahoo, .ics) and a full .ics export.
 - 🌐 **Language switcher** — English, Türkçe, Русский. English is the default; switch from the sidebar or Settings.
 - 🌗 **Theme** — dark / light / system, with a colourful gradient-based look.
 - 💾 **Backup** — JSON export and import.
@@ -134,7 +134,7 @@ What you get:
 
 | Direction | Behaviour |
 |---|---|
-| Google → Hyper Do | Events of the next 2 weeks are shown above the list in **Today** and **This week** (collapsible). Pick which calendars to show. "+ Task" turns an event into a task. Refreshes every 10 minutes or on **Sync now**. |
+| Google → Hyper Do | **Events become tasks automatically**: every event of the next 7 days is added to the task list with the `#calendar` tag and nagged like any other task (toggle *Turn events into tasks automatically*). If an event moves, its task follows; a task you delete is not re-added. Events of the next 2 weeks are also shown above the list in **Today** and **This week** (collapsible). Pick which calendars to show. Refreshes every 10 minutes or on **Sync now**. |
 | Hyper Do → Google | Optional toggle **Send tasks to Google Calendar**: every open task with a due date appears in a calendar named **Hyper Do** (30-minute block at the due time; tasks due at 23:59 become all-day). Edits are patched, done/deleted tasks are removed. Turning the toggle off removes them all. |
 
 The refresh token and the task→event map are stored in a separate local file (`hyperdo-calendar.json` next to the data file, or `localStorage` on the web). They are **not** part of JSON backups. **Disconnect** deletes the mirrored events and revokes the token.
@@ -143,7 +143,7 @@ Android: Google blocks OAuth inside app WebViews, so the Android build offers IC
 
 ### Other calendars (ICS / webcal, read-only)
 
-Paste the private iCal address of any calendar: Outlook.com (*Settings → Calendar → Shared calendars → Publish → ICS*), iCloud (*Share → Public calendar*), Nextcloud, Fastmail, Proton, a Google "secret address in iCal format"… Recurring events (`RRULE` daily/weekly/monthly/yearly, `EXDATE`, overrides) and `TZID` time zones are handled. The web version may be blocked by some providers (CORS); the desktop and Android apps are not.
+Paste the private iCal address of any calendar: Outlook.com (*Settings → Calendar → Shared calendars → Publish → ICS*), iCloud (*Share → Public calendar*), Nextcloud, Fastmail, Proton, a Google "secret address in iCal format"… Their upcoming events become tasks automatically too. Recurring events (`RRULE` daily/weekly/monthly/yearly, `EXDATE`, overrides) and `TZID` time zones are handled. The web version may be blocked by some providers (CORS); the desktop and Android apps are not.
 
 ### Add to calendar / export
 

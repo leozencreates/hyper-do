@@ -34,6 +34,8 @@ export interface Task {
   order: number
   completedAt: number | null
   createdAt: number
+  /** Takvimden otomatik eklenen görev: kaynak etkinliğin anahtarı (Google'a geri gönderilmez). */
+  calendarEventId?: string
 }
 
 export interface Settings {
@@ -81,6 +83,8 @@ export interface CalendarFeed {
 export interface CalendarSettings {
   /** Show calendar events above the task list in Today / This week */
   showEvents: boolean
+  /** Automatically turn upcoming events (next 7 days) of connected calendars into tasks */
+  autoImport: boolean
   google: GoogleCalendarSettings
   feeds: CalendarFeed[]
 }
@@ -88,6 +92,8 @@ export interface CalendarSettings {
 /** A calendar event as shown in the UI (from Google or an ICS feed). */
 export interface CalendarEvent {
   id: string
+  /** Stable key used for task import: survives time changes of a single event, unique per recurring instance. */
+  importKey: string
   source: 'google' | 'feed'
   calendarId: string
   calendarName: string
@@ -155,6 +161,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pomodoro: { workMin: 40, breakMin: 5 },
   calendar: {
     showEvents: true,
+    autoImport: true,
     google: {
       // A distributor can bake a default OAuth client into the build via .env (VITE_GOOGLE_CLIENT_ID / _SECRET).
       clientId: import.meta.env?.VITE_GOOGLE_CLIENT_ID ?? '',
@@ -177,7 +184,7 @@ export interface HyperDoApi {
   requestPermission(): Promise<'granted' | 'denied' | 'default' | 'unsupported'>
   onFocusTask(cb: (taskId: string) => void): () => void
   onReminded(cb: (taskId: string) => void): () => void
-  /** Ana süreç veriyi kendisi değiştirdiyse (Telegram komutu vb.) arayüzü günceller. */
+  /** Platform veriyi kendisi değiştirdiyse (Telegram komutu, takvimden içe aktarma) arayüzü günceller. */
   onDataChanged?(cb: (data: AppData) => void): () => void
   /** Telegram'a test mesajı gönderir; hata varsa metnini döndürür. */
   telegramTest?(): Promise<{ ok: boolean; error?: string }>

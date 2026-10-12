@@ -15,12 +15,13 @@ export function webRedirectUri(): string {
   return location.origin + location.pathname
 }
 
-export function createBrowserCalendar(getData: () => AppData, opts: { googleSupported: boolean }) {
+export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: AppData) => AppData) => void, opts: { googleSupported: boolean }) {
   const evListeners = new Set<(e: CalendarEvent[]) => void>()
   const stListeners = new Set<(s: CalendarStatus) => void>()
 
   const sync = new CalendarSync({
     getData,
+    mutate,
     loadState: () => {
       try {
         return localStorage.getItem(STATE_KEY)

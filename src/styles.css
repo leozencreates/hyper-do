@@ -424,3 +424,4 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   .cal-event .mini { grid-area: btn; opacity: 1; }
   .cal-item.feed { flex-wrap: wrap; }
 }
+.chip.cal { background: color-mix(in srgb, var(--violet) 16%, transparent); }

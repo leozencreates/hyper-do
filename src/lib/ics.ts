@@ -16,6 +16,8 @@ export interface IcsEvent {
   location?: string
   url?: string
   description?: string
+  /** instance of a recurring event (UID is shared with its siblings) */
+  recurring: boolean
 }
 
 interface Prop {
@@ -329,7 +331,8 @@ export function parseIcs(text: string, rangeStart: number, rangeEnd: number): Ic
     if (e.cancelled) continue
     const end = Number.isNaN(e.end) ? e.start + (e.allDay ? DAY : 0) : e.end
     const duration = Math.max(0, end - e.start)
-    const base = { uid: e.uid, title: e.title || '(untitled)', allDay: e.allDay, location: e.location, url: e.url, description: e.description }
+    const recurring = !!e.rrule || e.recurrenceId !== undefined
+    const base = { uid: e.uid, title: e.title || '(untitled)', allDay: e.allDay, location: e.location, url: e.url, description: e.description, recurring }
 
     if (e.rrule && e.recurrenceId === undefined) {
       const rule = parseRule(e.rrule)

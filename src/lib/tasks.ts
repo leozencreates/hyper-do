@@ -51,6 +51,7 @@ export function normalizeTask(t: Partial<Task> & { id: string }): Task {
     order: typeof t.order === 'number' ? t.order : createdAt,
     completedAt: t.completedAt ?? null,
     createdAt,
+    ...(t.calendarEventId ? { calendarEventId: t.calendarEventId } : {}),
   }
 }
 

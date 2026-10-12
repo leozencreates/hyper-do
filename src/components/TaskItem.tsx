@@ -79,6 +79,11 @@ export default function TaskItem({ task, highlighted, onComplete, onReopen, onEd
           {task.focused && <span className="chip focus">🎯</span>}
           {task.status !== 'todo' && !done && <span className="chip">{t(`col_${task.status}` as const)}</span>}
           {task.recurrence !== 'none' && <span className="chip">↻</span>}
+          {task.calendarEventId && (
+            <span className="chip cal" title={t('cal_imported')}>
+              📅
+            </span>
+          )}
           {task.remindEveryMin > 0 && !done && (
             <span className={snoozed ? 'chip muted' : 'chip remind'} title={t('remind_interval')}>
               {snoozed ? `😴 ${relativeMinutes(task.snoozedUntil! - Date.now(), lang)}` : `🔔 ${task.remindEveryMin}′`}
