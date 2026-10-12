@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Hyper Do</string>
+    <string name="title_activity_main">Hyper Do</string>
+    <string name="package_name">com.hyperdo.app</string>
+    <string name="custom_url_scheme">com.hyperdo.app</string>
+</resources>

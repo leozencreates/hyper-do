@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-electron
+release
+
+.tools
+android/app/build
+android/.gradle
+android/build
