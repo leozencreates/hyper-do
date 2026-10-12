@@ -6,7 +6,6 @@ contextBridge.exposeInMainWorld('tidi', {
   save: (data: unknown) => ipcRenderer.invoke('tidi:save', data),
   notifyTest: () => ipcRenderer.invoke('tidi:notify-test'),
   telegramTest: () => ipcRenderer.invoke('tidi:telegram-test'),
-  installChromeExtension: () => ipcRenderer.invoke('tidi:install-extension'),
   permission: () => 'granted',
   requestPermission: async () => 'granted',
   onFocusTask: (cb: (id: string) => void) => {

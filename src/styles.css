@@ -326,22 +326,6 @@ h2 { margin: 0 0 14px; font-size: 20px; }
 .ghost.small { padding: 6px 10px; font-size: 13px; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* --- Chrome extension popup --- */
-html.popup, html.popup body { width: 460px; height: 600px; overflow: hidden; }
-html.popup .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: 600px; }
-html.popup .sidebar { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; border-right: none; border-bottom: 1px solid var(--border); }
-html.popup .brand { padding: 0 6px; font-size: 18px; }
-html.popup nav { flex-direction: row; flex-wrap: wrap; gap: 2px; }
-html.popup .nav { padding: 6px 10px; gap: 6px; }
-html.popup .tags-block { display: none; }
-html.popup .sidebar-footer { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-html.popup .sidebar-footer .stats { display: none; }
-html.popup .content { padding: 12px 14px; }
-html.popup .grid2 { grid-template-columns: 1fr; }
-html.popup .focus-title { font-size: 20px; }
-html.popup .head-tools { width: 100%; justify-content: flex-start; }
-html.popup .search { flex: 1; min-width: 0; }
-
 /* --- Hyper Focus (Pomodoro) --- */
 .hf-start { background: linear-gradient(135deg, var(--violet), var(--pink)); color: #fff; font-weight: 700; padding: 9px 14px; border-radius: 10px; box-shadow: 0 4px 14px rgba(167,139,250,.35); transition: transform .12s, filter .2s; white-space: nowrap; }
 .hf-start:hover { filter: brightness(1.08); transform: translateY(-1px); }

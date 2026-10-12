@@ -1,7 +1,6 @@
-import { app, BrowserWindow, ipcMain, Notification, Tray, Menu, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, Tray, Menu, nativeImage } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
-import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { DEFAULT_SETTINGS, type AppData } from '../src/lib/types'
 import { buildNotification, collectDueReminders, syncCounters } from '../src/lib/reminder'
@@ -178,27 +177,6 @@ ipcMain.handle('tidi:save', (_e, incoming: AppData) => {
 })
 ipcMain.handle('tidi:telegram-test', () => telegram.test())
 
-// ---- Chrome extension bundled with the installer (resources/chrome-extension) ----
-function extensionDir(): string {
-  return app.isPackaged ? path.join(process.resourcesPath, 'chrome-extension') : path.resolve(__dirname, '..', 'dist-ext')
-}
-function openChromeExtensionsPage() {
-  const url = 'chrome://extensions'
-  try {
-    if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', 'chrome', url], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
-    else if (process.platform === 'darwin') spawn('open', ['-a', 'Google Chrome', url], { detached: true, stdio: 'ignore' }).unref()
-    else spawn('google-chrome', [url], { detached: true, stdio: 'ignore' }).unref()
-  } catch {
-    /* Chrome not installed */
-  }
-}
-ipcMain.handle('tidi:install-extension', async () => {
-  const dir = extensionDir()
-  if (!fs.existsSync(path.join(dir, 'manifest.json'))) return { ok: false, path: dir, error: 'manifest.json missing' }
-  const err = await shell.openPath(dir)
-  openChromeExtensionsPage()
-  return { ok: !err, path: dir, error: err || undefined }
-})
 ipcMain.handle('tidi:notify-test', () => {
   const lang = data.settings.language
   new Notification({ title: translate(lang, 'notif_test_title'), body: translate(lang, 'notif_test_body') }).show()

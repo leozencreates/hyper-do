@@ -2,7 +2,7 @@
 
 > An ADHD-friendly personal to-do app that keeps nagging you **until you actually mark the task done**.
 
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Android%20%7C%20PWA%20%7C%20Chrome-ff8a3d)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Android%20%7C%20PWA-ff8a3d)
 ![Stack](https://img.shields.io/badge/stack-React%2019%20%C2%B7%20TypeScript%20%C2%B7%20Vite%20%C2%B7%20Electron%20%C2%B7%20Capacitor-a78bfa)
 ![Languages](https://img.shields.io/badge/i18n-EN%20%7C%20TR%20%7C%20RU-38bdf8)
 ![Privacy](https://img.shields.io/badge/data-only%20on%20your%20device-4fd18b)
@@ -19,7 +19,6 @@ No account, no cloud, no subscription. Your data never leaves your device.
 - [Quick start](#quick-start)
 - [Natural-language quick add](#natural-language-quick-add)
 - [Telegram bot](#telegram-bot-windowsmacos)
-- [Chrome extension](#chrome-extension)
 - [Windows installer and uninstall](#windows-installer-and-uninstall)
 - [Building for Android](#building-for-android)
 - [Development](#development)
@@ -54,10 +53,9 @@ Most to-do apps notify you once and go quiet. Hyper Do doesn't. Until you comple
 
 | Platform | How | Reminder behaviour |
 |---|---|---|
-| Windows (Electron) | `npm run dist` → run `Hyper-Do-Setup-x.y.z.exe`; desktop and Start menu shortcuts are created, the Chrome extension is bundled | Reminds from the tray even when the window is closed, flashes the taskbar entry |
+| Windows (Electron) | `npm run dist` → run `Hyper-Do-Setup-x.y.z.exe`; desktop and Start menu shortcuts are created automatically | Reminds from the tray even when the window is closed, flashes the taskbar entry |
 | macOS (Electron) | `npm run dist:mac` (must run on a Mac) | Stays in the Dock, notifies when the window is closed |
 | Android (Capacitor) | `npm run android:apk` → `android/app/build/outputs/apk/debug/app-debug.apk` | Notifies even when the app is closed: reminders are scheduled 48 h ahead as local notifications and extended on every launch |
-| Chrome extension | `npm run build:ext` → load `dist-ext/` as an unpacked extension | Service worker keeps reminding while Chrome is running, even with no Hyper Do tab open |
 | Web / iPhone / iPad (PWA) | `npm run dev:web` or publish the `dist-web` folder | Notifies only while the tab or the home-screen app is **open** |
 
 **On iPhone:** open the site in Safari → Share → **Add to Home Screen**. Notification permission can only be requested from the app launched from the home screen (iOS 16.4+).
@@ -113,21 +111,6 @@ Keywords work in English, Turkish and Russian. Parsed parts show up in the previ
 
 The token is stored only in the local data file; it is never sent anywhere except to the Telegram Bot API.
 
-## Chrome extension
-
-The extension packages the same UI as a popup and a full-page tab, and adds a background service worker that fires reminders through Chrome notifications while the browser is running.
-
-```bash
-npm run build:ext      # produces dist-ext/
-```
-
-Then open `chrome://extensions`, enable **Developer mode**, click **Load unpacked** and choose the `dist-ext` folder.
-
-- The toolbar icon opens the app in a popup. The badge shows the number of overdue tasks.
-- Right-click the icon → "Open Hyper Do in a tab" for the full-width layout.
-- Reminders are delivered via `chrome.notifications`; clicking one focuses the task, and the buttons let you mark it done or snooze it.
-- Data lives in `chrome.storage.local`, synced with any open Hyper Do tab or popup.
-
 ## Windows installer and uninstall
 
 ```bash
@@ -138,7 +121,6 @@ The installer is a standard NSIS setup wizard:
 
 - Lets you pick the installation folder, creates desktop and Start menu shortcuts and launches the app when finished.
 - Registers an uninstaller: remove it from **Settings → Apps → Installed apps → Hyper Do** or run `Uninstall Hyper Do.exe` in the install folder. Your task data in `%APPDATA%hyper-do` is kept so a reinstall picks up where you left off.
-- Bundles the Chrome extension under `resourceschrome-extension`. Chrome does not allow installers to add extensions silently, so open **Settings → Chrome extension → Install in Chrome** inside Hyper Do: it opens the folder and `chrome://extensions`, where you turn on Developer mode and click **Load unpacked**.
 
 ## Building for Android
 
@@ -164,7 +146,6 @@ npm run dev          # Electron + Vite with hot reload
 npm run dev:web      # Browser only, http://localhost:5180
 npm run build        # Build for Electron (dist/ + dist-electron/)
 npm run build:web    # Build the PWA (dist-web/)
-npm run build:ext    # Build the Chrome extension (dist-ext/)
 npm run preview:web  # Preview dist-web locally
 npm run dist         # Windows installer → %LOCALAPPDATA%\hyperdo-release\
 npm run dist:mac     # macOS DMG (on a Mac)
@@ -173,7 +154,7 @@ npm run android:apk  # Android debug APK
 
 > `npm run dist` writes its output to `%LOCALAPPDATA%\hyperdo-release\` instead of the project folder because of a folder-naming restriction under Desktop.
 
-Tech stack: React 19, TypeScript, Vite, Electron, electron-builder, Capacitor (Android), Web Notifications + Service Worker (PWA), Chrome Extensions Manifest V3.
+Tech stack: React 19, TypeScript, Vite, Electron, electron-builder, Capacitor (Android), Web Notifications + Service Worker (PWA).
 
 ## Project structure
 
@@ -181,17 +162,14 @@ Tech stack: React 19, TypeScript, Vite, Electron, electron-builder, Capacitor (A
 electron/main.ts               Main process: window, tray, notifications, reminder scheduler, JSON storage
 electron/telegram.ts           Telegram bot: long-polling commands, reminders with inline buttons
 electron/preload.ts            Secure IPC bridge (window.tidi)
-extension/manifest.json        Chrome extension manifest (MV3)
-extension/background.ts        Extension service worker: alarms, notifications, badge
-src/lib/reminder.ts            Platform-independent reminder engine (shared by Electron, web and extension)
+src/lib/reminder.ts            Platform-independent reminder engine (shared by Electron and web)
 src/lib/tasks.ts               Pure task helpers (add, complete, sort, drag-and-drop, duplicate, normalize)
 src/lib/parse.ts               Natural-language quick-add parser
 src/lib/dates.ts               Date helpers (today, this week, overdue)
 src/lib/store.ts               App state and persistence
 src/lib/types.ts               Task / settings types and defaults
-src/lib/platform.ts            Picks the Electron / Capacitor / extension / web adapter
+src/lib/platform.ts            Picks the Electron / Capacitor / web adapter
 src/lib/platform.capacitor.ts  Android: schedules local notifications 48 h ahead
-src/lib/platform.extension.ts  Chrome extension: chrome.storage + messaging to the service worker
 src/lib/platform.web.ts        Browser: localStorage + Web Notification
 src/lib/i18n.ts                EN / TR / RU strings and the playful title pool
 src/components/Board.tsx       Kanban board (drag-and-drop)
@@ -212,7 +190,6 @@ android/                       Capacitor Android project
 |---|---|
 | Electron (Windows/macOS) | `%APPDATA%/hyper-do/hyperdo-data.json` |
 | Android | Capacitor Preferences (app sandbox) |
-| Chrome extension | `chrome.storage.local` |
 | Web / PWA | Browser `localStorage` |
 
 There is no account, no telemetry and no remote server. The only outbound connection is the Telegram Bot API, and only **if you enable it**. Use Settings → Export JSON to back up.

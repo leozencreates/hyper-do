@@ -85,7 +85,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 /** Platform köprüsü: Electron preload veya tarayıcı uyarlaması bunu sağlar. */
 export interface HyperDoApi {
-  readonly kind: 'electron' | 'web' | 'capacitor' | 'extension'
+  readonly kind: 'electron' | 'web' | 'capacitor'
   load(): Promise<AppData>
   save(data: AppData): Promise<void>
   notifyTest(): Promise<void>
@@ -98,8 +98,6 @@ export interface HyperDoApi {
   onDataChanged?(cb: (data: AppData) => void): () => void
   /** Telegram'a test mesajı gönderir; hata varsa metnini döndürür. */
   telegramTest?(): Promise<{ ok: boolean; error?: string }>
-  /** Electron: opens the bundled Chrome extension folder and chrome://extensions so it can be loaded. */
-  installChromeExtension?(): Promise<{ ok: boolean; path: string; error?: string }>
 }
 
 declare global {

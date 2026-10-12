@@ -34,7 +34,10 @@ type MainProps = ReturnType<typeof useAppData> & { data: NonNullable<ReturnType<
 function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
   const t = useT()
   const hf = useHyperFocus(data.settings.pomodoro, data.settings.language)
-  const [view, setView] = useState<View>('today')
+  const [view, setView] = useState<View>(() => {
+    const v = new URLSearchParams(location.search).get('view') as View | null
+    return v && VIEW_KEYS.includes(v) ? v : 'today'
+  })
   const [tag, setTag] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Task | null>(null)
@@ -243,11 +246,6 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
             <button className="ghost" onClick={() => setShowSettings(true)}>
               ⚙ {t('settings')}
             </button>
-            {platform.kind === 'extension' && (
-              <button className="icon open-tab" title="Open in a tab" onClick={() => void chrome.runtime.sendMessage({ type: 'openTab' })}>
-                ↗
-              </button>
-            )}
             <select
               className="lang-switch"
               value={settings.language}
