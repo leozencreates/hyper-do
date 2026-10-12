@@ -114,13 +114,13 @@ The token is stored only in the local data file; it is never sent anywhere excep
 ## Windows installer and uninstall
 
 ```bash
-npm run dist     # → %LOCALAPPDATA%hyperdo-releaseHyper-Do-Setup-0.1.0.exe
+npm run dist     # → %LOCALAPPDATA%\hyperdo-release\Hyper-Do-Setup-0.1.0.exe
 ```
 
 The installer is a standard NSIS setup wizard:
 
 - Lets you pick the installation folder, creates desktop and Start menu shortcuts and launches the app when finished.
-- Registers an uninstaller: remove it from **Settings → Apps → Installed apps → Hyper Do** or run `Uninstall Hyper Do.exe` in the install folder. Your task data in `%APPDATA%hyper-do` is kept so a reinstall picks up where you left off.
+- Registers an uninstaller: remove it from **Settings → Apps → Installed apps → Hyper Do** or run `Uninstall Hyper Do.exe` in the install folder. Your task data in `%APPDATA%\hyper-do` is kept so a reinstall picks up where you left off.
 
 ## Building for Android
 
