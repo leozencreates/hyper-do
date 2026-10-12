@@ -6,12 +6,14 @@ import type { SortMode, Status, Task } from './lib/types'
 import { isOverdue, isToday, isThisWeek, DAY } from './lib/dates'
 import { platform } from './lib/platform'
 import { LangContext, useT } from './lib/useT'
+import { LANGS, type Lang } from './lib/i18n'
 import TaskItem from './components/TaskItem'
 import TaskEditor from './components/TaskEditor'
 import FocusBanner from './components/FocusBanner'
 import SettingsPanel from './components/SettingsPanel'
 import QuickAdd from './components/QuickAdd'
 import Board from './components/Board'
+import { HyperFocusBar, useHyperFocus } from './components/HyperFocus'
 
 type View = 'today' | 'week' | 'all' | 'board' | 'done'
 const VIEW_KEYS: View[] = ['today', 'week', 'all', 'board', 'done']
@@ -31,6 +33,7 @@ type MainProps = ReturnType<typeof useAppData> & { data: NonNullable<ReturnType<
 
 function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
   const t = useT()
+  const hf = useHyperFocus(data.settings.pomodoro, data.settings.language)
   const [view, setView] = useState<View>('today')
   const [tag, setTag] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -213,8 +216,9 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
         </div>
         <nav>
           {VIEW_KEYS.map((v, i) => (
-            <button key={v} className={view === v ? 'nav active' : 'nav'} onClick={() => setView(v)} title={`${i + 1}`}>
-              {viewLabel(v)}
+            <button key={v} className={view === v ? `nav v-${v} active` : `nav v-${v}`} onClick={() => setView(v)} title={`${i + 1}`}>
+              <span className="nav-dot" />
+              <span className="nav-label">{viewLabel(v)}</span>
               {v === 'today' && overdueCount > 0 && <span className="badge danger">{overdueCount}</span>}
               {v === 'all' && openCount > 0 && <span className="badge">{openCount}</span>}
             </button>
@@ -235,9 +239,29 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
         )}
         <div className="sidebar-footer">
           <div className="stats">{t('stats_line', { done: doneToday, open: openCount })}</div>
-          <button className="ghost" onClick={() => setShowSettings(true)}>
-            ⚙ {t('settings')}
-          </button>
+          <div className="footer-row">
+            <button className="ghost" onClick={() => setShowSettings(true)}>
+              ⚙ {t('settings')}
+            </button>
+            {platform.kind === 'extension' && (
+              <button className="icon open-tab" title="Open in a tab" onClick={() => void chrome.runtime.sendMessage({ type: 'openTab' })}>
+                ↗
+              </button>
+            )}
+            <select
+              className="lang-switch"
+              value={settings.language}
+              title={t('s_language')}
+              aria-label={t('s_language')}
+              onChange={(e) => setSettings((s) => ({ ...s, language: e.target.value as Lang }))}
+            >
+              {LANGS.map((l) => (
+                <option key={l.key} value={l.key}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </aside>
 
@@ -253,18 +277,26 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
           </div>
         )}
 
+        <HyperFocusBar hf={hf} task={hf.session?.taskId ? (data.tasks.find((x) => x.id === hf.session!.taskId) ?? null) : focusTask ?? null} />
+
         {focusTask && view !== 'board' && (
           <FocusBanner
             task={focusTask}
             onComplete={() => complete(focusTask.id)}
             onUnfocus={() => setFocus(focusTask.id, false)}
             onToggleSub={(sid) => toggleSub(focusTask, sid)}
+            onHyperFocus={hf.session ? undefined : () => hf.start(focusTask.id)}
           />
         )}
 
         <header className="content-head">
           <h1>{viewLabel(view)}</h1>
           <div className="head-tools">
+            {!hf.session && (
+              <button className="hf-start" title="Pomodoro" onClick={() => hf.start(focusTask?.id ?? null)}>
+                {t('hf_start')}
+              </button>
+            )}
             <input
               ref={searchRef}
               className="search"

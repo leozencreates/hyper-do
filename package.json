@@ -2,7 +2,7 @@
   "name": "hyper-do",
   "productName": "Hyper Do",
   "version": "0.1.0",
-  "description": "ADHD dostu, bitene kadar hatırlatan kişisel to-do",
+  "description": "ADHD-friendly personal to-do that keeps reminding you until the task is done",
   "private": true,
   "main": "dist-electron/main.js",
   "type": "module",
@@ -11,9 +11,10 @@
     "dev:web": "vite --config vite.web.config.ts",
     "build": "tsc --noEmit && vite build",
     "build:web": "tsc --noEmit && vite build --config vite.web.config.ts",
+    "build:ext": "tsc --noEmit && vite build --config vite.ext.config.ts",
     "preview:web": "vite preview --config vite.web.config.ts",
-    "dist": "npm run build && electron-builder --win --config.directories.output=%LOCALAPPDATA%/hyperdo-release",
-    "dist:mac": "npm run build && electron-builder --mac",
+    "dist": "npm run build && npm run build:ext && electron-builder --win --config.directories.output=%LOCALAPPDATA%/hyperdo-release",
+    "dist:mac": "npm run build && npm run build:ext && electron-builder --mac",
     "android:sync": "npm run build:web && npx cap sync android",
     "android:open": "npx cap open android",
     "android:run": "npm run android:sync && npx cap run android",
@@ -30,10 +31,26 @@
       "dist-electron/**",
       "package.json"
     ],
+    "extraResources": [
+      { "from": "dist-ext", "to": "chrome-extension" }
+    ],
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "Hyper-Do-Setup-${version}.${ext}",
+      "uninstallDisplayName": "Hyper Do",
+      "shortcutName": "Hyper Do"
     },
     "mac": {
       "target": [
@@ -44,6 +61,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",
+    "@types/chrome": "^0.3.5",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

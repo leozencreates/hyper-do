@@ -1,7 +1,7 @@
 {
   "name": "Hyper Do",
   "short_name": "Hyper Do",
-  "description": "Bitene kadar hatırlatan kişisel to-do",
+  "description": "A personal to-do that keeps reminding you until the task is done",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

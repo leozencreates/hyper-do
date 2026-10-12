@@ -52,6 +52,8 @@ export interface Settings {
   telegram: TelegramSettings
   theme: Theme
   sort: SortMode
+  /** Hyper Focus (Pomodoro): work / break lengths in minutes */
+  pomodoro: { workMin: number; breakMin: number }
 }
 
 export interface TelegramSettings {
@@ -68,7 +70,7 @@ export interface AppData {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  language: 'tr',
+  language: 'en',
   escalateOverdue: true,
   flashWindow: true,
   showWindowOnRemind: false,
@@ -78,11 +80,12 @@ export const DEFAULT_SETTINGS: Settings = {
   telegram: { enabled: false, token: '', chatId: '' },
   theme: 'dark',
   sort: 'smart',
+  pomodoro: { workMin: 40, breakMin: 5 },
 }
 
 /** Platform köprüsü: Electron preload veya tarayıcı uyarlaması bunu sağlar. */
 export interface HyperDoApi {
-  readonly kind: 'electron' | 'web' | 'capacitor'
+  readonly kind: 'electron' | 'web' | 'capacitor' | 'extension'
   load(): Promise<AppData>
   save(data: AppData): Promise<void>
   notifyTest(): Promise<void>
@@ -95,6 +98,8 @@ export interface HyperDoApi {
   onDataChanged?(cb: (data: AppData) => void): () => void
   /** Telegram'a test mesajı gönderir; hata varsa metnini döndürür. */
   telegramTest?(): Promise<{ ok: boolean; error?: string }>
+  /** Electron: opens the bundled Chrome extension folder and chrome://extensions so it can be loaded. */
+  installChromeExtension?(): Promise<{ ok: boolean; path: string; error?: string }>
 }
 
 declare global {

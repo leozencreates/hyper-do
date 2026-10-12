@@ -75,6 +75,21 @@ export default function SettingsPanel({ settings, data, onChange, onImport, onCl
           </select>
         </label>
 
+        <div className="field">
+          <span>{t('s_pomodoro')}</span>
+          <div className="row pomodoro-row">
+            <label className="pomo">
+              <small>{t('s_work')}</small>
+              <input type="number" min={5} max={180} value={settings.pomodoro.workMin} onChange={(e) => set('pomodoro', { ...settings.pomodoro, workMin: Math.max(1, Number(e.target.value) || 40) })} />
+            </label>
+            <label className="pomo">
+              <small>{t('s_break')}</small>
+              <input type="number" min={1} max={60} value={settings.pomodoro.breakMin} onChange={(e) => set('pomodoro', { ...settings.pomodoro, breakMin: Math.max(1, Number(e.target.value) || 5) })} />
+            </label>
+            <span className="hint">{t('s_pomodoro_d')}</span>
+          </div>
+        </div>
+
         <Toggle checked={settings.funTitles} onChange={(v) => set('funTitles', v)} label={t('s_fun')} desc={t('s_fun_d')} />
         <Toggle checked={settings.escalateOverdue} onChange={(v) => set('escalateOverdue', v)} label={t('s_escalate')} desc={t('s_escalate_d')} />
         {isElectron && <Toggle checked={settings.flashWindow} onChange={(v) => set('flashWindow', v)} label={t('s_flash')} desc={t('s_flash_d')} />}
@@ -94,6 +109,7 @@ export default function SettingsPanel({ settings, data, onChange, onImport, onCl
         )}
 
         {isElectron && <TelegramSection settings={settings} onChange={onChange} />}
+        {isElectron && platform.installChromeExtension && <ExtensionSection />}
 
         <BackupSection data={data} onImport={onImport} />
 
@@ -225,6 +241,34 @@ function TelegramSection({ settings, onChange }: { settings: Settings; onChange(
             {result && <span className="hint">{result}</span>}
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+/** Electron only: the Chrome extension ships inside the installer; this opens its folder and chrome://extensions. */
+function ExtensionSection() {
+  const t = useT()
+  const [result, setResult] = useState<{ ok: boolean; path: string; error?: string } | null>(null)
+  const install = async () => {
+    const r = await platform.installChromeExtension?.()
+    if (r) setResult(r)
+  }
+  return (
+    <div className="field">
+      <span>{t('s_ext')}</span>
+      <p className="hint">{t('s_ext_d')}</p>
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" className="ghost small" onClick={() => void install()}>
+          🧩 {t('ext_install_btn')}
+        </button>
+        {result && !result.ok && <span className="hint">{t('ext_fail', { e: result.error ?? result.path })}</span>}
+      </div>
+      {result?.ok && (
+        <>
+          <p className="hint">{t('ext_steps')}</p>
+          <p className="hint mono">{t('ext_path', { p: result.path })}</p>
+        </>
       )}
     </div>
   )

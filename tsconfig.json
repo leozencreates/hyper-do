@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "chrome"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
@@ -11,5 +12,5 @@
     "isolatedModules": true,
     "resolveJsonModule": true
   },
-  "include": ["src", "electron"]
+  "include": ["src", "electron", "extension"]
 }

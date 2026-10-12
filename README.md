@@ -1,182 +1,218 @@
 # Hyper Do
 
-> ADHD dostu kişisel to-do: bir görevi **bitirip işaretleyene kadar** hatırlatmaya devam eder.
-> _An ADHD-friendly personal to-do app that keeps nagging you until you actually mark the task done._
+> An ADHD-friendly personal to-do app that keeps nagging you **until you actually mark the task done**.
 
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Android%20%7C%20PWA-ff8a3d)
-![Stack](https://img.shields.io/badge/stack-React%2019%20%C2%B7%20TypeScript%20%C2%B7%20Vite%20%C2%B7%20Electron%20%C2%B7%20Capacitor-0f1117)
-![Languages](https://img.shields.io/badge/i18n-TR%20%7C%20EN%20%7C%20RU-4c9aff)
-![Privacy](https://img.shields.io/badge/data-only%20on%20your%20device-2ea043)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Android%20%7C%20PWA%20%7C%20Chrome-ff8a3d)
+![Stack](https://img.shields.io/badge/stack-React%2019%20%C2%B7%20TypeScript%20%C2%B7%20Vite%20%C2%B7%20Electron%20%C2%B7%20Capacitor-a78bfa)
+![Languages](https://img.shields.io/badge/i18n-EN%20%7C%20TR%20%7C%20RU-38bdf8)
+![Privacy](https://img.shields.io/badge/data-only%20on%20your%20device-4fd18b)
 
-Hesap yok, bulut yok, abonelik yok. Veriler sadece cihazında durur.
-
----
-
-## İçindekiler
-
-- [Neden Hyper Do?](#neden-hyper-do)
-- [Özellikler](#özellikler)
-- [Platformlar](#platformlar)
-- [Hızlı başlangıç](#hızlı-başlangıç)
-- [Doğal dilli hızlı ekleme](#doğal-dilli-hızlı-ekleme)
-- [Telegram botu](#telegram-botu-windowsmacos)
-- [Android derleme](#android-derleme)
-- [Geliştirme](#geliştirme)
-- [Proje yapısı](#proje-yapısı)
-- [Veri ve gizlilik](#veri-ve-gizlilik)
+No account, no cloud, no subscription. Your data never leaves your device.
 
 ---
 
-## Neden Hyper Do?
+## Contents
 
-Klasik to-do uygulamaları bir kez bildirir ve susar. Hyper Do susmaz: görevi tamamlayıp işaretlemediğin sürece, seçtiğin aralıkla hatırlatmayı sürdürür. Son tarih geçtiyse aralığı yarıya indirir. Pencereyi kapatsan da tepsiden, telefonun kilitliyken de yerel bildirimle, istersen Telegram'dan da ulaşır.
+- [Why Hyper Do?](#why-hyper-do)
+- [Features](#features)
+- [Platforms](#platforms)
+- [Quick start](#quick-start)
+- [Natural-language quick add](#natural-language-quick-add)
+- [Telegram bot](#telegram-bot-windowsmacos)
+- [Chrome extension](#chrome-extension)
+- [Windows installer and uninstall](#windows-installer-and-uninstall)
+- [Building for Android](#building-for-android)
+- [Development](#development)
+- [Project structure](#project-structure)
+- [Data and privacy](#data-and-privacy)
 
-## Özellikler
+---
 
-- 🔔 **Bitene kadar hatırlat** — her görev için ayrı aralık (5 dk … 2 sa). Son tarih geçtiyse aralık yarıya iner.
-- 😏 **Eğlenceli başlıklar** — "Yine unuttun dimi?", "Tık tık…", "Forgot again, didn't you?" gibi rastgele başlıklar (ayarlardan kapatılabilir).
-- 🎯 **Odak modu** — tek bir görevi en üste sabitle, sıradaki alt adımı gör.
-- 📋 **Görev ayrıntıları** — öncelik (yüksek/orta/düşük), etiketler, son tarih, alt görevler, tekrarlayan görevler (günlük, hafta içi, haftalık, aylık).
-- 🗂️ **Pano (Kanban)** — Yapılacak / Yapılıyor / Bekliyor / Bitti sütunları; kartları sürükleyerek sütun ve sıra değiştir, "Bitti"ye bırakmak görevi tamamlar. Her sütunun altından hızlı ekleme.
-- ⚡ **Doğal dilli hızlı ekleme** — `yarın 18:00 fatura öde #ev !1 @30dk` → tarih, saat, etiket, öncelik ve hatırlatma aralığı otomatik ayrışır; yazarken önizleme görünür.
-- 🔍 **Arama ve sıralama** — arama (`/`), sıralama (akıllı, son tarih, öncelik, yeni, A→Z, elle), listede sürükleyerek elle sıralama.
-- ↶ **Pişmanlık yok** — silmeyi geri al, görevi kopyala, yarına ertele, bitenleri topluca temizle, "bugün N bitti" sayacı.
-- ⌨️ **Kısayollar** — `N` yeni görev, `/` ara, `1-5` görünüm değiştir, `Esc` kapat.
-- 🔕 **Sustur** — 15 dk / 30 dk / 1 sa / 3 sa; ayrıca sessiz saatler.
-- 📲 **Telegram botu** — hatırlatmalar telefonuna Telegram'dan da gelir; mesajın altındaki düğmelerle "Bitirdim / 30 dk sustur / Odak" diyebilir, bota düz yazarak görev ekleyebilirsin.
-- 🌗 **Tema** — koyu / açık / sistem.
-- 💾 **Yedek** — JSON dışa/içe aktarma.
-- 🌍 **Diller** — Türkçe / English / Русский.
+## Why Hyper Do?
 
-## Platformlar
+Most to-do apps notify you once and go quiet. Hyper Do doesn't. Until you complete a task and check it off, it keeps reminding you at the interval you chose. If the due date has passed, the interval is halved. It reaches you from the system tray when the window is closed, as a local notification when your phone is locked, and through Telegram if you want it to.
 
-| Platform | Nasıl | Hatırlatma davranışı |
+## Features
+
+- 🔔 **Reminds until done** — a separate interval per task (5 min … 2 h). Overdue tasks get reminded twice as often.
+- 😏 **Playful titles** — random notification titles like "Forgot again, didn't you?" or "Tick tock…" (can be turned off in settings).
+- 🎯 **Focus mode** — pin a single task to the top and see its next sub-step.
+- ⚡ **Hyper Focus (Pomodoro)** — one click starts a 40-minute deep-work round followed by a 5-minute break, repeating until you stop. Progress ring, countdown in the window title, chime and notification on every phase change. Lengths are adjustable in Settings.
+- 📋 **Task details** — priority (high / medium / low), tags, due date, subtasks, recurring tasks (daily, weekdays, weekly, monthly).
+- 🗂️ **Board (Kanban)** — To do / Doing / Waiting / Done columns. Drag cards between columns and reorder them; dropping onto "Done" completes the task. Quick add at the bottom of every column.
+- ⚡ **Natural-language quick add** — `tomorrow 18:00 pay the bill #home !1 @30m` → date, time, tag, priority and reminder interval are parsed automatically with a live preview.
+- 🔍 **Search and sort** — search (`/`), sort (smart, due date, priority, newest, A→Z, manual), drag to reorder manually.
+- ↶ **No regrets** — undo delete, duplicate a task, push to tomorrow, clear all completed tasks, "N done today" counter.
+- ⌨️ **Shortcuts** — `N` new task, `/` search, `1-5` switch views, `Esc` close.
+- 🔕 **Snooze** — 15 min / 30 min / 1 h / 3 h, plus quiet hours.
+- 📲 **Telegram bot** — reminders also arrive on your phone via Telegram. Use the inline buttons ("Done / Snooze 30 min / Focus") or just type to the bot to add tasks.
+- 🌐 **Language switcher** — English, Türkçe, Русский. English is the default; switch from the sidebar or Settings.
+- 🌗 **Theme** — dark / light / system, with a colourful gradient-based look.
+- 💾 **Backup** — JSON export and import.
+
+## Platforms
+
+| Platform | How | Reminder behaviour |
 |---|---|---|
-| Windows (Electron) | `npm run dist` → `Hyper Do Setup x.y.z.exe` kur; masaüstü ve Başlat kısayolu kendiliğinden oluşur | Pencere kapalıyken bile tepsiden hatırlatır, görev çubuğunda yanıp söner |
-| macOS (Electron) | `npm run dist:mac` (bir Mac'te çalıştırılmalı) | Dock'ta kalır, pencere kapalıyken bildirir |
-| Android (Capacitor) | `npm run android:apk` → `android/app/build/outputs/apk/debug/app-debug.apk` | Uygulama kapalıyken de bildirir: hatırlatmalar 48 saat ileriye yerel bildirim olarak planlanır, uygulama her açılışta plan uzatılır |
-| Web / iPhone / iPad (PWA) | `npm run dev:web` veya `dist-web` klasörünü yayınla | Sadece sekme ya da ana ekrana eklenmiş uygulama **açıkken** bildirir |
+| Windows (Electron) | `npm run dist` → run `Hyper-Do-Setup-x.y.z.exe`; desktop and Start menu shortcuts are created, the Chrome extension is bundled | Reminds from the tray even when the window is closed, flashes the taskbar entry |
+| macOS (Electron) | `npm run dist:mac` (must run on a Mac) | Stays in the Dock, notifies when the window is closed |
+| Android (Capacitor) | `npm run android:apk` → `android/app/build/outputs/apk/debug/app-debug.apk` | Notifies even when the app is closed: reminders are scheduled 48 h ahead as local notifications and extended on every launch |
+| Chrome extension | `npm run build:ext` → load `dist-ext/` as an unpacked extension | Service worker keeps reminding while Chrome is running, even with no Hyper Do tab open |
+| Web / iPhone / iPad (PWA) | `npm run dev:web` or publish the `dist-web` folder | Notifies only while the tab or the home-screen app is **open** |
 
-**iPhone'da:** Safari'de siteyi aç → Paylaş → **Ana Ekrana Ekle**. Bildirim izni ancak ana ekrandan açılan uygulamada istenebilir (iOS 16.4+).
+**On iPhone:** open the site in Safari → Share → **Add to Home Screen**. Notification permission can only be requested from the app launched from the home screen (iOS 16.4+).
 
-## Hızlı başlangıç
+## Quick start
 
 ```bash
 git clone https://github.com/leozencreates/hyper-do.git
 cd hyper-do
 npm install
-npm run dev        # Electron + Vite, sıcak yenileme
+npm run dev        # Electron + Vite with hot reload
 ```
 
-Sadece tarayıcıda denemek için:
+To try it in the browser only:
 
 ```bash
-npm run dev:web    # http://localhost:5180 — aynı ağdaki telefon da erişebilir
+npm run dev:web    # http://localhost:5180 — phones on the same network can open it too
 ```
 
-## Doğal dilli hızlı ekleme
+## Natural-language quick add
 
-Tek satır yaz, gerisini Hyper Do ayrıştırır:
+Type one line and Hyper Do parses the rest:
 
 ```
-yarın 18:00 fatura öde #ev !1 @30dk
+tomorrow 18:00 pay the bill #home !1 @30m
 ```
 
-| Parça | Anlamı |
+| Token | Meaning |
 |---|---|
-| `bugün`, `yarın`, `cuma`, `15.10` | Son tarih (gün adları ve `gg.aa` biçimi desteklenir) |
-| `18:00` | Saat |
-| `#ev` | Etiket (birden fazla olabilir) |
-| `!1` / `!2` / `!3` | Öncelik: yüksek / orta / düşük |
-| `@30dk`, `@2sa` | Hatırlatma aralığı |
+| `today`, `tomorrow`, `friday`, `15.10` | Due date (weekday names and `dd.mm` are supported) |
+| `18:00` | Time |
+| `#home` | Tag (several allowed) |
+| `!1` / `!2` / `!3` | Priority: high / medium / low |
+| `@30m`, `@2h` | Reminder interval |
 
-Anahtar kelimeler Türkçe, İngilizce ve Rusça çalışır; yazarken ayrışan parçalar önizlemede görünür.
+Keywords work in English, Turkish and Russian. Parsed parts show up in the preview as you type.
 
-## Telegram botu (Windows/macOS)
+## Telegram bot (Windows/macOS)
 
-1. Telegram'da **@BotFather**'a `/newbot` yaz, bir ad ver; verdiği token'ı kopyala.
-2. Hyper Do → Ayarlar → **Telegram botu**'nu aç, token'ı yapıştır.
-3. Telegram'da kendi botunu aç ve `/start` yaz. Bağlantı otomatik kurulur; ilk `/start` yazan sohbet sahip olur, diğerleri yoksayılır.
-4. Uygulama (ya da tepsi simgesi) açık olduğu sürece hatırlatmalar hem masaüstü bildirimi hem Telegram mesajı olarak gelir.
+1. In Telegram, send `/newbot` to **@BotFather**, give it a name and copy the token it returns.
+2. In Hyper Do open Settings → enable **Telegram bot** and paste the token.
+3. Open your bot in Telegram and send `/start`. The link is established automatically. The first chat that sends `/start` becomes the owner; others are ignored.
+4. While the app (or its tray icon) is running, reminders arrive both as desktop notifications and as Telegram messages.
 
-| Komut | İşlev |
+| Command | What it does |
 |---|---|
-| `/list` | Açık görevleri listele |
-| `/done N` | N numaralı görevi bitir |
-| `/snooze N [dk]` | N numaralı görevi sustur (varsayılan süre ayarlardan) |
-| `/focus N` | N numaralı görevi odağa al |
-| `/add metin` | Görev ekle (düz yazmak da yeter, hızlı ekleme sözdizimi geçerlidir) |
-| `/help` | Yardım |
+| `/list` | List open tasks |
+| `/done N` | Complete task number N |
+| `/snooze N [min]` | Snooze task N (default duration from settings) |
+| `/focus N` | Put task N in focus |
+| `/add text` | Add a task (plain text works too, quick-add syntax applies) |
+| `/help` | Help |
 
-Token yalnızca cihazındaki veri dosyasında saklanır; hiçbir sunucuya gönderilmez.
+The token is stored only in the local data file; it is never sent anywhere except to the Telegram Bot API.
 
-## Android derleme
+## Chrome extension
 
-Gereksinimler:
+The extension packages the same UI as a popup and a full-page tab, and adds a background service worker that fires reminders through Chrome notifications while the browser is running.
+
+```bash
+npm run build:ext      # produces dist-ext/
+```
+
+Then open `chrome://extensions`, enable **Developer mode**, click **Load unpacked** and choose the `dist-ext` folder.
+
+- The toolbar icon opens the app in a popup. The badge shows the number of overdue tasks.
+- Right-click the icon → "Open Hyper Do in a tab" for the full-width layout.
+- Reminders are delivered via `chrome.notifications`; clicking one focuses the task, and the buttons let you mark it done or snooze it.
+- Data lives in `chrome.storage.local`, synced with any open Hyper Do tab or popup.
+
+## Windows installer and uninstall
+
+```bash
+npm run dist     # → %LOCALAPPDATA%hyperdo-releaseHyper-Do-Setup-0.1.0.exe
+```
+
+The installer is a standard NSIS setup wizard:
+
+- Lets you pick the installation folder, creates desktop and Start menu shortcuts and launches the app when finished.
+- Registers an uninstaller: remove it from **Settings → Apps → Installed apps → Hyper Do** or run `Uninstall Hyper Do.exe` in the install folder. Your task data in `%APPDATA%hyper-do` is kept so a reinstall picks up where you left off.
+- Bundles the Chrome extension under `resourceschrome-extension`. Chrome does not allow installers to add extensions silently, so open **Settings → Chrome extension → Install in Chrome** inside Hyper Do: it opens the folder and `chrome://extensions`, where you turn on Developer mode and click **Load unpacked**.
+
+## Building for Android
+
+Requirements:
 
 - Android SDK (`%LOCALAPPDATA%\Android\Sdk`, platform 36)
-- JDK 21 — `.tools/jdk-21*` altında taşınabilir kopya; `android/gradle.properties` içindeki `org.gradle.java.home` oraya bakar
+- JDK 21 — a portable copy under `.tools/jdk-21*`; `org.gradle.java.home` in `android/gradle.properties` points there
 
 ```bash
-npm run android:sync   # web derle + Android projesine kopyala
-npm run android:apk    # debug APK üret
-npm run android:open   # Android Studio'da aç (kuruluysa)
-npm run android:run    # bağlı cihaza yükle ve çalıştır
+npm run android:sync   # build web + copy into the Android project
+npm run android:apk    # build a debug APK
+npm run android:open   # open in Android Studio (if installed)
+npm run android:run    # install and run on a connected device
 ```
 
-APK'yı telefona atıp kur. İlk açılışta bildirim izni ister. **Ayarlar → Pil → Hyper Do → "Kısıtlama yok"** seçmen hatırlatmaların gecikmemesi için önemlidir.
+Copy the APK to your phone and install it. It asks for notification permission on first launch. Setting **Settings → Battery → Hyper Do → "Unrestricted"** matters so reminders are not delayed.
 
-## Geliştirme
+## Development
 
 ```bash
 npm install
-npm run dev          # Electron + Vite, sıcak yenileme
-npm run dev:web      # Sadece tarayıcı, http://localhost:5180
-npm run build        # Electron için derle (dist/ + dist-electron/)
-npm run build:web    # PWA için derle (dist-web/)
-npm run preview:web  # dist-web'i yerelde önizle
-npm run dist         # Windows kurulum paketi → %LOCALAPPDATA%\hyperdo-release\
-npm run dist:mac     # macOS DMG (Mac'te)
+npm run dev          # Electron + Vite with hot reload
+npm run dev:web      # Browser only, http://localhost:5180
+npm run build        # Build for Electron (dist/ + dist-electron/)
+npm run build:web    # Build the PWA (dist-web/)
+npm run build:ext    # Build the Chrome extension (dist-ext/)
+npm run preview:web  # Preview dist-web locally
+npm run dist         # Windows installer → %LOCALAPPDATA%\hyperdo-release\
+npm run dist:mac     # macOS DMG (on a Mac)
 npm run android:apk  # Android debug APK
 ```
 
-> `npm run dist` çıktıyı Desktop yerine `%LOCALAPPDATA%\hyperdo-release\` altına yazar; Desktop altında klasör adlandırma kısıtı buna sebep olur.
+> `npm run dist` writes its output to `%LOCALAPPDATA%\hyperdo-release\` instead of the project folder because of a folder-naming restriction under Desktop.
 
-Teknolojiler: React 19, TypeScript, Vite, Electron, electron-builder, Capacitor (Android), Web Notifications + Service Worker (PWA).
+Tech stack: React 19, TypeScript, Vite, Electron, electron-builder, Capacitor (Android), Web Notifications + Service Worker (PWA), Chrome Extensions Manifest V3.
 
-## Proje yapısı
+## Project structure
 
 ```
-electron/main.ts               Ana süreç: pencere, tepsi, bildirimler, hatırlatma zamanlayıcısı, JSON depolama
-electron/telegram.ts           Telegram botu: long-polling komutlar, düğmeli hatırlatmalar
-electron/preload.ts            Güvenli IPC köprüsü (window.tidi)
-src/lib/reminder.ts            Platformdan bağımsız hatırlatma motoru (Electron ve web ortak)
-src/lib/tasks.ts               Saf görev yardımcıları (ekle, bitir, sırala, sürükle-bırak, kopyala, normalize)
-src/lib/parse.ts               Doğal dilli hızlı ekleme ayrıştırıcısı
-src/lib/dates.ts               Tarih yardımcıları (bugün, bu hafta, gecikmiş)
-src/lib/store.ts               Uygulama durumu ve kalıcılık
-src/lib/types.ts               Görev / ayar tipleri ve varsayılanlar
-src/lib/platform.ts            Electron / Capacitor (Android) / Web uyarlamasından uygununu seçer
-src/lib/platform.capacitor.ts  Android: yerel bildirimleri 48 saat ileriye planlar
-src/lib/platform.web.ts        Tarayıcı: localStorage + Web Notification
-src/lib/i18n.ts                TR / EN / RU metinler ve eğlenceli başlık havuzu
-src/components/Board.tsx       Kanban panosu (sürükle-bırak)
-src/components/QuickAdd.tsx    Hızlı ekleme kutusu ve önizleme
-src/components/TaskItem.tsx    Liste satırı
-src/components/TaskEditor.tsx  Görev düzenleme paneli
-src/components/FocusBanner.tsx Odak modu şeridi
-src/components/SettingsPanel.tsx  Ayarlar
-src/App.tsx                    Arayüz
-public/sw.js                   PWA service worker (çevrimdışı + bildirim tıklaması)
-android/                       Capacitor Android projesi
+electron/main.ts               Main process: window, tray, notifications, reminder scheduler, JSON storage
+electron/telegram.ts           Telegram bot: long-polling commands, reminders with inline buttons
+electron/preload.ts            Secure IPC bridge (window.tidi)
+extension/manifest.json        Chrome extension manifest (MV3)
+extension/background.ts        Extension service worker: alarms, notifications, badge
+src/lib/reminder.ts            Platform-independent reminder engine (shared by Electron, web and extension)
+src/lib/tasks.ts               Pure task helpers (add, complete, sort, drag-and-drop, duplicate, normalize)
+src/lib/parse.ts               Natural-language quick-add parser
+src/lib/dates.ts               Date helpers (today, this week, overdue)
+src/lib/store.ts               App state and persistence
+src/lib/types.ts               Task / settings types and defaults
+src/lib/platform.ts            Picks the Electron / Capacitor / extension / web adapter
+src/lib/platform.capacitor.ts  Android: schedules local notifications 48 h ahead
+src/lib/platform.extension.ts  Chrome extension: chrome.storage + messaging to the service worker
+src/lib/platform.web.ts        Browser: localStorage + Web Notification
+src/lib/i18n.ts                EN / TR / RU strings and the playful title pool
+src/components/Board.tsx       Kanban board (drag-and-drop)
+src/components/QuickAdd.tsx    Quick-add box with live preview
+src/components/TaskItem.tsx    List row
+src/components/TaskEditor.tsx  Task editor panel
+src/components/FocusBanner.tsx Focus-mode banner
+src/components/HyperFocus.tsx  Hyper Focus (Pomodoro) timer hook and bar
+src/components/SettingsPanel.tsx  Settings
+src/App.tsx                    UI shell
+public/sw.js                   PWA service worker (offline + notification click)
+android/                       Capacitor Android project
 ```
 
-## Veri ve gizlilik
+## Data and privacy
 
-| Ortam | Depolama |
+| Environment | Storage |
 |---|---|
 | Electron (Windows/macOS) | `%APPDATA%/hyper-do/hyperdo-data.json` |
-| Android | Capacitor Preferences (uygulama sandbox'ı) |
-| Web / PWA | Tarayıcı `localStorage` |
+| Android | Capacitor Preferences (app sandbox) |
+| Chrome extension | `chrome.storage.local` |
+| Web / PWA | Browser `localStorage` |
 
-Hesap, telemetri veya uzak sunucu yoktur. Tek dış bağlantı, **sen açarsan** Telegram Bot API'dir. Yedek almak için Ayarlar → JSON dışa aktar.
+There is no account, no telemetry and no remote server. The only outbound connection is the Telegram Bot API, and only **if you enable it**. Use Settings → Export JSON to back up.

@@ -7,10 +7,11 @@ interface Props {
   onComplete(): void
   onUnfocus(): void
   onToggleSub(subId: string): void
+  onHyperFocus?(): void
 }
 
 /** Tek bir göreve odaklanmayı kolaylaştıran büyük, dikkat çeken alan. */
-export default function FocusBanner({ task, onComplete, onUnfocus, onToggleSub }: Props) {
+export default function FocusBanner({ task, onComplete, onUnfocus, onToggleSub, onHyperFocus }: Props) {
   const t = useT()
   const lang = useLang()
   const next = task.subtasks.find((s) => !s.done)
@@ -35,6 +36,11 @@ export default function FocusBanner({ task, onComplete, onUnfocus, onToggleSub }
         <button className="primary big" onClick={onComplete}>
           {t('finished')}
         </button>
+        {onHyperFocus && (
+          <button className="hf-start" onClick={onHyperFocus}>
+            {t('hf_start')}
+          </button>
+        )}
         <button className="ghost" onClick={onUnfocus}>
           {t('unfocus')}
         </button>

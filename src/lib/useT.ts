@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext } from 'react'
 import { translate, type Key, type Lang } from './i18n'
 
-export const LangContext = createContext<Lang>('tr')
+export const LangContext = createContext<Lang>('en')
 
 export function useLang(): Lang {
   return useContext(LangContext)
