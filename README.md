@@ -9,10 +9,19 @@
 
 No account, no cloud, no subscription. Your data never leaves your device — unless **you** connect Telegram or a calendar, and even then it goes straight from your device to that service.
 
+## Download
+
+**Windows:** grab the latest installer from the [Releases page](https://github.com/leozencreates/hyper-do/releases/latest) — currently [`Hyper-Do-Setup-0.1.0.exe`](https://github.com/leozencreates/hyper-do/releases/download/v0.1.0/Hyper-Do-Setup-0.1.0.exe). Run it, pick a folder, done. See [Windows installer and uninstall](#windows-installer-and-uninstall) for details.
+
+> Windows SmartScreen may warn that the publisher is unknown because the installer is not code-signed. Click **More info → Run anyway**.
+
+**Android / macOS:** no prebuilt packages yet — see [Building for Android](#building-for-android) and [Development](#development).
+
 ---
 
 ## Contents
 
+- [Download](#download)
 - [Why Hyper Do?](#why-hyper-do)
 - [Features](#features)
 - [Platforms](#platforms)
@@ -153,6 +162,8 @@ Paste the private iCal address of any calendar: Outlook.com (*Settings → Calen
 Optional for distributors: a `.env` with `VITE_GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_SECRET` pre-fills the OAuth client in the build.
 
 ## Windows installer and uninstall
+
+Prebuilt installers are published on the [Releases page](https://github.com/leozencreates/hyper-do/releases). To build one yourself:
 
 ```bash
 npm run dist     # → %LOCALAPPDATA%\hyperdo-release\Hyper-Do-Setup-0.1.0.exe
