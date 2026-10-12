@@ -65,7 +65,7 @@ function chime(phase: HfPhase) {
 function notify(title: string, body: string) {
   try {
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      const n = new Notification(title, { body, tag: 'hyperdo-hf', icon: './icon.svg' })
+      const n = new Notification(title, { body, tag: 'hyperdo-hf', icon: './icon-192.png' })
       n.onclick = () => {
         window.focus()
         n.close()

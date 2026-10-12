@@ -363,3 +363,64 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   .hf-time { font-size: 18px; }
   .hf-task { font-size: 15px; white-space: normal; }
 }
+
+/* --- Takvim: Bugün / Bu hafta üstündeki etkinlik şeridi --- */
+.cal-strip { background: color-mix(in srgb, var(--bg-2) 85%, transparent); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px 10px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+.cal-head { display: flex; align-items: center; gap: 8px; padding: 4px 2px; color: var(--text-2); font-size: 13px; text-align: left; width: 100%; }
+.cal-head:hover { color: var(--text); }
+.cal-head-title { font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: 12px; }
+.cal-caret { margin-left: auto; color: var(--text-3); }
+.cal-day { display: flex; flex-direction: column; gap: 4px; }
+.cal-day-label { font-size: 12px; color: var(--text-3); font-weight: 600; padding: 6px 2px 2px; text-transform: capitalize; }
+.cal-event { --c: var(--sky); display: grid; grid-template-columns: 10px 112px 1fr auto auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; font-size: 14px; background: color-mix(in srgb, var(--c) 7%, transparent); }
+.cal-event:hover { background: color-mix(in srgb, var(--c) 14%, transparent); }
+.cal-event.past { opacity: .5; }
+.cal-event.now { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); }
+.cal-event.now .cal-time { color: var(--c); font-weight: 700; }
+.cal-dot { --c: var(--sky); width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px color-mix(in srgb, var(--c) 60%, transparent); flex: none; display: inline-block; }
+.cal-time { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cal-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-title a { color: inherit; text-decoration: none; }
+.cal-title a:hover { text-decoration: underline; }
+.cal-loc { color: var(--text-3); font-size: 13px; }
+.cal-cal { font-size: 11px; color: var(--text-3); white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.cal-event .mini { opacity: 0; transition: opacity .15s; }
+.cal-event:hover .mini, .cal-event:focus-within .mini { opacity: 1; }
+
+/* "Takvime ekle" açılır menüsü */
+.cal-add { position: relative; display: inline-block; }
+.cal-popover { position: absolute; left: 0; top: calc(100% + 4px); z-index: 5; min-width: 230px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.35); padding: 6px; display: flex; flex-direction: column; }
+.cal-popover a, .cal-popover button { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; color: var(--text); text-decoration: none; font-size: 14px; text-align: left; }
+.cal-popover a:hover, .cal-popover button:hover { background: var(--bg-3); }
+.cal-popover-icon { width: 18px; text-align: center; }
+
+/* Ayarlar → Takvimler */
+.cal-settings { display: flex; flex-direction: column; gap: 12px; }
+.cal-block { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; background: color-mix(in srgb, var(--bg-3) 40%, transparent); }
+.cal-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cal-block .row { flex-wrap: wrap; }
+.cal-list { display: flex; flex-direction: column; gap: 4px; }
+.cal-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 7px; font-size: 14px; cursor: pointer; }
+.cal-item:hover { background: var(--bg-3); }
+.cal-item.off > span:not(.hint) { opacity: .5; }
+.cal-item.feed { cursor: default; }
+.cal-item.feed .hint { margin-left: auto; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.cal-color { width: 26px; height: 26px; padding: 0; border: none; background: none; border-radius: 50%; cursor: pointer; flex: none; }
+.cal-color::-webkit-color-swatch-wrapper { padding: 0; }
+.cal-color::-webkit-color-swatch { border: 1px solid var(--border); border-radius: 50%; }
+.cal-feed-name { width: 130px; flex: none !important; padding: 5px 8px; }
+.cal-feed-url { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cal-add-feed .mono { flex: 1; }
+.hint.error { color: var(--danger); }
+.hint code { font-size: 12px; background: var(--bg-3); padding: 1px 6px; border-radius: 5px; user-select: all; }
+:root[data-theme="light"] .cal-popover { box-shadow: 0 12px 40px rgba(30,40,80,.18); }
+
+@media (max-width: 720px) {
+  .cal-event { grid-template-columns: 10px 1fr auto; grid-template-areas: "dot title btn" ". time btn"; row-gap: 2px; }
+  .cal-event .cal-dot { grid-area: dot; }
+  .cal-event .cal-title { grid-area: title; white-space: normal; }
+  .cal-event .cal-time { grid-area: time; }
+  .cal-event .cal-cal { display: none; }
+  .cal-event .mini { grid-area: btn; opacity: 1; }
+  .cal-item.feed { flex-wrap: wrap; }
+}

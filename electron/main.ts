@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, Tray, Menu, nativeImage, shell } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -6,9 +6,21 @@ import { DEFAULT_SETTINGS, type AppData } from '../src/lib/types'
 import { buildNotification, collectDueReminders, syncCounters } from '../src/lib/reminder'
 import { translate } from '../src/lib/i18n'
 import { normalizeTask } from '../src/lib/tasks'
+import { CalendarSync, normalizeCalendarSettings } from '../src/lib/calsync'
 import { TelegramBot } from './telegram'
+import { googleLoginDesktop } from './calendar'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// ---- Uygulama ikonu ----
+// Paketli sürümde electron-builder ikonu resources/icon.ico olarak kopyalar (extraResources);
+// geliştirmede build/icon.ico kullanılır. Pencereye açıkça ikon verilmezse Windows görev çubuğu
+// ikonu AppUserModelID kısayol önbelleğinden arar; önbellek bozuksa boş belge simgesi görünür.
+function appIconPath() {
+  const packaged = path.join(process.resourcesPath, 'icon.ico')
+  if (app.isPackaged && fs.existsSync(packaged)) return packaged
+  return path.join(__dirname, '../build/icon.ico')
+}
 
 // ---- Kalıcı depolama: userData/hyperdo-data.json ----
 const dataFile = () => path.join(app.getPath('userData'), 'hyperdo-data.json')
@@ -17,9 +29,10 @@ function loadData(): AppData {
   try {
     const raw = fs.readFileSync(dataFile(), 'utf8')
     const parsed = JSON.parse(raw) as Partial<AppData>
+    const settings = { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) }
     return {
       tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : [],
-      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      settings: { ...settings, calendar: normalizeCalendarSettings(settings.calendar) },
     }
   } catch {
     return { tasks: [], settings: { ...DEFAULT_SETTINGS } }
@@ -43,6 +56,31 @@ let quitting = false
 // bekleyen görevler kısa süre içinde tekrar hatırlatılır.
 const lastNotified = new Map<string, number>()
 
+// ---- Takvim senkronu: Google + ICS akışları. Token ve görev→etkinlik eşlemesi ayrı dosyada tutulur
+//      (yedeğe girmez): userData/hyperdo-calendar.json ----
+const calendarFile = () => path.join(app.getPath('userData'), 'hyperdo-calendar.json')
+const calendar = new CalendarSync({
+  getData: () => data,
+  loadState() {
+    try {
+      return fs.readFileSync(calendarFile(), 'utf8')
+    } catch {
+      return null
+    }
+  },
+  saveState(json) {
+    try {
+      fs.mkdirSync(path.dirname(calendarFile()), { recursive: true })
+      fs.writeFileSync(calendarFile(), json, 'utf8')
+    } catch (e) {
+      console.error('[calendar] state save failed:', (e as Error).message)
+    }
+  },
+  onEvents: (events) => win?.webContents.send('tidi:cal-events', events),
+  onStatus: (status) => win?.webContents.send('tidi:cal-status', status),
+  googleSupported: true,
+})
+
 // ---- Telegram botu: veriyi okur; komutla değiştirdiğinde kaydeder ve arayüzü günceller ----
 const telegram = new TelegramBot({
   getData: () => data,
@@ -53,6 +91,7 @@ const telegram = new TelegramBot({
     saveData(data)
     win?.webContents.send('tidi:data-changed', data)
     telegram.sync()
+    calendar.onDataSaved()
   },
 })
 
@@ -65,6 +104,7 @@ function createWindow() {
     minHeight: 480,
     backgroundColor: '#0f1117',
     title: 'Hyper Do',
+    icon: appIconPath(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
@@ -79,6 +119,12 @@ function createWindow() {
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  // Dış bağlantılar ("Takvime ekle" vb.) sistem tarayıcısında açılır, yeni Electron penceresi değil.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
 
   // Kapat = tepsiye küçült (macOS'ta Dock'ta kalır). Hatırlatmalar çalışmaya devam eder.
   win.on('close', (e) => {
@@ -97,8 +143,10 @@ function showWindow() {
   win.focus()
 }
 
-// ---- Tepsi simgesi (programatik 16x16 turuncu daire) ----
+// ---- Tepsi simgesi: gerçek logo; ikon dosyası okunamazsa programatik turuncu daire ----
 function trayIcon() {
+  const fromFile = nativeImage.createFromPath(appIconPath())
+  if (!fromFile.isEmpty()) return fromFile.resize({ width: 16, height: 16 })
   const size = 16
   const buf = Buffer.alloc(size * size * 4)
   for (let y = 0; y < size; y++) {
@@ -174,8 +222,28 @@ ipcMain.handle('tidi:save', (_e, incoming: AppData) => {
   saveData(data)
   if (langChanged) buildTrayMenu()
   telegram.sync()
+  calendar.onDataSaved()
 })
 ipcMain.handle('tidi:telegram-test', () => telegram.test())
+
+// ---- Takvim IPC ----
+ipcMain.handle('tidi:cal-status', () => calendar.status())
+ipcMain.handle('tidi:cal-events', () => calendar.events())
+ipcMain.handle('tidi:cal-sync', () => calendar.sync())
+ipcMain.handle('tidi:cal-disconnect', () => calendar.disconnectGoogle())
+ipcMain.handle('tidi:cal-connect', async (): Promise<{ ok: boolean; error?: string }> => {
+  const { clientId, clientSecret } = data.settings.calendar.google
+  if (!clientId.trim()) return { ok: false, error: 'client_id' }
+  const lang = data.settings.language
+  try {
+    const tokens = await googleLoginDesktop(clientId.trim(), clientSecret.trim(), { ok: translate(lang, 'cal_browser_ok'), fail: translate(lang, 'cal_browser_fail') })
+    await calendar.completeGoogleLogin(tokens)
+    showWindow()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+})
 
 ipcMain.handle('tidi:notify-test', () => {
   const lang = data.settings.language
@@ -194,6 +262,7 @@ if (!app.requestSingleInstanceLock()) {
     createWindow()
     createTray()
     telegram.sync()
+    calendar.start()
     setInterval(tick, 30_000)
   })
   app.on('activate', showWindow) // macOS: Dock simgesine tıklama
@@ -203,5 +272,6 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     quitting = true
     telegram.stop()
+    calendar.stop()
   })
 }

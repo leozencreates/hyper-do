@@ -10,6 +10,7 @@ import { type AppData, type HyperDoApi } from './types'
 import { buildNotification, planReminderTimes } from './reminder'
 import { translate } from './i18n'
 import { parseStored } from './platform.web'
+import { createBrowserCalendar } from './platform.calendar'
 
 const STORAGE_KEY = 'hyperdo-data'
 const PER_TASK_MAX = 48 // görev başına en fazla planlanan bildirim
@@ -26,6 +27,8 @@ function hashId(s: string): number {
 
 export function createCapacitorApi(): HyperDoApi {
   let data: AppData = parseStored(null)
+  // Google blocks OAuth inside Android WebViews, so only ICS feeds are offered here; CapacitorHttp lifts CORS for them.
+  const calendar = createBrowserCalendar(() => data, { googleSupported: false })
   const focusListeners = new Set<(id: string) => void>()
   const remindListeners = new Set<(id: string) => void>()
   let perm: ReturnType<HyperDoApi['permission']> = 'default'
@@ -105,6 +108,7 @@ export function createCapacitorApi(): HyperDoApi {
       }
       await refreshPermission()
       void reschedule()
+      calendar.sync.start()
       return data
     },
     async save(incoming) {
@@ -115,7 +119,9 @@ export function createCapacitorApi(): HyperDoApi {
         /* yoksay */
       }
       void reschedule()
+      calendar.sync.onDataSaved()
     },
+    calendar: calendar.api,
     async notifyTest() {
       if (perm !== 'granted') return
       const lang = data.settings.language

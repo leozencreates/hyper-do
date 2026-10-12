@@ -13,7 +13,9 @@ import FocusBanner from './components/FocusBanner'
 import SettingsPanel from './components/SettingsPanel'
 import QuickAdd from './components/QuickAdd'
 import Board from './components/Board'
+import CalendarStrip from './components/CalendarStrip'
 import { HyperFocusBar, useHyperFocus } from './components/HyperFocus'
+import { useCalendar } from './lib/useCalendar'
 
 type View = 'today' | 'week' | 'all' | 'board' | 'done'
 const VIEW_KEYS: View[] = ['today', 'week', 'all', 'board', 'done']
@@ -34,6 +36,7 @@ type MainProps = ReturnType<typeof useAppData> & { data: NonNullable<ReturnType<
 function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
   const t = useT()
   const hf = useHyperFocus(data.settings.pomodoro, data.settings.language)
+  const cal = useCalendar()
   const [view, setView] = useState<View>(() => {
     const v = new URLSearchParams(location.search).get('view') as View | null
     return v && VIEW_KEYS.includes(v) ? v : 'today'
@@ -342,6 +345,14 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
 
         {view !== 'done' && view !== 'board' && <QuickAdd ref={quickRef} onAdd={(text) => quickAdd(text)} />}
 
+        {cal.available && settings.calendar.showEvents && (view === 'today' || view === 'week') && !query.trim() && (
+          <CalendarStrip
+            events={cal.events}
+            view={view}
+            onMakeTask={(e) => setEditing(newTask({ title: e.title, dueAt: e.allDay ? e.start + 9 * 3_600_000 : e.start, notes: e.location ?? '', status: 'todo' }, settings))}
+          />
+        )}
+
         {view === 'board' ? (
           <Board
             tasks={filtered}
@@ -411,6 +422,7 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
         <SettingsPanel
           settings={settings}
           data={data}
+          cal={cal}
           onChange={(s) => setSettings(() => s)}
           onImport={(d) => {
             replaceData(d)

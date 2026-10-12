@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_SETTINGS, type AppData, type Settings, type Task } from './types'
+import { normalizeCalendarSettings } from './calsync'
 import { platform } from './platform'
 
 import { normalizeTask } from './tasks'
@@ -10,7 +11,14 @@ export { uid, newTask, completeTask } from './tasks'
 export function normalizeData(d: AppData): AppData {
   return {
     tasks: (Array.isArray(d.tasks) ? d.tasks : []).map(normalizeTask),
-    settings: { ...DEFAULT_SETTINGS, ...d.settings, quietHours: { ...DEFAULT_SETTINGS.quietHours, ...d.settings?.quietHours }, telegram: { ...DEFAULT_SETTINGS.telegram, ...d.settings?.telegram }, pomodoro: { ...DEFAULT_SETTINGS.pomodoro, ...d.settings?.pomodoro } },
+    settings: {
+      ...DEFAULT_SETTINGS,
+      ...d.settings,
+      quietHours: { ...DEFAULT_SETTINGS.quietHours, ...d.settings?.quietHours },
+      telegram: { ...DEFAULT_SETTINGS.telegram, ...d.settings?.telegram },
+      pomodoro: { ...DEFAULT_SETTINGS.pomodoro, ...d.settings?.pomodoro },
+      calendar: normalizeCalendarSettings(d.settings?.calendar),
+    },
   }
 }
 

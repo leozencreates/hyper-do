@@ -6,7 +6,7 @@ Hyper Do is a personal to-do application available as a desktop app, an Android 
 
 ## What data Hyper Do handles
 
-Hyper Do stores the tasks you create (titles, notes, tags, due dates, subtasks, reminder settings) and your application settings (language, theme, reminder intervals, Pomodoro lengths, optional Telegram bot token).
+Hyper Do stores the tasks you create (titles, notes, tags, due dates, subtasks, reminder settings) and your application settings (language, theme, reminder intervals, Pomodoro lengths, optional Telegram bot token, optional Google OAuth client and calendar feed links). If you connect a calendar, a local cache of the upcoming events is kept on the device as well.
 
 ## Where the data is stored
 
@@ -22,7 +22,13 @@ Hyper Do has no server, no account system and no analytics. We do not collect, t
 
 ## Network connections
 
-The desktop app connects to the internet only if **you** enable the optional Telegram bot in Settings. In that case the app talks directly to the Telegram Bot API (`api.telegram.org`) using the bot token you provided, in order to send your reminders to your own Telegram chat and receive your commands. The token is stored only on your device.
+Hyper Do connects to the internet only for features **you** switch on in Settings:
+
+- **Telegram bot** (desktop): the app talks directly to the Telegram Bot API (`api.telegram.org`) using the bot token you provided, in order to send your reminders to your own Telegram chat and receive your commands. The token is stored only on your device.
+- **Google Calendar**: after you sign in with your own Google account and your own OAuth client, the app talks directly to Google (`accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`) to read your calendar events and, if you enable it, to write your tasks with a due date into a calendar named "Hyper Do". The OAuth refresh token is stored only on your device, in a separate file that is not included in backups. Disconnecting revokes the token.
+- **Calendar feeds (ICS / webcal)**: the app downloads the calendar links you add, directly from the provider you chose.
+
+No request ever goes through a Hyper Do server, because there is none.
 
 ## Data deletion
 

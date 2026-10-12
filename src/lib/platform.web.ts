@@ -5,6 +5,8 @@
 import { DEFAULT_SETTINGS, type AppData, type HyperDoApi } from './types'
 import { buildNotification, collectDueReminders, syncCounters } from './reminder'
 import { detectLang, translate } from './i18n'
+import { normalizeCalendarSettings } from './calsync'
+import { createBrowserCalendar } from './platform.calendar'
 
 const STORAGE_KEY = 'hyperdo-data'
 
@@ -13,9 +15,10 @@ export function parseStored(raw: string | null): AppData {
   if (!raw) return base
   try {
     const parsed = JSON.parse(raw) as Partial<AppData>
+    const settings = { ...base.settings, ...(parsed.settings ?? {}) }
     return {
       tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
-      settings: { ...base.settings, ...(parsed.settings ?? {}) },
+      settings: { ...settings, calendar: normalizeCalendarSettings(settings.calendar) },
     }
   } catch {
     return base
@@ -24,6 +27,8 @@ export function parseStored(raw: string | null): AppData {
 
 export function createWebApi(): HyperDoApi {
   let data: AppData = parseStored(null)
+  // Google login needs a real http(s) origin to redirect back to (not file://).
+  const calendar = createBrowserCalendar(() => data, { googleSupported: location.protocol.startsWith('http') })
   const lastNotified = new Map<string, number>()
   const focusListeners = new Set<(id: string) => void>()
   const remindListeners = new Set<(id: string) => void>()
@@ -34,7 +39,7 @@ export function createWebApi(): HyperDoApi {
   function show(title: string, body: string, tag: string, onClick?: () => void) {
     if (permission() !== 'granted') return
     try {
-      const n = new Notification(title, { body, tag, requireInteraction: true, icon: './icon.svg' })
+      const n = new Notification(title, { body, tag, requireInteraction: true, icon: './icon-192.png' })
       n.onclick = () => {
         window.focus()
         n.close()
@@ -78,6 +83,8 @@ export function createWebApi(): HyperDoApi {
         /* localStorage erişilemez */
       }
       for (const t of data.tasks) if (!lastNotified.has(t.id)) lastNotified.set(t.id, Date.now())
+      await calendar.handleRedirect()
+      calendar.sync.start()
       return data
     },
     async save(incoming) {
@@ -88,7 +95,9 @@ export function createWebApi(): HyperDoApi {
       } catch {
         /* kota dolu vb. */
       }
+      calendar.sync.onDataSaved()
     },
+    calendar: calendar.api,
     async notifyTest() {
       show(translate(data.settings.language, 'notif_test_title'), translate(data.settings.language, 'notif_test_body'), 'hyperdo-test')
     },

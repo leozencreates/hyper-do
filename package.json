@@ -30,6 +30,12 @@
       "dist-electron/**",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
     "win": {
       "target": [
         "nsis"

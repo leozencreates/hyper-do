@@ -3,10 +3,13 @@ import type { AppData, Settings, SortMode, Theme } from '../lib/types'
 import { LANGS, type Lang } from '../lib/i18n'
 import { platform } from '../lib/platform'
 import { useT } from '../lib/useT'
+import type { CalendarState } from '../lib/useCalendar'
+import CalendarSettings from './CalendarSettings'
 
 interface Props {
   settings: Settings
   data: AppData
+  cal: CalendarState
   onChange(s: Settings): void
   onImport(d: AppData): void
   onClose(): void
@@ -15,7 +18,7 @@ interface Props {
 const THEMES: Theme[] = ['dark', 'light', 'system']
 const SORTS: SortMode[] = ['smart', 'due', 'priority', 'created', 'alpha', 'manual']
 
-export default function SettingsPanel({ settings, data, onChange, onImport, onClose }: Props) {
+export default function SettingsPanel({ settings, data, cal, onChange, onImport, onClose }: Props) {
   const t = useT()
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...settings, [k]: v })
   const isElectron = platform.kind === 'electron'
@@ -109,6 +112,8 @@ export default function SettingsPanel({ settings, data, onChange, onImport, onCl
         )}
 
         {isElectron && <TelegramSection settings={settings} onChange={onChange} />}
+
+        {cal.available && <CalendarSettings settings={settings} tasks={data.tasks} cal={cal} onChange={onChange} />}
 
         <BackupSection data={data} onImport={onImport} />
 

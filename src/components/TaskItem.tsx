@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Task } from '../lib/types'
 import { formatDue, isOverdue, relativeMinutes } from '../lib/dates'
 import { useLang, useT } from '../lib/useT'
+import AddToCalendar from './AddToCalendar'
 
 export interface DragHandlers {
   dragging: boolean
@@ -133,6 +134,7 @@ export default function TaskItem({ task, highlighted, onComplete, onReopen, onEd
                     📅 {t('postpone_tomorrow')}
                   </button>
                 )}
+                <AddToCalendar task={task} />
               </div>
             )}
           </div>
