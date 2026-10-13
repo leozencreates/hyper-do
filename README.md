@@ -11,9 +11,9 @@ No account, no cloud, no subscription. Your data never leaves your device — un
 
 ## Download
 
-**Windows:** grab the latest installer from the [Releases page](https://github.com/leozencreates/hyper-do/releases/latest) — currently [`Hyper-Do-Setup-0.1.0.exe`](https://github.com/leozencreates/hyper-do/releases/download/v0.1.0/Hyper-Do-Setup-0.1.0.exe). Run it, pick a folder, done. See [Windows installer and uninstall](#windows-installer-and-uninstall) for details.
+**Windows:** grab the latest installer from the [Releases page](https://github.com/leozencreates/hyper-do/releases/latest) — currently [`Hyper-Do-Setup-0.2.0.exe`](https://github.com/leozencreates/hyper-do/releases/download/v0.2.0/Hyper-Do-Setup-0.2.0.exe). Run it, pick a folder, done. See [Windows installer and uninstall](#windows-installer-and-uninstall) for details.
 
-**0.2.0 is the next release** (this repository): quick-add popup, actionable toasts, mini window, escalation ladder, streaks, Telegram bot v2, digests, Android notification buttons and share target, auto-update and cross-device sync. Installed 0.1.0 builds do not auto-update; install 0.2.0 by hand once, later versions arrive through the built-in updater.
+**New in 0.2.0:** quick-add popup, actionable toasts, mini window, escalation ladder, streaks, Telegram bot v2, digests, Android notification buttons and share target, auto-update and cross-device sync. Installing over 0.1.0 keeps your data. Installed 0.1.0 builds do not auto-update; install 0.2.0 by hand once, later versions arrive through the built-in updater.
 
 > Windows SmartScreen may warn that the publisher is unknown because the installer is not code-signed. Click **More info → Run anyway**.
 
