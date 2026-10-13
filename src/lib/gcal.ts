@@ -100,12 +100,31 @@ async function tokenRequest(body: Record<string, string>): Promise<GoogleTokens>
   return { accessToken: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000, refreshToken: json.refresh_token, idToken: json.id_token }
 }
 
-export function exchangeCode(o: { clientId: string; clientSecret: string; code: string; verifier: string; redirectUri: string }): Promise<GoogleTokens> {
-  return tokenRequest({ client_id: o.clientId, client_secret: o.clientSecret, code: o.code, code_verifier: o.verifier, redirect_uri: o.redirectUri, grant_type: 'authorization_code' })
+/** Public clients (Android OAuth client type) have no secret: an empty `clientSecret` is simply left out of the request. */
+export function exchangeCode(o: { clientId: string; clientSecret?: string; code: string; verifier: string; redirectUri: string }): Promise<GoogleTokens> {
+  return tokenRequest({ client_id: o.clientId, client_secret: o.clientSecret ?? '', code: o.code, code_verifier: o.verifier, redirect_uri: o.redirectUri, grant_type: 'authorization_code' })
 }
 
-export function refreshAccessToken(o: { clientId: string; clientSecret: string; refreshToken: string }): Promise<GoogleTokens> {
-  return tokenRequest({ client_id: o.clientId, client_secret: o.clientSecret, refresh_token: o.refreshToken, grant_type: 'refresh_token' })
+export function refreshAccessToken(o: { clientId: string; clientSecret?: string; refreshToken: string }): Promise<GoogleTokens> {
+  return tokenRequest({ client_id: o.clientId, client_secret: o.clientSecret ?? '', refresh_token: o.refreshToken, grant_type: 'refresh_token' })
+}
+
+/** Redirect URI of the Android app (custom scheme = package name, caught by an intent filter + `appUrlOpen`). */
+export const ANDROID_REDIRECT_URI = 'com.hyperdo.app:/oauth2redirect'
+
+/**
+ * Pulls `code` / `state` / `error` out of an OAuth redirect URL, whatever its scheme
+ * (`http://127.0.0.1:1234/callback?code=…`, `com.hyperdo.app:/oauth2redirect?code=…`).
+ * Returns null when the URL carries neither a code nor an error.
+ */
+export function parseOAuthRedirect(url: string): { code: string | null; state: string | null; error: string | null } | null {
+  const i = url.indexOf('?')
+  if (i < 0) return null
+  const q = new URLSearchParams(url.slice(i + 1).replace(/#.*$/, ''))
+  const code = q.get('code')
+  const error = q.get('error')
+  if (!code && !error) return null
+  return { code, state: q.get('state'), error }
 }
 
 export async function revokeToken(token: string): Promise<void> {

@@ -1,4 +1,18 @@
 import { useEffect, useState } from 'react'
+import type { Theme } from './types'
+
+/** Applies the dark / light / system theme to <html data-theme> and follows OS changes in system mode. */
+export function useTheme(theme: Theme) {
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)')
+    const apply = () => {
+      document.documentElement.dataset.theme = theme === 'system' ? (mq.matches ? 'light' : 'dark') : theme
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [theme])
+}
 
 /** Calls `onEscape` when the Escape key is pressed anywhere in the window (modals). */
 export function useEscape(onEscape: () => void) {

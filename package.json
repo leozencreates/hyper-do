@@ -1,7 +1,7 @@
 {
   "name": "hyper-do",
   "productName": "Hyper Do",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ADHD-friendly personal to-do that keeps reminding you until the task is done",
   "private": true,
   "main": "dist-electron/main.js",
@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "build:web": "tsc --noEmit && vite build --config vite.web.config.ts",
     "preview:web": "vite preview --config vite.web.config.ts",
+    "test": "vitest run",
     "dist": "npm run build && electron-builder --win --config.directories.output=%LOCALAPPDATA%/hyperdo-release",
     "dist:mac": "npm run build && electron-builder --mac",
     "android:sync": "npm run build:web && npx cap sync android",
@@ -25,6 +26,13 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "leozencreates",
+        "repo": "hyper-do"
+      }
+    ],
     "files": [
       "dist/**",
       "dist-electron/**",
@@ -71,14 +79,17 @@
     "electron-builder": "^26.15.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
-    "vite-plugin-electron": "^1.1.2"
+    "vite-plugin-electron": "^1.1.2",
+    "vitest": "^5.0.4"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
     "@capacitor/core": "^8.5.3",
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/preferences": "^8.0.1",
+    "electron-updater": "^6.8.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   }

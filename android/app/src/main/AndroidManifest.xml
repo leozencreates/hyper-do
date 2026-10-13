@@ -22,6 +22,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- "Share → Hyper Do": plain text from other apps becomes a task (MainActivity.java) -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <!-- Google sign-in redirect: com.hyperdo.app:/oauth2redirect (caught by @capacitor/app appUrlOpen) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.hyperdo.app" />
+            </intent-filter>
+
         </activity>
 
         <provider

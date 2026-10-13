@@ -1,9 +1,10 @@
 /**
  * Browser-side calendar bridge (web / PWA / Capacitor): runs the CalendarSync engine in the page,
  * keeps its state in localStorage and does the Google login with a redirect back to the app URL.
+ * The Android app plugs in its own login (Custom Tab + custom-scheme redirect) through `opts.connect`.
  * (Electron has its own bridge in the main process: electron/calendar.ts)
  */
-import { CalendarSync } from './calsync'
+import { CalendarSync, type CalendarSyncHost } from './calsync'
 import { buildAuthUrl, exchangeCode, pkcePair, randomToken } from './gcal'
 import { createEmitter } from './emitter'
 import type { AppData, CalendarApi, CalendarEvent, CalendarStatus } from './types'
@@ -16,7 +17,14 @@ export function webRedirectUri(): string {
   return location.origin + location.pathname
 }
 
-export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: AppData) => AppData) => void, opts: { googleSupported: boolean }) {
+export interface BrowserCalendarOptions {
+  googleSupported: CalendarSyncHost['googleSupported']
+  /** Platform login replacing the page redirect (Android). Resolves once the browser has been opened. */
+  connect?(sync: CalendarSync): Promise<{ ok: boolean; error?: string }>
+  googleClient?: CalendarSyncHost['googleClient']
+}
+
+export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: AppData) => AppData) => void, opts: BrowserCalendarOptions) {
   const events = createEmitter<CalendarEvent[]>()
   const status = createEmitter<CalendarStatus>()
 
@@ -40,6 +48,7 @@ export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: A
     onEvents: events.emit,
     onStatus: status.emit,
     googleSupported: opts.googleSupported,
+    ...(opts.googleClient ? { googleClient: opts.googleClient } : {}),
   })
 
   /** Call once at startup (after settings are loaded): finishes a Google login redirect if there is one. */
@@ -63,9 +72,9 @@ export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: A
 
     if (err) return sync.setGoogleError(err)
     if (!saved || saved.state !== state || !code) return sync.setGoogleError('state_mismatch')
-    const { clientId, clientSecret } = getData().settings.calendar.google
+    const { clientId, clientSecret } = sync.googleClient()
     try {
-      const tokens = await exchangeCode({ clientId: clientId.trim(), clientSecret: clientSecret.trim(), code, verifier: saved.verifier, redirectUri: saved.redirectUri })
+      const tokens = await exchangeCode({ clientId, clientSecret, code, verifier: saved.verifier, redirectUri: saved.redirectUri })
       await sync.completeGoogleLogin(tokens)
     } catch (e) {
       sync.setGoogleError((e as Error).message)
@@ -80,7 +89,8 @@ export function createBrowserCalendar(getData: () => AppData, mutate: (fn: (d: A
       return sync.events()
     },
     async connectGoogle() {
-      if (!opts.googleSupported) return { ok: false, error: 'unsupported' }
+      if (!sync.googleSupported) return { ok: false, error: 'unsupported' }
+      if (opts.connect) return opts.connect(sync)
       const clientId = getData().settings.calendar.google.clientId.trim()
       if (!clientId) return { ok: false, error: 'client_id' }
       const { verifier, challenge } = await pkcePair()

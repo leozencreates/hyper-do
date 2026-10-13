@@ -12,7 +12,7 @@ import { GoogleAuthError, GoogleCalendarClient, emailFromIdToken, refreshAccessT
 import { parseIcs } from './ics'
 import { taskDescription, taskEventWindow } from './calendar-links'
 import { startOfDay, endOfDay, DAY } from './dates'
-import { newTask } from './tasks'
+import { newTask, touchTask } from './tasks'
 import { translate } from './i18n'
 
 export const TASK_CALENDAR_NAME = 'Hyper Do'
@@ -29,7 +29,13 @@ export interface CalendarSyncHost {
   saveState(json: string): void
   onEvents(events: CalendarEvent[]): void
   onStatus(status: CalendarStatus): void
-  googleSupported: boolean
+  /** Whether the platform can run the Google login; a function when it depends on settings (Android client id). */
+  googleSupported: boolean | (() => boolean)
+  /**
+   * OAuth client used at the token endpoint. Default: `clientId` + `clientSecret` (Desktop / Web clients);
+   * the Android app passes its secret-less Android client instead.
+   */
+  googleClient?(s: CalendarSettings['google']): { clientId: string; clientSecret: string }
 }
 
 interface PushedEntry {
@@ -150,9 +156,14 @@ export class CalendarSync {
     return this.state.google.refreshToken.length > 0
   }
 
+  get googleSupported(): boolean {
+    const g = this.host.googleSupported
+    return typeof g === 'function' ? g() : g
+  }
+
   status(): CalendarStatus {
     return {
-      googleSupported: this.host.googleSupported,
+      googleSupported: this.googleSupported,
       google: { connected: this.connected, email: this.state.google.email, calendars: this.calendars, error: this.googleError },
       feeds: this.feedStatus,
       syncedAt: this.state.syncedAt,
@@ -273,10 +284,17 @@ export class CalendarSync {
 
   private async token(force = false): Promise<string> {
     if (!force && this.access && this.access.expiresAt - Date.now() > 60_000) return this.access.token
-    const { clientId, clientSecret } = this.settings.google
-    const t = await refreshAccessToken({ clientId: clientId.trim(), clientSecret: clientSecret.trim(), refreshToken: this.state.google.refreshToken })
+    const { clientId, clientSecret } = this.googleClient()
+    const t = await refreshAccessToken({ clientId, clientSecret, refreshToken: this.state.google.refreshToken })
     this.access = { token: t.accessToken, expiresAt: t.expiresAt }
     return t.accessToken
+  }
+
+  /** Trimmed OAuth client for the token endpoint (platform override or the Desktop/Web client from settings). */
+  googleClient(): { clientId: string; clientSecret: string } {
+    const g = this.settings.google
+    const c = this.host.googleClient ? this.host.googleClient(g) : { clientId: g.clientId, clientSecret: g.clientSecret }
+    return { clientId: c.clientId.trim(), clientSecret: c.clientSecret.trim() }
   }
 
   private client() {
@@ -484,7 +502,7 @@ export class CalendarSync {
     try {
       this.host.mutate((d) => ({
         ...d,
-        tasks: [...added, ...d.tasks.map((t) => (updates.has(t.id) ? { ...t, ...updates.get(t.id), snoozedUntil: null } : t))],
+        tasks: [...added, ...d.tasks.map((t) => (updates.has(t.id) ? touchTask({ ...t, ...updates.get(t.id), snoozedUntil: null }, now) : t))],
       }))
     } finally {
       this.importing = false

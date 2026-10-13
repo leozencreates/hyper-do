@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { PRIORITIES, RECURRENCES, STATUSES, type Recurrence, type Task } from '../lib/types'
-import { fromLocalInput, toLocalInput } from '../lib/dates'
+import { DEFAULT_RECURRENCE_RULE, ENERGIES, ESTIMATE_PRESETS, PRIORITIES, RECURRENCES, RECURRENCE_UNITS, STATUSES, type Recurrence, type RecurrenceRule, type RecurrenceUnit, type Task } from '../lib/types'
+import { formatMinutes, fromLocalInput, recurrenceUnitName, toLocalInput, weekdayShort } from '../lib/dates'
 import { uid } from '../lib/tasks'
-import { useT } from '../lib/useT'
+import { useLang, useT } from '../lib/useT'
 import Modal from './Modal'
 
 interface Props {
@@ -13,13 +13,29 @@ interface Props {
 }
 
 const REMIND_OPTIONS = [0, 5, 10, 15, 20, 30, 45, 60, 120]
+/** Weekday toggles in Monday-first order (0 = Sunday). */
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
 export default function TaskEditor({ task, allTags, onSave, onCancel }: Props) {
   const t = useT()
+  const lang = useLang()
   const [x, setX] = useState<Task>(task)
   const [tagInput, setTagInput] = useState('')
   const [subInput, setSubInput] = useState('')
   const set = <K extends keyof Task>(k: K, v: Task[K]) => setX((p) => ({ ...p, [k]: v }))
+  const rule: RecurrenceRule = x.recurrenceRule ?? DEFAULT_RECURRENCE_RULE
+  const setRule = (patch: Partial<RecurrenceRule>) => set('recurrenceRule', { ...rule, ...patch })
+  const setRecurrence = (r: Recurrence) => {
+    setX((p) => {
+      const { recurrenceRule, ...rest } = p
+      return r === 'custom' ? { ...rest, recurrence: r, recurrenceRule: recurrenceRule ?? { ...DEFAULT_RECURRENCE_RULE } } : { ...rest, recurrence: r }
+    })
+  }
+  const toggleWeekday = (wd: number) => {
+    const days = rule.weekdays ?? []
+    const next = days.includes(wd) ? days.filter((d) => d !== wd) : [...days, wd].sort((a, b) => a - b)
+    setRule({ weekdays: next.length ? next : undefined })
+  }
 
   const addTag = (raw: string) => {
     const v = raw.trim().replace(/^#/, '').toLowerCase()
@@ -77,7 +93,7 @@ export default function TaskEditor({ task, allTags, onSave, onCancel }: Props) {
         </label>
         <label className="field">
           <span>{t('recurrence')}</span>
-          <select value={x.recurrence} onChange={(e) => set('recurrence', e.target.value as Recurrence)}>
+          <select value={x.recurrence} onChange={(e) => setRecurrence(e.target.value as Recurrence)}>
             {RECURRENCES.map((r) => (
               <option key={r} value={r}>
                 {t(`r_${r}` as const)}
@@ -85,6 +101,87 @@ export default function TaskEditor({ task, allTags, onSave, onCancel }: Props) {
             ))}
           </select>
         </label>
+      </div>
+
+      {x.recurrence === 'custom' && (
+        <div className="field rec-custom">
+          <div className="row rec-every">
+            <span>{t('rec_every')}</span>
+            <input
+              type="number"
+              className="rec-n"
+              min={1}
+              max={999}
+              value={rule.every}
+              onChange={(e) => {
+                const n = Math.floor(Number(e.target.value))
+                setRule({ every: n >= 1 ? n : 1 })
+              }}
+            />
+            <select value={rule.unit} onChange={(e) => setRule({ unit: e.target.value as RecurrenceUnit, weekdays: e.target.value === 'week' ? rule.weekdays : undefined })}>
+              {RECURRENCE_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {recurrenceUnitName(lang, u, rule.every)}
+                </option>
+              ))}
+            </select>
+          </div>
+          {rule.unit === 'week' && (
+            <div className="row rec-weekdays">
+              <span>{t('rec_weekdays_label')}</span>
+              {WEEKDAY_ORDER.map((wd) => (
+                <button key={wd} type="button" className={rule.weekdays?.includes(wd) ? 'mini active' : 'mini'} onClick={() => toggleWeekday(wd)}>
+                  {weekdayShort(lang, wd)}
+                </button>
+              ))}
+            </div>
+          )}
+          <label className="toggle">
+            <input type="checkbox" checked={!!rule.afterCompletion} onChange={(e) => setRule({ afterCompletion: e.target.checked || undefined })} />
+            <span>
+              <b>{t('rec_after_completion')}</b>
+              <small>{t('rec_after_completion_d')}</small>
+            </span>
+          </label>
+        </div>
+      )}
+
+      <div className="grid2">
+        <div className="field">
+          <span>{t('estimate')}</span>
+          <div className="est-row">
+            {ESTIMATE_PRESETS.map((m) => (
+              <button key={m} type="button" className={x.estimateMin === m ? 'mini active' : 'mini'} onClick={() => set('estimateMin', x.estimateMin === m ? null : m)}>
+                {formatMinutes(m, lang)}
+              </button>
+            ))}
+            <input
+              type="number"
+              className="est-input"
+              min={1}
+              max={1440}
+              placeholder={t('estimate_custom_ph')}
+              value={x.estimateMin ?? ''}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                set('estimateMin', e.target.value === '' || !(n > 0) ? null : Math.round(n))
+              }}
+            />
+          </div>
+        </div>
+        <div className="field">
+          <span>{t('energy')}</span>
+          <div className="seg">
+            <button type="button" className={x.energy === null ? 'seg-btn active lang' : 'seg-btn'} onClick={() => set('energy', null)}>
+              {t('energy_none')}
+            </button>
+            {ENERGIES.map((e) => (
+              <button key={e} type="button" className={x.energy === e ? `seg-btn active energy-${e}` : 'seg-btn'} onClick={() => set('energy', e)}>
+                {t(`energy_${e}` as const)}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="field">
@@ -168,7 +265,14 @@ export default function TaskEditor({ task, allTags, onSave, onCancel }: Props) {
         <button className="ghost" onClick={onCancel}>
           {t('cancel_btn')}
         </button>
-        <button className="primary" disabled={!canSave} onClick={() => onSave({ ...x, title: x.title.trim() })}>
+        <button
+          className="primary"
+          disabled={!canSave}
+          onClick={() => {
+            const { recurrenceRule, ...rest } = x
+            onSave(x.recurrence === 'custom' ? { ...rest, recurrenceRule: recurrenceRule ?? { ...DEFAULT_RECURRENCE_RULE }, title: x.title.trim() } : { ...rest, title: x.title.trim() })
+          }}
+        >
           {t('save')}
         </button>
       </div>

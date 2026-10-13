@@ -30,6 +30,7 @@ export default function CalendarSettings({ settings, tasks, cal, onChange }: Pro
   const g = status?.google
   const isElectron = platform.kind === 'electron'
   const isWeb = platform.kind === 'web'
+  const isAndroid = platform.kind === 'capacitor'
 
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -62,7 +63,22 @@ export default function CalendarSettings({ settings, tasks, cal, onChange }: Pro
           {g?.connected ? <span className="tg-status ok">{t('cal_connected', { email: g.email || '✓' })}</span> : <span className="tg-status">{t('cal_not_connected')}</span>}
         </div>
 
-        {!status?.googleSupported ? (
+        {isAndroid && !g?.connected ? (
+          /* Android (#14): secret-less OAuth client of type "Android"; the login runs in a Custom Tab and comes back via com.hyperdo.app:/oauth2redirect */
+          <>
+            <label className="field">
+              <span>{t('cal_android_client_id')}</span>
+              <input className="mono" value={c.google.androidClientId} placeholder="xxxx.apps.googleusercontent.com" onChange={(e) => setGoogle({ androidClientId: e.target.value.trim() })} autoComplete="off" />
+            </label>
+            <p className="hint">{t('cal_android_help')}</p>
+            <div className="row">
+              <button type="button" className="primary" disabled={busy || !c.google.androidClientId} onClick={() => void connect()}>
+                {busy ? t('cal_connecting') : t('cal_connect')}
+              </button>
+              {(localError || googleError) && <span className="hint error">{localError ?? googleError}</span>}
+            </div>
+          </>
+        ) : !status?.googleSupported ? (
           <p className="hint">{t('cal_unsupported')}</p>
         ) : g?.connected ? (
           <>

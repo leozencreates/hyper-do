@@ -3,11 +3,13 @@
  * Hatırlatmalar yalnızca sekme ya da ana ekrana eklenmiş uygulama açıkken gelir.
  */
 import type { AppData, HyperDoApi, NotifyPermission } from './types'
-import { buildNotification, collectDueReminders, syncCounters } from './reminder'
+import { activeFocusTaskId, buildNotification, collectDueReminders, markNagged, syncCounters } from './reminder'
 import { translate } from './i18n'
 import { browserDefaultSettings, parseAppData, DATA_STORAGE_KEY } from './data'
+import { bumpChanged } from './tasks'
 import { createEmitter } from './emitter'
 import { createBrowserCalendar } from './platform.calendar'
+import { createBrowserSync, localStorageSyncStore } from './platform.sync'
 
 export function createWebApi(): HyperDoApi {
   const defaults = browserDefaultSettings()
@@ -25,17 +27,28 @@ export function createWebApi(): HyperDoApi {
     }
   }
 
-  /** Platform-side change (calendar import): save and tell the UI, like the Electron main process does. */
-  function mutate(fn: (d: AppData) => AppData) {
-    const next = fn(data)
+  /**
+   * Platform-side change (calendar import, nag counters): save and tell the UI, like the Electron main process does.
+   * Replaced task objects get their `updatedAt` bumped (#16) unless the change *is* the sync result (`bump: false`).
+   */
+  function mutate(fn: (d: AppData) => AppData, { bump = true } = {}) {
+    let next = fn(data)
+    if (bump && next.tasks !== data.tasks) next = { ...next, tasks: bumpChanged(data.tasks, next.tasks) }
     syncCounters(data.tasks, next.tasks, lastNotified)
     data = next
     persist()
     changed.emit(data)
+    if (bump) sync.engine.onDataSaved()
   }
 
   // Google login needs a real http(s) origin to redirect back to (not file://).
   const calendar = createBrowserCalendar(() => data, mutate, { googleSupported: location.protocol.startsWith('http') })
+  // Cross-device sync (#16): WebDAV only in the browser; state + credentials in localStorage
+  const sync = createBrowserSync(
+    () => data,
+    (fn) => mutate(fn, { bump: false }),
+    localStorageSyncStore,
+  )
   const hasNotif = typeof Notification !== 'undefined'
 
   const permission = (): NotifyPermission => (hasNotif ? Notification.permission : 'unsupported')
@@ -56,7 +69,9 @@ export function createWebApi(): HyperDoApi {
   }
 
   function tick() {
-    const hits = collectDueReminders(data.tasks, data.settings, lastNotified)
+    const now = Date.now()
+    const hits = collectDueReminders(data.tasks, data.settings, lastNotified, now, activeFocusTaskId(data, now))
+    if (hits.length === 0) return
     for (const h of hits) {
       const { title, body } = buildNotification(h.task, h.overdue, data.settings)
       show(title, body, 'hyperdo-' + h.task.id, () => focus.emit(h.task.id))
@@ -64,6 +79,8 @@ export function createWebApi(): HyperDoApi {
       document.title = `🔔 ${h.task.title} – Hyper Do`
       setTimeout(() => (document.title = 'Hyper Do'), 15_000)
     }
+    // Escalation ladder (#6): the delivered reminders count as ignored until the user reacts
+    mutate((d) => ({ ...d, tasks: markNagged(d.tasks, hits.map((h) => h.task.id)) }))
   }
 
   navigator.serviceWorker?.addEventListener('message', (e) => {
@@ -89,6 +106,7 @@ export function createWebApi(): HyperDoApi {
       for (const t of data.tasks) if (!lastNotified.has(t.id)) lastNotified.set(t.id, Date.now())
       await calendar.handleRedirect()
       calendar.sync.start()
+      void sync.engine.start()
       return data
     },
     async save(incoming) {
@@ -96,8 +114,10 @@ export function createWebApi(): HyperDoApi {
       data = incoming
       persist()
       calendar.sync.onDataSaved()
+      sync.engine.onDataSaved()
     },
     calendar: calendar.api,
+    sync: sync.api,
     async notifyTest() {
       show(translate(data.settings.language, 'notif_test_title'), translate(data.settings.language, 'notif_test_body'), 'hyperdo-test')
     },

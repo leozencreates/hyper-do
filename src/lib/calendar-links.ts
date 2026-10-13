@@ -3,11 +3,43 @@
  * "add to calendar" deep links for Google / Outlook.com / Office 365 / Yahoo plus .ics text.
  * Browser-only download helpers live in download.ts.
  */
-import type { Task } from './types'
+import type { Recurrence, RecurrenceRule, Task } from './types'
 import { buildIcs, icsUtc, type IcsOutEvent } from './ics'
 import { DAY, isEndOfDay, startOfDay } from './dates'
 
 export const TASK_EVENT_MIN = 30
+
+const RRULE_FREQ: Record<RecurrenceRule['unit'], string> = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' }
+const RRULE_DAY = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+
+/**
+ * RFC 5545 RRULE body (without `RRULE:`) for a task's recurrence, or null when there is nothing to export:
+ * `none`, and custom rules with `afterCompletion` (the next date depends on when the task is finished,
+ * which no calendar can express).
+ */
+export function recurrenceRrule(rec: Recurrence, rule?: RecurrenceRule | null): string | null {
+  switch (rec) {
+    case 'daily':
+      return 'FREQ=DAILY'
+    case 'weekdays':
+      return 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR'
+    case 'weekly':
+      return 'FREQ=WEEKLY'
+    case 'monthly':
+      return 'FREQ=MONTHLY'
+    case 'yearly':
+      return 'FREQ=YEARLY'
+    case 'custom': {
+      if (!rule || rule.afterCompletion) return null
+      const parts = [`FREQ=${RRULE_FREQ[rule.unit]}`]
+      if (rule.every > 1) parts.push(`INTERVAL=${Math.floor(rule.every)}`)
+      if (rule.unit === 'week' && rule.weekdays?.length) parts.push(`BYDAY=${[...new Set(rule.weekdays)].sort((a, b) => a - b).map((d) => RRULE_DAY[d]).join(',')}`)
+      return parts.join(';')
+    }
+    default:
+      return null
+  }
+}
 
 /** A task due at 23:59 (quick-add "today") is treated as an all-day event; otherwise a 30-minute block at the due time. */
 export function taskEventWindow(task: Task): { start: number; end: number; allDay: boolean } | null {
@@ -44,7 +76,8 @@ export function calendarLink(kind: LinkKind, task: Task): string | null {
   switch (kind) {
     case 'google': {
       const dates = w.allDay ? `${localDate(w.start)}/${localDate(w.end)}` : `${icsUtc(w.start)}/${icsUtc(w.end)}`
-      return `https://calendar.google.com/calendar/render?${new URLSearchParams({ action: 'TEMPLATE', text: title, dates, details })}`
+      const rrule = recurrenceRrule(task.recurrence, task.recurrenceRule)
+      return `https://calendar.google.com/calendar/render?${new URLSearchParams({ action: 'TEMPLATE', text: title, dates, details, ...(rrule ? { recur: `RRULE:${rrule}` } : {}) })}`
     }
     case 'outlook':
     case 'office': {
@@ -71,7 +104,8 @@ export function calendarLink(kind: LinkKind, task: Task): string | null {
 export function taskToIcsEvent(task: Task): IcsOutEvent | null {
   const w = taskEventWindow(task)
   if (!w) return null
-  return { uid: `hyperdo-${task.id}@hyperdo.app`, title: task.title, start: w.start, end: w.end, allDay: w.allDay, description: taskDescription(task) }
+  const rrule = recurrenceRrule(task.recurrence, task.recurrenceRule)
+  return { uid: `hyperdo-${task.id}@hyperdo.app`, title: task.title, start: w.start, end: w.end, allDay: w.allDay, description: taskDescription(task), ...(rrule ? { rrule } : {}) }
 }
 
 export function tasksToIcs(tasks: Task[]): string {

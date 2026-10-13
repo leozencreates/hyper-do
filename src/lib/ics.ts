@@ -359,6 +359,8 @@ export interface IcsOutEvent {
   allDay?: boolean
   description?: string
   location?: string
+  /** Recurrence rule body without the `RRULE:` prefix, e.g. `FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE`. */
+  rrule?: string
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -386,6 +388,7 @@ export function buildIcs(events: IcsOutEvent[], calendarName = 'Hyper Do'): stri
     lines.push('BEGIN:VEVENT', `UID:${e.uid}`, `DTSTAMP:${now}`)
     if (e.allDay) lines.push(`DTSTART;VALUE=DATE:${icsDate(e.start)}`, `DTEND;VALUE=DATE:${icsDate(e.end)}`)
     else lines.push(`DTSTART:${icsUtc(e.start)}`, `DTEND:${icsUtc(e.end)}`)
+    if (e.rrule) lines.push(`RRULE:${e.rrule}`)
     lines.push(`SUMMARY:${escapeText(e.title)}`)
     if (e.description) lines.push(`DESCRIPTION:${escapeText(e.description)}`)
     if (e.location) lines.push(`LOCATION:${escapeText(e.location)}`)

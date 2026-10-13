@@ -1,66 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Settings, Task } from '../lib/types'
+import type { FocusEntry, HfPhase, HfSession, Settings, Task } from '../lib/types'
 import { translate, type Lang } from '../lib/i18n'
 import { useT } from '../lib/useT'
+import { chimePhase } from '../lib/sound'
+import { uid } from '../lib/tasks'
 
 /**
  * Hyper Focus: a Pomodoro-style timer (default 40 min deep work / 5 min break)
  * that repeats until stopped. Phase changes trigger a notification and a soft chime.
+ * The session itself lives in `AppData.hyperFocus` (store), so the platform's reminder
+ * engine can hold back other tasks while a work round runs. Finished phases of at least a
+ * minute are handed to `onPhaseEnd` (the focus log, #8).
  */
-export type HfPhase = 'work' | 'break'
-export interface HfSession {
-  phase: HfPhase
-  round: number
-  endsAt: number
-  /** When paused: remaining ms at the moment of pausing. */
-  pausedRemaining: number | null
-  taskId: string | null
-}
+export type { HfPhase, HfSession }
 
-const KEY = 'hyperdo-hyperfocus'
-
-function load(): HfSession | null {
-  try {
-    const raw = localStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as HfSession) : null
-  } catch {
-    return null
-  }
-}
-function persist(s: HfSession | null) {
-  try {
-    if (s) localStorage.setItem(KEY, JSON.stringify(s))
-    else localStorage.removeItem(KEY)
-  } catch {
-    /* ignore */
-  }
-}
-
-function chime(phase: HfPhase) {
-  try {
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!Ctx) return
-    const ctx = new Ctx()
-    const notes = phase === 'break' ? [660, 880] : [880, 660, 990]
-    notes.forEach((f, i) => {
-      const o = ctx.createOscillator()
-      const g = ctx.createGain()
-      o.type = 'sine'
-      o.frequency.value = f
-      g.gain.value = 0.0001
-      o.connect(g)
-      g.connect(ctx.destination)
-      const t0 = ctx.currentTime + i * 0.18
-      g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02)
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4)
-      o.start(t0)
-      o.stop(t0 + 0.42)
-    })
-    setTimeout(() => void ctx.close(), 1500)
-  } catch {
-    /* audio blocked */
-  }
-}
+/** Phases shorter than this are not logged (accidental starts). */
+const MIN_LOG_MS = 60_000
 
 function notify(title: string, body: string) {
   try {
@@ -76,13 +31,24 @@ function notify(title: string, body: string) {
   }
 }
 
-export function useHyperFocus(pomodoro: Settings['pomodoro'], lang: Lang) {
-  const [session, setSession] = useState<HfSession | null>(() => load())
+type SetSession = (fn: (s: HfSession | null) => HfSession | null) => void
+
+export interface HfOptions {
+  /**
+   * The main window drives the timer (phase transitions, chime, notification). A second window
+   * showing the same session (mini window) passes `driver: false` so phases do not advance twice.
+   */
+  driver?: boolean
+  /** Receives every finished phase (timer, skip, stop) that lasted at least a minute. */
+  onPhaseEnd?(entry: FocusEntry): void
+}
+
+const phaseMs = (s: HfSession, pomodoro: Settings['pomodoro']) => (s.phase === 'work' ? pomodoro.workMin : pomodoro.breakMin) * 60_000
+
+export function useHyperFocus(session: HfSession | null, setSession: SetSession, pomodoro: Settings['pomodoro'], lang: Lang, { driver = true, onPhaseEnd }: HfOptions = {}) {
   const [now, setNow] = useState(() => Date.now())
   const ref = useRef(session)
   ref.current = session
-
-  useEffect(() => persist(session), [session])
 
   useEffect(() => {
     if (!session) return
@@ -90,47 +56,88 @@ export function useHyperFocus(pomodoro: Settings['pomodoro'], lang: Lang) {
     return () => window.clearInterval(id)
   }, [session])
 
+  /** Logs the phase that is ending right now. Paused sessions end at the moment they were paused. */
+  const logPhase = useCallback(
+    (s: HfSession, nowMs: number) => {
+      if (!onPhaseEnd) return
+      const endedAt = s.pausedRemaining !== null ? s.startedAt + Math.max(0, phaseMs(s, pomodoro) - s.pausedRemaining) : Math.min(nowMs, s.endsAt)
+      if (endedAt - s.startedAt < MIN_LOG_MS) return
+      onPhaseEnd({ id: uid(), taskId: s.taskId, phase: s.phase, startedAt: s.startedAt, endedAt })
+    },
+    [onPhaseEnd, pomodoro],
+  )
+
+  /** Next phase; side effects (log, chime, notification) happen here, so call it outside state updaters. */
   const advance = useCallback(
     (s: HfSession, skip = false): HfSession => {
+      const nowMs = Date.now()
       const nextPhase: HfPhase = s.phase === 'work' ? 'break' : 'work'
       const round = nextPhase === 'work' ? s.round + 1 : s.round
       const mins = nextPhase === 'work' ? pomodoro.workMin : pomodoro.breakMin
+      logPhase(s, nowMs)
       if (!skip) {
-        chime(nextPhase)
+        chimePhase(nextPhase)
         if (nextPhase === 'break') notify(translate(lang, 'hf_notif_break'), translate(lang, 'hf_notif_break_d', { n: pomodoro.breakMin }))
         else notify(translate(lang, 'hf_notif_work'), translate(lang, 'hf_notif_work_d', { r: round, n: pomodoro.workMin }))
       }
-      return { ...s, phase: nextPhase, round, endsAt: Date.now() + mins * 60_000, pausedRemaining: null }
+      return { ...s, phase: nextPhase, round, endsAt: nowMs + mins * 60_000, pausedRemaining: null, startedAt: nowMs }
     },
-    [pomodoro, lang],
+    [pomodoro, lang, logPhase],
   )
 
-  // Phase transition
+  // Phase transition (driver window only)
   useEffect(() => {
+    if (!driver) return
     const s = ref.current
     if (!s || s.pausedRemaining !== null) return
-    if (now >= s.endsAt) setSession(advance(s))
-  }, [now, advance])
+    if (now >= s.endsAt) {
+      const next = advance(s) // side effects (chime, notification) once, outside the updater
+      setSession((cur) => (cur === s ? next : cur))
+    }
+  }, [now, advance, setSession, driver])
 
   const start = useCallback(
     (taskId: string | null) => {
-      setNow(Date.now())
-      setSession({ phase: 'work', round: 1, endsAt: Date.now() + pomodoro.workMin * 60_000, pausedRemaining: null, taskId })
+      const nowMs = Date.now()
+      setNow(nowMs)
+      setSession(() => ({ phase: 'work', round: 1, endsAt: nowMs + pomodoro.workMin * 60_000, pausedRemaining: null, taskId, startedAt: nowMs }))
     },
-    [pomodoro.workMin],
+    [pomodoro.workMin, setSession],
   )
-  const pause = useCallback(() => setSession((s) => (s && s.pausedRemaining === null ? { ...s, pausedRemaining: Math.max(0, s.endsAt - Date.now()) } : s)), [])
-  const resume = useCallback(() => setSession((s) => (s && s.pausedRemaining !== null ? { ...s, endsAt: Date.now() + s.pausedRemaining, pausedRemaining: null } : s)), [])
-  const skip = useCallback(() => setSession((s) => (s ? advance(s, true) : s)), [advance])
-  const stop = useCallback(() => setSession(null), [])
+  const pause = useCallback(() => setSession((s) => (s && s.pausedRemaining === null ? { ...s, pausedRemaining: Math.max(0, s.endsAt - Date.now()) } : s)), [setSession])
+  // Resume moves `startedAt` forward by the pause length, so logged durations exclude pauses.
+  const resume = useCallback(
+    () =>
+      setSession((s) => {
+        if (!s || s.pausedRemaining === null) return s
+        const nowMs = Date.now()
+        const elapsed = Math.max(0, phaseMs(s, pomodoro) - s.pausedRemaining)
+        return { ...s, endsAt: nowMs + s.pausedRemaining, pausedRemaining: null, startedAt: nowMs - elapsed }
+      }),
+    [setSession, pomodoro],
+  )
+  const skip = useCallback(() => {
+    const s = ref.current
+    if (!s) return
+    const next = advance(s, true)
+    setSession((cur) => (cur === s ? next : cur))
+  }, [advance, setSession])
+  const stop = useCallback(() => {
+    const s = ref.current
+    if (s) logPhase(s, Date.now())
+    setSession(() => null)
+  }, [logPhase, setSession])
 
-  const totalMs = session ? (session.phase === 'work' ? pomodoro.workMin : pomodoro.breakMin) * 60_000 : 0
+  const totalMs = session ? phaseMs(session, pomodoro) : 0
   const remainingMs = session ? (session.pausedRemaining !== null ? session.pausedRemaining : Math.max(0, session.endsAt - now)) : 0
 
   return { session, remainingMs, totalMs, start, pause, resume, skip, stop }
 }
 
-function fmt(ms: number) {
+export type HyperFocusState = ReturnType<typeof useHyperFocus>
+
+/** m:ss countdown label. */
+export function fmtCountdown(ms: number) {
   const s = Math.ceil(ms / 1000)
   const m = Math.floor(s / 60)
   const r = s % 60
@@ -138,19 +145,21 @@ function fmt(ms: number) {
 }
 
 interface BarProps {
-  hf: ReturnType<typeof useHyperFocus>
+  hf: HyperFocusState
   task: Task | null
+  /** Settings → "Hyper Focus silences other tasks": shows the 🔕 note during work rounds. */
+  suppressOthers?: boolean
 }
 
 /** The active-session bar: progress ring, countdown, phase, round and controls. */
-export function HyperFocusBar({ hf, task }: BarProps) {
+export function HyperFocusBar({ hf, task, suppressOthers = false }: BarProps) {
   const t = useT()
   const { session, remainingMs, totalMs } = hf
   const label = session ? (session.phase === 'work' ? t('hf_work') : t('hf_break')) : ''
 
   useEffect(() => {
     if (!session) return
-    document.title = `${fmt(remainingMs)} · ${label} – Hyper Do`
+    document.title = `${fmtCountdown(remainingMs)} · ${label} – Hyper Do`
     return () => {
       document.title = 'Hyper Do'
     }
@@ -163,12 +172,13 @@ export function HyperFocusBar({ hf, task }: BarProps) {
   return (
     <section className={`hf-bar ${session.phase}${paused ? ' paused' : ''}`}>
       <div className="hf-ring" style={{ ['--p' as string]: `${Math.round(progress * 100)}%` }}>
-        <span className="hf-time">{fmt(remainingMs)}</span>
+        <span className="hf-time">{fmtCountdown(remainingMs)}</span>
       </div>
       <div className="hf-body">
         <div className="hf-head">
           <span className="hf-phase">{session.phase === 'work' ? '⚡' : '🧘'} {label}</span>
           <span className="chip">{t('hf_round', { n: session.round })}</span>
+          {suppressOthers && session.phase === 'work' && !paused && <span className="chip muted">{t('hf_quiet')}</span>}
         </div>
         <div className="hf-task">{task ? task.title : t('hf_no_task')}</div>
         <div className="hf-actions">

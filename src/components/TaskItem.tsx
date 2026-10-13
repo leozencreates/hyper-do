@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { Task } from '../lib/types'
-import { formatDue, isOverdue, relativeMinutes } from '../lib/dates'
+import { ENERGY_ICON, type Task } from '../lib/types'
+import { formatDue, formatMinutes, isOverdue, recurrenceLabel, recurrenceText, relativeMinutes } from '../lib/dates'
 import { useLang, useT } from '../lib/useT'
 import AddToCalendar from './AddToCalendar'
 
@@ -14,6 +14,10 @@ export interface DragHandlers {
 interface Props {
   task: Task
   highlighted: boolean
+  /** Minutes spent on the task in Hyper Focus work rounds (focus log). */
+  spentMin?: number
+  /** `escalationLevel(task, settings)`: ≥ 1 shows the "👀 ×N" chip. */
+  escalation?: 0 | 1 | 2
   onComplete(): void
   onReopen(): void
   onEdit(): void
@@ -26,7 +30,7 @@ interface Props {
   drag?: DragHandlers
 }
 
-export default function TaskItem({ task, highlighted, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, drag }: Props) {
+export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, drag }: Props) {
   const t = useT()
   const lang = useLang()
   const [open, setOpen] = useState(false)
@@ -36,6 +40,8 @@ export default function TaskItem({ task, highlighted, onComplete, onReopen, onEd
   const overdue = !done && isOverdue(task.dueAt)
   const subDone = task.subtasks.filter((s) => s.done).length
   const snoozed = task.snoozedUntil !== null && task.snoozedUntil > Date.now()
+  const est = task.estimateMin
+  const overEstimate = est !== null && spentMin > est
 
   const cls = ['task', `p-${task.priority}`, done && 'done', overdue && 'overdue', task.focused && 'focused', highlighted && 'highlight', drag?.dragging && 'dragging', over && 'drag-over']
     .filter(Boolean)
@@ -78,7 +84,24 @@ export default function TaskItem({ task, highlighted, onComplete, onReopen, onEd
           <span className="task-title">{task.title}</span>
           {task.focused && <span className="chip focus">🎯</span>}
           {task.status !== 'todo' && !done && <span className="chip">{t(`col_${task.status}` as const)}</span>}
-          {task.recurrence !== 'none' && <span className="chip">↻</span>}
+          {task.recurrence !== 'none' && (
+            <span className="chip rec" title={recurrenceText(task.recurrence, task.recurrenceRule, lang)}>
+              {recurrenceLabel(task.recurrence, task.recurrenceRule, lang)}
+            </span>
+          )}
+          {task.energy && (
+            <span className={`chip energy ${task.energy}`} title={t(`energy_${task.energy}` as const)}>
+              {ENERGY_ICON[task.energy]}
+            </span>
+          )}
+          {(est !== null || spentMin > 0) && (
+            <span
+              className={overEstimate ? 'chip est over' : 'chip est'}
+              title={est !== null && spentMin > 0 ? t('spent_title', { spent: formatMinutes(spentMin, lang), est: formatMinutes(est, lang) }) : spentMin > 0 ? t('spent_only_title', { spent: formatMinutes(spentMin, lang) }) : t('estimate')}
+            >
+              ⏱ {spentMin > 0 ? (est !== null ? `${formatMinutes(spentMin, lang)} / ${formatMinutes(est, lang)}` : formatMinutes(spentMin, lang)) : `~${formatMinutes(est!, lang)}`}
+            </span>
+          )}
           {task.calendarEventId && (
             <span className="chip cal" title={t('cal_imported')}>
               📅
@@ -87,6 +110,11 @@ export default function TaskItem({ task, highlighted, onComplete, onReopen, onEd
           {task.remindEveryMin > 0 && !done && (
             <span className={snoozed ? 'chip muted' : 'chip remind'} title={t('remind_interval')}>
               {snoozed ? `😴 ${relativeMinutes(task.snoozedUntil! - Date.now(), lang)}` : `🔔 ${task.remindEveryMin}′`}
+            </span>
+          )}
+          {!done && escalation >= 1 && (
+            <span className={escalation >= 2 ? 'chip nag hot' : 'chip nag'} title={t('nag_chip_title', { n: task.nagCount })}>
+              {t('nag_chip', { n: task.nagCount })}
             </span>
           )}
         </div>

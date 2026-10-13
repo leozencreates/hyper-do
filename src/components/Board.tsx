@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { STATUSES, type Status, type Task } from '../lib/types'
-import { formatDue, isOverdue } from '../lib/dates'
+import { formatDue, isOverdue, recurrenceLabel, recurrenceText } from '../lib/dates'
 import { useLang, useT } from '../lib/useT'
 
 type Column = Status | 'done'
@@ -182,7 +182,11 @@ function Card({ task, highlighted, dragging, over, onDragStart, onDragEnd, onDra
               {subDone}/{task.subtasks.length}
             </span>
           )}
-          {task.recurrence !== 'none' && <span className="chip">↻</span>}
+          {task.recurrence !== 'none' && (
+            <span className="chip rec" title={recurrenceText(task.recurrence, task.recurrenceRule, lang)}>
+              {recurrenceLabel(task.recurrence, task.recurrenceRule, lang)}
+            </span>
+          )}
           {task.tags.map((x) => (
             <span key={x} className="tag">
               #{x}

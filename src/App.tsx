@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppData, type AppStore } from './lib/store'
-import { newTask } from './lib/tasks'
-import { matchesQuery, sortTasks } from './lib/tasks'
-import { SORT_MODES, type AppData, type SortMode, type Task } from './lib/types'
-import { endOfDay, isOverdue, isToday, isThisWeek } from './lib/dates'
+import { matchesQuery, newTask, pickEasyTask, sortTasks } from './lib/tasks'
+import { ENERGIES, ENERGY_ICON, SORT_MODES, type AppData, type Energy, type SortMode, type Task, type UpdateStatus } from './lib/types'
+import { dayKey, endOfDay, isOverdue, isToday, isThisWeek } from './lib/dates'
+import { escalationLevel } from './lib/reminder'
+import { spentMinByTask, streak } from './lib/stats'
+import { shareToTaskFields } from './lib/share'
 import { platform } from './lib/platform'
 import { LangContext, useT } from './lib/useT'
-import { LANGS, type Lang } from './lib/i18n'
-import { useNow } from './lib/hooks'
+import { LANGS, LOCALE, type Lang } from './lib/i18n'
+import { useNow, useTheme } from './lib/hooks'
 import { useTaskActions } from './lib/useTaskActions'
 import { useCalendar } from './lib/useCalendar'
 import TaskItem from './components/TaskItem'
@@ -15,17 +17,36 @@ import TaskEditor from './components/TaskEditor'
 import FocusBanner from './components/FocusBanner'
 import SettingsPanel from './components/SettingsPanel'
 import QuickAdd from './components/QuickAdd'
+import QuickCapture from './components/QuickCapture'
+import MiniView from './components/MiniView'
+import StatsModal from './components/StatsModal'
+import BrainDump from './components/BrainDump'
 import Board from './components/Board'
 import CalendarStrip from './components/CalendarStrip'
 import { HyperFocusBar, useHyperFocus } from './components/HyperFocus'
+import { useCelebration } from './components/Celebration'
 
 type View = 'today' | 'week' | 'all' | 'board' | 'done'
 const VIEW_KEYS: View[] = ['today', 'week', 'all', 'board', 'done']
 
+/**
+ * `?view=` is read once at startup. Besides the list views it selects the renderer *window kind*:
+ * `quick` = the global quick-add popup, `mini` = the always-on-top mini window (both Electron).
+ */
+const VIEW_PARAM = new URLSearchParams(location.search).get('view')
+
 /** Time-dependent UI (overdue, "today") refreshes this often without user interaction. */
 const CLOCK_MS = 30_000
+/** The "Try this" suggestion disappears by itself after this long. */
+const EASY_TOAST_MS = 12_000
 
 export default function App() {
+  if (VIEW_PARAM === 'quick') return <QuickCapture />
+  if (VIEW_PARAM === 'mini') return <MiniView />
+  return <MainApp />
+}
+
+function MainApp() {
   const store = useAppData()
   if (!store.data) return <div className="loading">…</div>
   return (
@@ -37,34 +58,47 @@ export default function App() {
 
 type MainProps = AppStore & { data: AppData }
 
-function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
+function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFocusEntry, replaceData }: MainProps) {
   const t = useT()
   const { tasks, settings } = data
-  const hf = useHyperFocus(settings.pomodoro, settings.language)
+  const hf = useHyperFocus(data.hyperFocus, setHyperFocus, settings.pomodoro, settings.language, { onPhaseEnd: appendFocusEntry })
   const cal = useCalendar()
   const now = useNow(CLOCK_MS)
-  const actions = useTaskActions({ tasks, settings, setTasks, setSettings })
+  const celebration = useCelebration(settings.celebrate)
+  const actions = useTaskActions({ tasks, settings, setTasks, setSettings, updateData, onCompleted: celebration.celebrate })
   const [view, setView] = useState<View>(() => {
-    const v = new URLSearchParams(location.search).get('view') as View | null
+    const v = VIEW_PARAM as View | null
     return v && VIEW_KEYS.includes(v) ? v : 'today'
   })
   const [tag, setTag] = useState<string | null>(null)
+  const [energy, setEnergy] = useState<Energy | null>(null)
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Task | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showStats, setShowStats] = useState(false)
+  const [showBrain, setShowBrain] = useState(false)
   const [highlight, setHighlight] = useState<string | null>(null)
+  /** "Give me an easy one": the suggested task id, or null for "nothing open". */
+  const [easy, setEasy] = useState<{ id: string | null } | null>(null)
   const [perm, setPerm] = useState(platform.permission())
   const [confirmClear, setConfirmClear] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
+  /** A downloaded update waiting for a restart (#18); `null` once dismissed with "Later" or when nothing is ready. */
+  const [update, setUpdate] = useState<UpdateStatus | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const quickRef = useRef<HTMLInputElement>(null)
+  const quickRef = useRef<HTMLTextAreaElement>(null)
+  const desktop = platform.desktop
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+
+  const scrollTo = (id: string) => setTimeout(() => document.getElementById('task-' + id)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50)
 
   // Bildirime tıklanınca ilgili görevi vurgula
   useEffect(() => {
     const off1 = platform.onFocusTask((id) => {
       setView('all')
       setHighlight(id)
-      setTimeout(() => document.getElementById('task-' + id)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50)
+      scrollTo(id)
     })
     const off2 = platform.onReminded((id) => {
       setHighlight(id)
@@ -76,42 +110,44 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
     }
   }, [])
 
-  // Tema: koyu / açık / sistem
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: light)')
-    const apply = () => {
-      document.documentElement.dataset.theme = settings.theme === 'system' ? (mq.matches ? 'light' : 'dark') : settings.theme
-    }
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [settings.theme])
+  // "Share → Hyper Do" (#15, Android): the shared text opens the editor prefilled (title = subject or first line, notes = everything)
+  useEffect(
+    () =>
+      platform.onShare?.((p) => {
+        const { title, notes } = shareToTaskFields(p)
+        if (!title) return
+        setShowSettings(false)
+        setShowStats(false)
+        setShowBrain(false)
+        setEditing(newTask({ title, notes, status: 'todo' }, settingsRef.current))
+      }),
+    [],
+  )
 
-  // Klavye kısayolları (bir alan yazılırken ya da pencere açıkken devre dışı)
+  // Auto-update (#18): a downloaded update shows a toast until "Restart now" / "Later"
   useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (editing || showSettings || e.ctrlKey || e.metaKey || e.altKey) return
-      const el = e.target as HTMLElement
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return
-      if (e.key === 'n' || e.key === 'N') {
-        e.preventDefault()
-        setEditing(newTask({ status: 'todo' }, settings))
-      } else if (e.key === '/') {
-        e.preventDefault()
-        searchRef.current?.focus()
-      } else if (e.key >= '1' && e.key <= '5') {
-        setView(VIEW_KEYS[Number(e.key) - 1])
-      }
+    if (!desktop) return
+    let alive = true
+    const show = (s: UpdateStatus) => {
+      if (s.status === 'downloaded') setUpdate((cur) => (cur && cur.version === s.version ? cur : s))
     }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [editing, showSettings, settings])
+    void desktop.updateStatus().then((s) => alive && show(s))
+    const off = desktop.onUpdateStatus(show)
+    return () => {
+      alive = false
+      off()
+    }
+  }, [desktop])
+
+  // Tema: koyu / açık / sistem
+  useTheme(settings.theme)
 
   const allTags = useMemo(() => {
     const s = new Set<string>()
     tasks.forEach((x) => x.tags.forEach((y) => s.add(y)))
     return [...s].sort()
   }, [tasks])
+  const hasEnergy = useMemo(() => tasks.some((x) => x.completedAt === null && x.energy !== null), [tasks])
 
   const filtered = useMemo(() => {
     let list = tasks
@@ -122,14 +158,18 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
       if (view === 'week') list = list.filter((x) => x.dueAt !== null && (isThisWeek(x.dueAt, now) || isOverdue(x.dueAt, now)))
     }
     if (tag) list = list.filter((x) => x.tags.includes(tag))
+    if (energy) list = list.filter((x) => x.energy === energy)
     if (query.trim()) list = list.filter((x) => matchesQuery(x, query))
     return list
-  }, [tasks, view, tag, query, now])
+  }, [tasks, view, tag, energy, query, now])
 
   const visible = useMemo(() => {
     if (view === 'done') return [...filtered].sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
     return sortTasks(filtered, settings.sort, now)
   }, [filtered, view, settings.sort, now])
+
+  const spentByTask = useMemo(() => spentMinByTask(data.focusLog), [data.focusLog])
+  const currentStreak = useMemo(() => streak(data.dailyDone, dayKey(now)), [data.dailyDone, now])
 
   const focusTask = tasks.find((x) => x.focused && x.completedAt === null) ?? null
   const hfTask = hf.session?.taskId ? (tasks.find((x) => x.id === hf.session!.taskId) ?? null) : focusTask
@@ -137,6 +177,63 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
   const overdueCount = tasks.filter((x) => x.completedAt === null && isOverdue(x.dueAt, now)).length
   const doneToday = tasks.filter((x) => x.completedAt !== null && isToday(x.completedAt, now)).length
   const doneCount = tasks.length - openCount
+  const easyTask = easy?.id ? (tasks.find((x) => x.id === easy.id && x.completedAt === null) ?? null) : null
+
+  /** 🎲 Easy one (#10): suggest a low-effort open task, bring it into view and highlight it. */
+  const pickEasy = (exclude: string | null = null) => {
+    const open = tasks.filter((x) => x.completedAt === null)
+    const pick = pickEasyTask(open.filter((x) => x.id !== exclude)) ?? pickEasyTask(open)
+    setEasy({ id: pick?.id ?? null })
+    if (!pick) return
+    if (!visible.some((x) => x.id === pick.id)) {
+      setView('all')
+      setTag(null)
+      setEnergy(null)
+      setQuery('')
+    }
+    setHighlight(pick.id)
+    scrollTo(pick.id)
+  }
+  const pickEasyRef = useRef(pickEasy)
+  pickEasyRef.current = pickEasy
+
+  // The suggestion toast goes away by itself
+  useEffect(() => {
+    if (!easy) return
+    const h = window.setTimeout(() => setEasy(null), EASY_TOAST_MS)
+    return () => window.clearTimeout(h)
+  }, [easy])
+
+  // Klavye kısayolları (bir alan yazılırken ya da pencere açıkken devre dışı)
+  const modalOpen = !!editing || showSettings || showStats || showBrain
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (modalOpen || e.ctrlKey || e.metaKey || e.altKey) return
+      const el = e.target as HTMLElement
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return
+      const k = e.key.toLowerCase()
+      if (k === 'n') {
+        e.preventDefault()
+        setEditing(newTask({ status: 'todo' }, settings))
+      } else if (e.key === '/') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      } else if (k === 'e') {
+        e.preventDefault()
+        pickEasyRef.current()
+      } else if (k === 'b') {
+        e.preventDefault()
+        setShowBrain(true)
+      } else if (k === 'm' && desktop) {
+        e.preventDefault()
+        void desktop.toggleMini()
+      } else if (e.key >= '1' && e.key <= '5') {
+        setView(VIEW_KEYS[Number(e.key) - 1])
+      }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [modalOpen, settings, desktop])
 
   const clearDone = () => {
     actions.clearDone()
@@ -181,8 +278,28 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
             ))}
           </div>
         )}
+        {hasEnergy && (
+          <div className="tags-block energy-block">
+            <div className="section-title">{t('energy')}</div>
+            <div className="energy-chips">
+              {ENERGIES.map((e) => (
+                <button key={e} className={energy === e ? `energybtn ${e} active` : `energybtn ${e}`} title={t(`energy_${e}` as const)} onClick={() => setEnergy(energy === e ? null : e)}>
+                  {ENERGY_ICON[e]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="sidebar-footer">
           <div className="stats">{t('stats_line', { done: doneToday, open: openCount })}</div>
+          <div className="footer-row">
+            <button className="ghost streak" title={t('streak_title', { n: currentStreak })} onClick={() => setShowStats(true)}>
+              🔥 {currentStreak}
+            </button>
+            <button className="ghost" onClick={() => setShowStats(true)}>
+              {t('stats_btn')}
+            </button>
+          </div>
           <div className="footer-row">
             <button className="ghost" onClick={() => setShowSettings(true)}>
               ⚙ {t('settings')}
@@ -216,7 +333,7 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
           </div>
         )}
 
-        <HyperFocusBar hf={hf} task={hfTask} />
+        <HyperFocusBar hf={hf} task={hfTask} suppressOthers={settings.focusSuppressOthers} />
 
         {focusTask && view !== 'board' && (
           <FocusBanner
@@ -234,6 +351,22 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
             {!hf.session && (
               <button className="hf-start" title="Pomodoro" onClick={() => hf.start(focusTask?.id ?? null)}>
                 {t('hf_start')}
+              </button>
+            )}
+            <button className="ghost small" title={t('easy_title')} onClick={() => pickEasy()}>
+              {t('easy_btn')}
+            </button>
+            <button className="ghost small" title="B" onClick={() => setShowBrain(true)}>
+              {t('brain_btn')}
+            </button>
+            {desktop && (
+              <button className="ghost small" title={`${t('mini_window')} (M)`} onClick={() => void desktop.toggleMini()}>
+                ▣
+              </button>
+            )}
+            {settings.mutedUntil !== null && settings.mutedUntil > now && (
+              <button className="ghost small" title={t('tg_unmuted')} onClick={() => setSettings((s) => ({ ...s, mutedUntil: null }))}>
+                {t('mute_chip', { t: new Date(settings.mutedUntil).toLocaleTimeString(LOCALE[settings.language], { hour: '2-digit', minute: '2-digit' }) })}
               </button>
             )}
             <input
@@ -282,7 +415,11 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
         </header>
 
         {view !== 'done' && view !== 'board' && (
-          <QuickAdd ref={quickRef} onAdd={(text) => actions.quickAdd(text, { defaultDueAt: view === 'today' ? endOfDay(now) : null })} />
+          <QuickAdd
+            ref={quickRef}
+            onAdd={(text) => actions.quickAdd(text, { defaultDueAt: view === 'today' ? endOfDay(now) : null })}
+            onAddMany={(lines) => actions.quickAddMany(lines, { defaultDueAt: view === 'today' ? endOfDay(now) : null })}
+          />
         )}
 
         {cal.available && settings.calendar.showEvents && (view === 'today' || view === 'week') && !query.trim() && (
@@ -312,6 +449,8 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
                 key={x.id}
                 task={x}
                 highlighted={highlight === x.id}
+                spentMin={spentByTask[x.id] ?? 0}
+                escalation={escalationLevel(x, settings)}
                 onComplete={() => actions.complete(x.id)}
                 onReopen={() => actions.reopen(x.id)}
                 onEdit={() => setEditing(x)}
@@ -346,6 +485,47 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
         </div>
       )}
 
+      {easy && !actions.undo && (
+        <div className="toast easy-toast">
+          {easyTask ? (
+            <>
+              <span>🎲 {t('easy_try', { title: easyTask.title })}</span>
+              <button
+                className="mini"
+                onClick={() => {
+                  actions.setFocus(easyTask.id, true)
+                  setEasy(null)
+                }}
+              >
+                {t('easy_focus')}
+              </button>
+              <button className="mini" onClick={() => pickEasy(easyTask.id)}>
+                {t('easy_another')}
+              </button>
+            </>
+          ) : (
+            <span>{t('easy_none')}</span>
+          )}
+          <button className="icon" title={t('dismiss')} onClick={() => setEasy(null)}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {update && desktop && !actions.undo && !easy && (
+        <div className="toast update-toast">
+          <span>⬆ {t('update_toast', { v: update.version ?? '?' })}</span>
+          <button className="mini" onClick={() => void desktop.installUpdate()}>
+            {t('update_install')}
+          </button>
+          <button className="mini" onClick={() => setUpdate(null)}>
+            {t('update_later')}
+          </button>
+        </div>
+      )}
+
+      {celebration.element}
+
       {editing && (
         <TaskEditor
           task={editing}
@@ -357,6 +537,10 @@ function Main({ data, setTasks, setSettings, replaceData }: MainProps) {
           }}
         />
       )}
+
+      {showBrain && <BrainDump onAdd={(lines) => actions.quickAddMany(lines, { defaultDueAt: view === 'today' ? endOfDay(now) : null })} onClose={() => setShowBrain(false)} />}
+
+      {showStats && <StatsModal data={data} now={now} onClose={() => setShowStats(false)} />}
 
       {showSettings && (
         <SettingsPanel
