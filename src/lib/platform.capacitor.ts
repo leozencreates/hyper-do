@@ -295,6 +295,27 @@ export function createCapacitorApi(): HyperDoApi {
       if (perm === 'granted') void reschedule()
       return perm
     },
+    // Android 12+: without the "Alarms & reminders" permission the plugin falls back to inexact alarms and the
+    // system may hold reminders back for minutes. USE_EXACT_ALARM in the manifest grants it at install on 13+;
+    // this is the safety net for devices where it was revoked.
+    async exactAlarms() {
+      try {
+        const r = await LocalNotifications.checkExactNotificationSetting()
+        return r.exact_alarm !== 'denied'
+      } catch {
+        return true
+      }
+    },
+    async requestExactAlarms() {
+      try {
+        const r = await LocalNotifications.changeExactNotificationSetting()
+        const ok = r.exact_alarm !== 'denied'
+        if (ok) void reschedule()
+        return ok
+      } catch {
+        return true
+      }
+    },
     onFocusTask: focus.on,
     onReminded: reminded.on,
     onDataChanged: changed.on,

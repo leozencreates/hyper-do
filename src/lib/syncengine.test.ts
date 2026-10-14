@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { SyncEngine, parseSyncState } from './syncengine'
-import { WebDavTransport, toBase64, type FetchLike } from './synctransport'
+import { WebDavTransport, normalizeWebDavUrl, toBase64, type FetchLike } from './synctransport'
 import { normalizeData } from './data'
 import { normalizeTask, touchTask } from './tasks'
 import { addTombstones, parseSyncDoc } from './sync'
@@ -128,6 +128,26 @@ afterEach(() => {
   clock.now = NOW
 })
 
+
+describe('normalizeWebDavUrl', () => {
+  it('lower-cases only the scheme (phone keyboards capitalise the first letter; Capacitor only proxies lower-case http/https)', () => {
+    expect(normalizeWebDavUrl(' Http://10.0.2.2:1900/HyperDo/hyperdo-sync.json ')).toBe('http://10.0.2.2:1900/HyperDo/hyperdo-sync.json')
+    expect(normalizeWebDavUrl('HTTPS://bulut.example.com/remote.php/dav/files/leo/HyperDo/hyperdo-sync.json')).toBe('https://bulut.example.com/remote.php/dav/files/leo/HyperDo/hyperdo-sync.json')
+    expect(normalizeWebDavUrl('https://ok.example.com/x.json')).toBe('https://ok.example.com/x.json')
+    expect(normalizeWebDavUrl('bulut.example.com/x.json')).toBe('bulut.example.com/x.json')
+  })
+
+  it('the transport requests the normalised URL', async () => {
+    const seen: string[] = []
+    const fetchImpl: FetchLike = async (url) => {
+      seen.push(String(url))
+      return { status: 404, headers: { get: () => null }, text: async () => '' } as unknown as Awaited<ReturnType<FetchLike>>
+    }
+    const t = new WebDavTransport({ url: 'Http://10.0.2.2:1900/hyperdo-sync.json', username: 'leo', password: 'x', fetchImpl })
+    await t.pull(null)
+    expect(seen).toEqual(['http://10.0.2.2:1900/hyperdo-sync.json'])
+  })
+})
 describe('SyncEngine over WebDAV', () => {
   it('first device creates the file (If-None-Match: *), keeps the token and a generated device id', async () => {
     const dav = fakeDav()

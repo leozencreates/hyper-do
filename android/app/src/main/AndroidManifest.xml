@@ -53,4 +53,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Reminders must fire on time: exact alarms. USE_EXACT_ALARM (Android 13+) is granted at install for
+         alarm/reminder apps; SCHEDULE_EXACT_ALARM (Android 12/12L) is merged in by the notifications plugin. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 </manifest>

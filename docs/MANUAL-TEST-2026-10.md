@@ -299,6 +299,14 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 
 Ön koşul: `npm run android:apk`, APK telefona kurulur, bildirim izni verilir, Pil → Kısıtlamasız.
 
+> **14 Eki 2026 — emülatörde (Pixel, Android 16 / API 36) doğrulandı:** C1 bildirim düğmeleri (🎯 Odak ve ✓ Bitirdim
+> uçtan uca; 😴 30 dk aynı yol), C2 Paylaş → Hyper Do (uygulama açıkken ve kapalıyken), C4 WebDAV eşitleme
+> (telefon ↔ ikinci cihaz, tamamlanma ve 🔥 sayacı dahil). Bu turda bulunup düzeltilenler: exact-alarm izni
+> yoktu → bildirimler dakikalarca gecikiyordu (`USE_EXACT_ALARM` + izin banner'ı); WebDAV URL'sini klavye
+> `Http://` yapınca Capacitor native HTTP devreye girmiyordu (URL alanı `autoCapitalize=none` + şema küçük harfe
+> çevriliyor); "az önce önce" metni. **Hâlâ elde test gerektiren:** C3 Google OAuth (Android client ID lazım),
+> gerçek cihazda Doze/pil kısıtlaması altında bildirim zamanlaması, C5 genel kontroller.
+
 ### C1. Bildirim düğmeleri  (📁 `src/lib/platform.capacitor.ts` → `registerActionTypes`, `localNotificationActionPerformed`; `src/lib/stats.ts` → `applyNotificationAction`)
 
 1. Görev `android @5dk`, telefonu kilitle.

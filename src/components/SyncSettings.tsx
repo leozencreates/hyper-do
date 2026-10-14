@@ -67,7 +67,8 @@ export default function SyncSettings({ api, settings, onChange }: Props) {
     setCredsMsg(t('sync_creds_saved'))
   }
 
-  const line = status?.syncing ? t('sync_syncing') : status?.lastSyncAt ? t('sync_last', { t: relativeMinutes(now - status.lastSyncAt, lang) }) : t('sync_never')
+  const sinceMs = status?.lastSyncAt ? now - status.lastSyncAt : 0
+  const line = status?.syncing ? t('sync_syncing') : status?.lastSyncAt ? (sinceMs < 60_000 ? t('sync_last_now') : t('sync_last', { t: relativeMinutes(sinceMs, lang) })) : t('sync_never')
   const error = status?.lastError ? errorLine(t, status.lastError) : null
 
   return (
@@ -105,7 +106,7 @@ export default function SyncSettings({ api, settings, onChange }: Props) {
         <div className="indent sync-body">
           <label className="field">
             <span>{t('sync_url')}</span>
-            <input className="mono" value={s.webdavUrl} placeholder={t('sync_url_ph')} onChange={(e) => setSync({ webdavUrl: e.target.value.trim() })} autoComplete="off" spellCheck={false} />
+            <input className="mono" type="url" inputMode="url" value={s.webdavUrl} placeholder={t('sync_url_ph')} onChange={(e) => setSync({ webdavUrl: e.target.value.trim() })} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
           </label>
           <p className="hint">{t('sync_url_d')}</p>
           <div className="grid2">

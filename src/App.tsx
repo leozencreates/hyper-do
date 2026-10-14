@@ -81,6 +81,18 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   /** "Give me an easy one": the suggested task id, or null for "nothing open". */
   const [easy, setEasy] = useState<{ id: string | null } | null>(null)
   const [perm, setPerm] = useState(platform.permission())
+  /** Android 12+: exact-alarm permission (null = unknown / not applicable). Re-checked whenever the app comes back to the front. */
+  const [exactOk, setExactOk] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!platform.exactAlarms || perm !== 'granted') return
+    const check = () => void platform.exactAlarms!().then(setExactOk)
+    check()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') check()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [perm])
   const [confirmClear, setConfirmClear] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   /** A downloaded update waiting for a restart (#18); `null` once dismissed with "Later" or when nothing is ready. */
@@ -330,6 +342,14 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 {t('web_perm_btn')}
               </button>
             )}
+          </div>
+        )}
+        {platform.kind !== 'electron' && perm === 'granted' && exactOk === false && platform.requestExactAlarms && (
+          <div className="perm-banner">
+            <span>{t('exact_perm')}</span>
+            <button className="primary" onClick={() => void platform.requestExactAlarms!().then(setExactOk)}>
+              {t('exact_perm_btn')}
+            </button>
           </div>
         )}
 

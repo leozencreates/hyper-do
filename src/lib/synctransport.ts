@@ -92,6 +92,17 @@ const strongEtag = (etag: string) => etag.replace(/^W\//i, '').trim()
 
 const timeoutSignal = (ms: number): AbortSignal | undefined => (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(ms) : undefined)
 
+/**
+ * Trims and lower-cases the scheme (`Http://` → `http://`): phone keyboards auto-capitalise the first letter,
+ * and Capacitor's native-HTTP patch only recognises lower-case `http:`/`https:` — anything else is sent to the
+ * WebView's own fetch and dies on the CSP. Everything after the scheme is kept verbatim (paths are case-sensitive).
+ */
+export function normalizeWebDavUrl(raw: string): string {
+  const url = raw.trim()
+  const m = /^([a-z][a-z0-9+.-]*):/i.exec(url)
+  return m ? m[1].toLowerCase() + url.slice(m[1].length) : url
+}
+
 export class WebDavTransport implements SyncTransport {
   readonly kind = 'webdav' as const
   private readonly url: string
@@ -100,7 +111,7 @@ export class WebDavTransport implements SyncTransport {
   private readonly timeoutMs: number
 
   constructor(opts: WebDavOptions) {
-    this.url = opts.url.trim()
+    this.url = normalizeWebDavUrl(opts.url)
     const u = opts.username ?? ''
     const p = opts.password ?? ''
     this.auth = u || p ? 'Basic ' + toBase64(`${u}:${p}`) : null

@@ -443,6 +443,10 @@ export interface HyperDoApi {
   notifyTest(): Promise<void>
   permission(): NotifyPermission
   requestPermission(): Promise<NotifyPermission>
+  /** Android 12+: can reminders use exact alarms? `false` = the system may delay them by minutes (banner in the UI). */
+  exactAlarms?(): Promise<boolean>
+  /** Android 12+: opens the system "Alarms & reminders" screen; resolves with the state after the user returns. */
+  requestExactAlarms?(): Promise<boolean>
   onFocusTask(cb: (taskId: string) => void): () => void
   onReminded(cb: (taskId: string) => void): () => void
   /** Platform veriyi kendisi değiştirdiyse (Telegram komutu, takvimden içe aktarma) arayüzü günceller. */
