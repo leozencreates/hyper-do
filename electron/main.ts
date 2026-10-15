@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Notification, Tray, Menu, nativeIm
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import type { AppData, BackupInfo, Task } from '../src/lib/types'
+import type { AppData, BackupInfo, MiniAppMode, MiniAppStatus, Task } from '../src/lib/types'
 import { activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, markNagged, resetNag, syncCounters } from '../src/lib/reminder'
 import { bumpChanged, taskFromQuickAdd, touchTask } from '../src/lib/tasks'
 import { SyncEngine } from '../src/lib/syncengine'
@@ -20,6 +20,8 @@ import { googleLoginDesktop } from './calendar'
 import { QUICK_HEIGHT, QUICK_WIDTH, QuickAddPopup } from './quick'
 import { MINI_HEIGHT, MINI_WIDTH, MiniWindow } from './mini'
 import { Updater } from './updater'
+import { startMiniAppServer, type MiniAppServer } from './miniapp-server'
+import { ensureCloudflared, startQuickTunnel, type Tunnel } from './tunnel'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -117,6 +119,8 @@ function applyLoginItem(on: boolean) {
 }
 
 let data: AppData = normalizeData(null)
+/** Revision counter (Phase D): +1 on every commit, any source; the Mini App polls it to learn about changes. */
+let rev = 0
 let win: BrowserWindow | null = null
 let tray: Tray | null = null
 let quitting = false
@@ -151,6 +155,7 @@ function commit(next: AppData, opts: { senderId?: number; bump?: boolean } = {})
   syncCounters(data.tasks, next.tasks, lastNotified)
   const prev = data
   data = next
+  rev++
   if (next.settings.autoBackup) maybeBackup()
   saveData(data)
   if (prev.settings.language !== next.settings.language) buildTrayMenu()
@@ -211,10 +216,11 @@ function idleSeconds(): number {
   }
 }
 
-/** Ayarlar değişmiş olabilir: Telegram botunu ve takvim motorunu yeni duruma göre uyar. */
+/** Ayarlar değişmiş olabilir: Telegram botunu, takvim motorunu ve Mini App sunucusunu yeni duruma göre uyar. */
 function afterSave() {
   telegram.sync()
   calendar.onDataSaved()
+  void applyMiniApp()
 }
 
 // ---- Takvim senkronu: Google + ICS akışları. Token ve görev→etkinlik eşlemesi ayrı dosyada tutulur
@@ -283,6 +289,147 @@ const telegram = new TelegramBot({
   onStatus: (s) => broadcast('tidi:tg-status', s),
   idleSeconds,
 })
+
+// ---- Telegram Mini App (Phase D): local server (dist-web + /api) + tunnel; the public URL feeds the bot's
+//      ☰ menu button and the "📱 Open in app" rows. Settings → Telegram → Mini App drives it through settings.miniApp.
+const MINI_BACKOFF_MIN = 5_000
+const MINI_BACKOFF_MAX = 60_000
+let miniStatus: MiniAppStatus = { state: 'off', url: '', port: 0, progress: null, error: null }
+let miniServer: MiniAppServer | null = null
+let miniTunnel: Tunnel | null = null
+let miniTimer: NodeJS.Timeout | null = null
+let miniBackoff = MINI_BACKOFF_MIN
+/** Mode the running setup was started for ('off' = nothing running). */
+let miniMode: MiniAppMode = 'off'
+/** Generation counter: results of async steps started before a stop / restart are ignored. */
+let miniGen = 0
+
+function setMiniStatus(patch: Partial<MiniAppStatus>) {
+  miniStatus = { ...miniStatus, ...patch }
+  broadcast('tidi:miniapp-status', miniStatus)
+}
+
+/** The web build next to the Electron build: `<app>/dist-web` when packaged (package.json › build.files), the repo folder in dev. */
+const miniStaticDir = () => (app.isPackaged ? path.join(app.getAppPath(), 'dist-web') : path.join(__dirname, '../dist-web'))
+const miniBinDir = () => path.join(app.getPath('userData'), 'bin')
+
+async function stopMiniApp() {
+  miniGen++
+  if (miniTimer) {
+    clearTimeout(miniTimer)
+    miniTimer = null
+  }
+  miniTunnel?.stop()
+  miniTunnel = null
+  const server = miniServer
+  miniServer = null
+  if (server) await server.close()
+  miniMode = 'off'
+  telegram.setMiniAppUrl(null)
+  setMiniStatus({ state: 'off', url: '', port: 0, progress: null, error: null })
+}
+
+/** Spawns the quick tunnel; when it dies while the mode is still `cloudflare`, respawns with 5 s → 60 s backoff. */
+function spawnTunnel(gen: number, bin: string, port: number) {
+  if (gen !== miniGen) return
+  setMiniStatus({ state: 'starting', url: '', progress: null, error: null })
+  miniTunnel = startQuickTunnel({
+    bin,
+    port,
+    onUrl(url) {
+      if (gen !== miniGen) return
+      miniBackoff = MINI_BACKOFF_MIN
+      setMiniStatus({ state: 'up', url, error: null })
+      telegram.setMiniAppUrl(url)
+    },
+    onExit(code) {
+      if (gen !== miniGen) return // stopped on purpose
+      miniTunnel = null
+      telegram.setMiniAppUrl(null)
+      const delay = miniBackoff
+      miniBackoff = Math.min(MINI_BACKOFF_MAX, miniBackoff * 2)
+      setMiniStatus({ state: 'error', url: '', error: translate(data.settings.language, 'miniapp_err_exit', { code: code ?? '?', s: Math.round(delay / 1000) }) })
+      miniTimer = setTimeout(() => {
+        miniTimer = null
+        spawnTunnel(gen, bin, port)
+      }, delay)
+    },
+    onLog: (line) => {
+      if (process.env.HYPERDO_DEBUG) console.log('[cloudflared]', line)
+    },
+  })
+}
+
+async function startMiniApp() {
+  const { mode, publicUrl } = data.settings.miniApp
+  const gen = ++miniGen
+  miniMode = mode
+  const dir = miniStaticDir()
+  if (!fs.existsSync(path.join(dir, 'tg.html'))) {
+    setMiniStatus({ state: 'error', url: '', port: 0, progress: null, error: translate(data.settings.language, 'miniapp_err_build') })
+    return
+  }
+  let server: MiniAppServer
+  try {
+    server = await startMiniAppServer({
+      getData: () => data,
+      rev: () => rev,
+      mutate(fn) {
+        // the merge result keeps the timestamps it negotiated with the phone (like the sync engine)
+        commit(fn(data), { bump: false })
+        afterSave()
+      },
+      staticDir: dir,
+    })
+  } catch (e) {
+    if (gen === miniGen) setMiniStatus({ state: 'error', url: '', port: 0, progress: null, error: (e as Error).message })
+    return
+  }
+  if (gen !== miniGen) {
+    await server.close() // stopped while starting
+    return
+  }
+  miniServer = server
+  setMiniStatus({ state: 'starting', port: server.port, url: '', progress: null, error: null })
+  if (mode === 'manual') {
+    // the user runs the tunnel: the port is what they need; the URL may come later (same server, see applyMiniApp)
+    setMiniStatus({ state: publicUrl ? 'up' : 'starting', url: publicUrl })
+    telegram.setMiniAppUrl(publicUrl || null)
+    return
+  }
+  let bin: string
+  try {
+    bin = await ensureCloudflared(miniBinDir(), (p) => {
+      if (gen === miniGen) setMiniStatus({ state: 'downloading', progress: p })
+    })
+  } catch (e) {
+    if (gen === miniGen) setMiniStatus({ state: 'error', progress: null, error: (e as Error).message })
+    return
+  }
+  if (gen !== miniGen) return
+  miniBackoff = MINI_BACKOFF_MIN
+  spawnTunnel(gen, bin, server.port)
+}
+
+/** Follows `settings.miniApp` (launch + every save): idempotent while the mode is unchanged; a manual URL edit keeps the server. */
+async function applyMiniApp() {
+  const { mode, publicUrl } = data.settings.miniApp
+  if (mode !== miniMode) {
+    await stopMiniApp()
+    if (mode !== 'off') await startMiniApp()
+    return
+  }
+  if (mode === 'manual' && miniServer && publicUrl !== miniStatus.url) {
+    setMiniStatus({ state: publicUrl ? 'up' : 'starting', url: publicUrl, error: null })
+    telegram.setMiniAppUrl(publicUrl || null)
+  }
+}
+
+/** "Restart tunnel" button: everything down and up again in the current mode (also retries after an error). */
+async function restartMiniApp() {
+  await stopMiniApp()
+  await applyMiniApp()
+}
 
 // ---- Pencereler: ana, hızlı ekleme ve mini pencere aynı renderer'ı ?view= ile yükler ----
 type RendererView = 'main' | 'quick' | 'mini'
@@ -584,6 +731,9 @@ ipcMain.handle('tidi:update-status', () => updater.current)
 ipcMain.handle('tidi:update-check', () => updater.checkNow())
 ipcMain.handle('tidi:update-install', () => updater.install())
 ipcMain.handle('tidi:app-version', () => app.getVersion())
+// Telegram Mini App (HyperDoApi.desktop)
+ipcMain.handle('tidi:miniapp-status', () => miniStatus)
+ipcMain.handle('tidi:miniapp-restart', () => restartMiniApp())
 
 // ---- Eşitleme IPC (HyperDoApi.sync) ----
 ipcMain.handle('tidi:sync-status', () => sync.status())
@@ -651,6 +801,7 @@ if (!app.requestSingleInstanceLock()) {
     applyLoginItem(data.settings.launchAtLogin)
     telegram.sync()
     calendar.start()
+    void applyMiniApp() // Phase D: server + tunnel when settings.miniApp.mode is not 'off'
     void sync.start() // #16: first cycle 2.5 s after start when a transport is configured
     if (data.settings.autoUpdate) updater.start() // packaged builds only; first check after 30 s
     setInterval(tick, 30_000)
@@ -665,6 +816,7 @@ if (!app.requestSingleInstanceLock()) {
   })
   app.on('before-quit', () => {
     quitting = true
+    void stopMiniApp() // kills cloudflared and closes the server; the menu-button reset is best effort
     telegram.stop()
     calendar.stop()
     sync.stop()

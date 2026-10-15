@@ -1,7 +1,7 @@
 {
   "name": "hyper-do",
   "productName": "Hyper Do",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "ADHD-friendly personal to-do that keeps reminding you until the task is done",
   "private": true,
   "main": "dist-electron/main.js",
@@ -13,8 +13,8 @@
     "build:web": "tsc --noEmit && vite build --config vite.web.config.ts",
     "preview:web": "vite preview --config vite.web.config.ts",
     "test": "vitest run",
-    "dist": "npm run build && electron-builder --win --config.directories.output=%LOCALAPPDATA%/hyperdo-release",
-    "dist:mac": "npm run build && electron-builder --mac",
+    "dist": "npm run build && npm run build:web && electron-builder --win --config.directories.output=%LOCALAPPDATA%/hyperdo-release",
+    "dist:mac": "npm run build && npm run build:web && electron-builder --mac",
     "android:sync": "npm run build:web && npx cap sync android",
     "android:open": "npx cap open android",
     "android:run": "npm run android:sync && npx cap run android",
@@ -36,6 +36,7 @@
     "files": [
       "dist/**",
       "dist-electron/**",
+      "dist-web/**",
       "package.json"
     ],
     "extraResources": [

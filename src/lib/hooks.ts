@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { Theme } from './types'
 
-/** Applies the dark / light / system theme to <html data-theme> and follows OS changes in system mode. */
-export function useTheme(theme: Theme) {
+/**
+ * Applies the dark / light / system theme to <html data-theme> and follows OS changes in system mode.
+ * `'telegram'`: the Telegram bridge owns `data-theme` (client colour scheme + `themeChanged`), nothing is touched.
+ */
+export function useTheme(theme: Theme | 'telegram') {
   useEffect(() => {
+    if (theme === 'telegram') return
     const mq = window.matchMedia('(prefers-color-scheme: light)')
     const apply = () => {
       document.documentElement.dataset.theme = theme === 'system' ? (mq.matches ? 'light' : 'dark') : theme

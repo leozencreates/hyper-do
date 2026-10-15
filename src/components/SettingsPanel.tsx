@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { DEFAULT_SETTINGS, SORT_MODES, THEMES, type AppData, type BackupInfo, type DesktopApi, type Settings, type ShortcutStatus, type SortMode, type TelegramStatus, type UpdateStatus } from '../lib/types'
+import { DEFAULT_SETTINGS, MINI_APP_MODES, SORT_MODES, THEMES, type AppData, type BackupInfo, type DesktopApi, type MiniAppMode, type MiniAppSettings, type MiniAppStatus, type Settings, type ShortcutStatus, type SortMode, type TelegramStatus, type UpdateStatus } from '../lib/types'
 import { LANGS, LOCALE, type Lang } from '../lib/i18n'
 import { platform } from '../lib/platform'
 import { useLang, useT } from '../lib/useT'
@@ -531,7 +531,132 @@ function TelegramSection({ settings, onChange }: { settings: Settings; onChange(
               </label>
             </div>
           )}
+          {platform.desktop && <MiniAppBlock desktop={platform.desktop} settings={settings} onChange={onChange} />}
         </div>
+      )}
+    </div>
+  )
+}
+
+/** One line for the Mini App server / tunnel state. */
+function miniAppStatusLine(t: ReturnType<typeof useT>, s: MiniAppStatus): string {
+  switch (s.state) {
+    case 'downloading':
+      return t('miniapp_status_downloading', { p: s.progress === null ? '' : `${s.progress}%` })
+    case 'starting':
+      return t('miniapp_status_starting')
+    case 'up':
+      return t('miniapp_status_up')
+    case 'error':
+      return t('miniapp_status_error', { e: s.error ?? '?' })
+    default:
+      return t('miniapp_status_off')
+  }
+}
+
+/**
+ * Settings → Telegram → Mini App (Phase D, Electron only): mode (off / Cloudflare tunnel / own URL), live status
+ * with the public URL (copy button), the local port, download progress, the manual URL field with inline https
+ * validation and "Restart tunnel".
+ */
+function MiniAppBlock({ desktop, settings, onChange }: DesktopProps) {
+  const t = useT()
+  const ma = settings.miniApp
+  const setMa = (patch: Partial<MiniAppSettings>) => onChange({ ...settings, miniApp: { ...ma, ...patch } })
+  const [status, setStatus] = useState<MiniAppStatus | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [busy, setBusy] = useState(false)
+  // The URL field is edited freely; the setting follows on blur / Enter when it is a valid https:// address.
+  const [draft, setDraft] = useState(ma.publicUrl)
+  useEffect(() => setDraft(ma.publicUrl), [ma.publicUrl])
+
+  useEffect(() => {
+    let alive = true
+    void desktop.miniAppStatus().then((s) => alive && setStatus(s))
+    const off = desktop.onMiniAppStatus(setStatus)
+    return () => {
+      alive = false
+      off()
+    }
+  }, [desktop])
+
+  const trimmed = draft.trim().replace(/\/+$/, '')
+  const draftValid = trimmed === '' || /^https:\/\/[^\s/]+/i.test(trimmed)
+  const commitUrl = () => {
+    if (!draftValid) return
+    if (trimmed !== ma.publicUrl) setMa({ publicUrl: trimmed })
+  }
+  const copy = () => {
+    if (!status?.url) return
+    void navigator.clipboard?.writeText(status.url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  const restart = async () => {
+    setBusy(true)
+    try {
+      await desktop.miniAppRestart()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="miniapp-block">
+      <div className="field">
+        <span>{t('miniapp_title')}</span>
+        <p className="hint">{t('miniapp_d')}</p>
+      </div>
+      <label className="field">
+        <span>{t('miniapp_mode')}</span>
+        <select value={ma.mode} onChange={(e) => setMa({ mode: e.target.value as MiniAppMode })}>
+          {MINI_APP_MODES.map((m) => (
+            <option key={m} value={m}>
+              {t(`miniapp_mode_${m}` as const)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {ma.mode !== 'off' && status && (
+        <>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <span className={status.state === 'error' ? 'tg-status error' : status.state === 'up' ? 'tg-status ok' : 'tg-status'}>{miniAppStatusLine(t, status)}</span>
+            {status.url && (
+              <>
+                <code className="miniapp-url">{status.url}</code>
+                <button type="button" className="ghost small" onClick={copy}>
+                  {copied ? t('miniapp_copied') : `📋 ${t('miniapp_copy')}`}
+                </button>
+              </>
+            )}
+            {status.port > 0 && <span className="hint">· {t('miniapp_port', { n: status.port })}</span>}
+          </div>
+          {ma.mode === 'manual' && (
+            <div className="field">
+              <span>{t('miniapp_manual_url')}</span>
+              <input
+                className="mono"
+                value={draft}
+                spellCheck={false}
+                placeholder="https://…"
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={commitUrl}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitUrl()
+                }}
+              />
+              {!draftValid && <p className="hint error">{t('miniapp_url_https')}</p>}
+              {status.port > 0 && <p className="hint">{t('miniapp_manual_hint', { n: status.port })}</p>}
+            </div>
+          )}
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <button type="button" className="ghost small" disabled={busy || status.state === 'downloading'} onClick={() => void restart()}>
+              ⟳ {t('miniapp_restart')}
+            </button>
+          </div>
+          <p className="hint">{t('miniapp_hint')}</p>
+        </>
       )}
     </div>
   )

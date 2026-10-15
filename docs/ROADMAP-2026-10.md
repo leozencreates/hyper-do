@@ -23,9 +23,12 @@ collected in `docs/MANUAL-TEST-2026-10.md` (Turkish, by platform, riskiest first
   morning digest / evening review as a daily local notification (#17). The Settings toggles are hidden on Android.
 - **Android nag counting**: notifications are pre-scheduled, so `nagCount` never increments on Android; the 👀 chip
   only shows counts synced from another device, and the escalation line / popup never trigger there (#6).
-- **Telegram is desktop-only** (Electron main process hosts the bot); one linked chat, long polling only, no Telegram
-  Mini App, no voice messages (spec non-goals). The live-message map (`live` / `byMessage`) lives in memory: after a
-  restart old messages keep their buttons but are no longer edited when a task is finished on the desktop.
+- **Telegram is desktop-only** (Electron main process hosts the bot and the Mini App server); one linked chat, long
+  polling only, no voice messages (spec non-goals). The Mini App (Phase D of
+  `2026-10-13-telegram-bot-design.md`) needs the PC running and a tunnel (Cloudflare quick tunnel = a new random
+  address on every restart; stable addresses need "My own address"). The live-message map (`live` / `byMessage`)
+  lives in memory: after a restart old messages keep their buttons but are no longer edited when a task is finished
+  on the desktop.
 - **Google push of recurring tasks**: `calsync.ts` mirrors every open task as a single 30-minute event (no RRULE);
   the next occurrence appears only after the current one is completed. `.ics` export carries an RRULE, except for
   "repeat after completion" rules, which cannot be expressed in a calendar.

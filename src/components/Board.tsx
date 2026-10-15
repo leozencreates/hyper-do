@@ -16,10 +16,12 @@ interface Props {
   /** Kartı sütuna taşı; beforeId verilirse o kartın önüne, yoksa sona */
   onMove(id: string, to: Column, beforeId: string | null): void
   onAdd(status: Status, text: string): void
+  /** false on touch layouts (Telegram Mini App): cards are not draggable so dragging cannot fight scrolling. */
+  draggable?: boolean
 }
 
 /** Kanban panosu: Yapılacak / Yapılıyor / Bekliyor / Bitti. Kartlar sürüklenebilir. */
-export default function Board({ tasks, highlight, onOpen, onComplete, onReopen, onMove, onAdd }: Props) {
+export default function Board({ tasks, highlight, onOpen, onComplete, onReopen, onMove, onAdd, draggable = true }: Props) {
   const t = useT()
   const [dragId, setDragId] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null) // sütun ya da kart kimliği
@@ -70,6 +72,7 @@ export default function Board({ tasks, highlight, onOpen, onComplete, onReopen, 
                   key={x.id}
                   task={x}
                   highlighted={highlight === x.id}
+                  draggable={draggable}
                   dragging={dragId === x.id}
                   over={over === x.id && dragId !== x.id}
                   onDragStart={() => setDragId(x.id)}
@@ -115,6 +118,7 @@ function ColumnAdd({ onAdd }: { onAdd(text: string): void }) {
 interface CardProps {
   task: Task
   highlighted: boolean
+  draggable: boolean
   dragging: boolean
   over: boolean
   onDragStart(): void
@@ -125,7 +129,7 @@ interface CardProps {
   onToggle(): void
 }
 
-function Card({ task, highlighted, dragging, over, onDragStart, onDragEnd, onDragOver, onDrop, onOpen, onToggle }: CardProps) {
+function Card({ task, highlighted, draggable, dragging, over, onDragStart, onDragEnd, onDragOver, onDrop, onOpen, onToggle }: CardProps) {
   const t = useT()
   const lang = useLang()
   const done = task.completedAt !== null
@@ -138,8 +142,8 @@ function Card({ task, highlighted, dragging, over, onDragStart, onDragEnd, onDra
     <article
       id={'task-' + task.id}
       className={cls}
-      draggable
-      title={t('drag_hint')}
+      draggable={draggable}
+      title={draggable ? t('drag_hint') : undefined}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'move'
         e.dataTransfer.setData('text/plain', task.id)

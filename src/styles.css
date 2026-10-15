@@ -547,3 +547,75 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .mini-actions .mini.hf { border-color: color-mix(in srgb, var(--violet) 55%, var(--border)); color: var(--violet); }
 .mini-close { position: absolute; top: 6px; right: 6px; font-size: 12px; color: var(--text-3); padding: 3px 6px; border-radius: 6px; }
 .mini-close:hover { background: var(--bg-3); color: var(--text); }
+
+/* --- Settings → Telegram → Mini App (Phase D) --- */
+.miniapp-block { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.miniapp-url { font-size: 12px; background: var(--bg-3); padding: 3px 8px; border-radius: 6px; user-select: all; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-unsaved { border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); color: var(--danger); font-weight: 600; white-space: nowrap; }
+
+/* --- Telegram Mini App (html.tg): the phone layout inside the Telegram client (Phase D) ---
+   Telegram's colours arrive as inline custom properties on <html> (tg-bridge.ts); the rules below only add
+   the bottom tab bar, safe areas, touch targets and hide what lives on the desktop. */
+html.tg { --tg-button: var(--accent); --tg-button-text: #1a0d04; --border: color-mix(in srgb, var(--text) 14%, var(--bg-2)); --tabbar-h: 62px; }
+html.tg body { background: var(--bg); background-attachment: scroll; overscroll-behavior: none; }
+.tg .app { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.tg .sidebar { display: none; }
+.tg .content {
+  padding: calc(10px + var(--tg-content-safe-area-inset-top, 0px) + var(--tg-safe-area-inset-top, 0px)) 14px
+    calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom) + var(--tg-safe-area-inset-bottom, 0px));
+  -webkit-overflow-scrolling: touch;
+}
+.tg .content-head { margin: 2px 0 12px; }
+.tg h1 { font-size: 24px; }
+.tg .head-tools { width: 100%; justify-content: flex-start; }
+.tg .search { flex: 1; min-width: 120px; width: auto; min-height: 40px; }
+.tg .ghost.small { min-height: 40px; }
+.tg .icon { min-width: 40px; min-height: 40px; display: inline-grid; place-items: center; }
+.tg .mini { min-height: 36px; }
+.tg .check { width: 28px; height: 28px; margin-top: 0; }
+.tg .task { grid-template-columns: auto 1fr; gap: 10px 12px; padding: 12px 12px 8px; touch-action: pan-y; }
+.tg .task-actions { grid-column: 1 / -1; justify-content: flex-end; }
+.tg .task-title { font-size: 16px; }
+.tg .card { touch-action: pan-y; cursor: pointer; }
+.tg .hf-bar { grid-template-columns: 1fr; }
+.tg .hf-ring { display: none; }
+.tg .quick-add textarea { font-size: 16px; } /* iOS: no zoom on focus */
+.tg .quick-add .mini { min-width: 64px; }
+.tg .toast { bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom) + var(--tg-safe-area-inset-bottom, 0px)); max-width: 94vw; }
+.tg .modal-backdrop { place-items: end center; }
+.tg .modal { width: 100vw; max-height: calc(100vh - 24px); border-radius: 18px 18px 0 0; border-image: none; border-top: 3px solid var(--accent); padding: 18px 16px calc(18px + env(safe-area-inset-bottom) + var(--tg-safe-area-inset-bottom, 0px)); }
+.tg .modal input, .tg .modal select, .tg .modal textarea { font-size: 16px; }
+.tg .seg-btn, .tg .modal .mini { min-height: 40px; }
+.tg .grid2 { grid-template-columns: 1fr; }
+.tg .primary { background: var(--tg-button); color: var(--tg-button-text); box-shadow: none; }
+.tg .primary:hover { filter: none; transform: none; }
+.tg .board { grid-template-columns: repeat(4, 84vw); grid-auto-flow: column; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
+.tg .col { scroll-snap-align: start; }
+.tg .perm-banner { display: none; }
+
+/* bottom tab bar: Today · Week · Board · Done · ＋ */
+.tg-tabs { display: none; }
+.tg .tg-tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9;
+  display: grid; grid-template-columns: repeat(4, 1fr) 60px; gap: 2px; align-items: stretch;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom) + var(--tg-safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--bg-2) 94%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--border);
+}
+.tg-tab { --c: var(--accent); position: relative; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 12px; color: var(--text-2); font-size: 12px; font-weight: 600; -webkit-tap-highlight-color: transparent; }
+.tg-tab .tg-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); opacity: .45; transition: opacity .15s, box-shadow .15s; }
+.tg-tab.active { color: var(--text); background: color-mix(in srgb, var(--c) 16%, transparent); }
+.tg-tab.active .tg-tab-dot { opacity: 1; box-shadow: 0 0 8px var(--c); }
+.tg-tab.v-week { --c: var(--violet); }
+.tg-tab.v-board { --c: var(--teal); }
+.tg-tab.v-done { --c: var(--ok); }
+.tg-tab .badge { position: absolute; top: 3px; right: 6px; font-size: 11px; }
+.tg-tab.add { font-size: 28px; font-weight: 800; line-height: 1; color: var(--tg-button-text); background: var(--grad-primary); border-radius: 14px; box-shadow: 0 4px 14px rgba(255,120,110,.28); }
+.tg-tab.add:active { transform: scale(.96); }
+
+/* full-screen connection panels (PC unreachable / wrong account) */
+.tg-panel { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; background: var(--bg); text-align: center; }
+.tg-panel-box { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 360px; }
+.tg-panel-icon { font-size: 44px; }
+.tg-panel h2 { margin: 0; font-size: 20px; }
+.tg-panel p { margin: 0; color: var(--text-2); }
+.tg-panel .hint { font-size: 12px; word-break: break-word; }

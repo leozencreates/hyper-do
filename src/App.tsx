@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppData, type AppStore } from './lib/store'
 import { matchesQuery, newTask, pickEasyTask, sortTasks } from './lib/tasks'
-import { ENERGIES, ENERGY_ICON, SORT_MODES, type AppData, type Energy, type SortMode, type Task, type UpdateStatus } from './lib/types'
+import { ENERGIES, ENERGY_ICON, SORT_MODES, type AppData, type ConnectionStatus, type Energy, type SortMode, type Task, type UpdateStatus } from './lib/types'
 import { dayKey, endOfDay, isOverdue, isToday, isThisWeek } from './lib/dates'
 import { escalationLevel } from './lib/reminder'
 import { spentMinByTask, streak } from './lib/stats'
 import { shareToTaskFields } from './lib/share'
 import { platform } from './lib/platform'
 import { LangContext, useT } from './lib/useT'
-import { LANGS, LOCALE, type Lang } from './lib/i18n'
+import { LANGS, LOCALE, translate, type Lang } from './lib/i18n'
 import { useNow, useTheme } from './lib/hooks'
+import { tgHaptic, tgLang } from './lib/tg-bridge'
 import { useTaskActions } from './lib/useTaskActions'
 import { useCalendar } from './lib/useCalendar'
 import TaskItem from './components/TaskItem'
@@ -23,6 +24,7 @@ import StatsModal from './components/StatsModal'
 import BrainDump from './components/BrainDump'
 import Board from './components/Board'
 import CalendarStrip from './components/CalendarStrip'
+import ConnectionPanel from './components/ConnectionPanel'
 import { HyperFocusBar, useHyperFocus } from './components/HyperFocus'
 import { useCelebration } from './components/Celebration'
 
@@ -34,6 +36,12 @@ const VIEW_KEYS: View[] = ['today', 'week', 'all', 'board', 'done']
  * `quick` = the global quick-add popup, `mini` = the always-on-top mini window (both Electron).
  */
 const VIEW_PARAM = new URLSearchParams(location.search).get('view')
+/** `?task=<id>` (Telegram "📱 Open in app" buttons): that task's editor opens once the data is loaded. */
+const TASK_PARAM = new URLSearchParams(location.search).get('task')
+/** Telegram Mini App: phone layout with the bottom tab bar, data on the PC, no desktop-only controls. */
+const IS_TG = platform.kind === 'telegram'
+/** Tabs of the Mini App's bottom bar (the ＋ tab is added separately). */
+const TG_TABS: View[] = ['today', 'week', 'board', 'done']
 
 /** Time-dependent UI (overdue, "today") refreshes this often without user interaction. */
 const CLOCK_MS = 30_000
@@ -46,12 +54,26 @@ export default function App() {
   return <MainApp />
 }
 
+/** Live state of the platform's data connection (Telegram Mini App); null where the data is local. */
+function useConnection(): ConnectionStatus | null {
+  const api = platform.connection
+  const [s, setS] = useState<ConnectionStatus | null>(() => api?.status() ?? null)
+  useEffect(() => api?.onStatus(setS), [api])
+  return s
+}
+
 function MainApp() {
   const store = useAppData()
-  if (!store.data) return <div className="loading">…</div>
+  const conn = useConnection()
+  const retry = () => platform.connection?.retry()
+  if (!store.data) {
+    if (conn && (conn.state === 'unreachable' || conn.state === 'forbidden')) return <ConnectionPanel status={conn} lang={tgLang()} onRetry={retry} />
+    return <div className="loading">{IS_TG ? translate(tgLang(), 'tgapp_connecting') : '…'}</div>
+  }
   return (
     <LangContext.Provider value={store.data.settings.language}>
       <Main {...store} data={store.data} />
+      {conn?.state === 'forbidden' && <ConnectionPanel status={conn} lang={store.data.settings.language} onRetry={retry} />}
     </LangContext.Provider>
   )
 }
@@ -61,11 +83,23 @@ type MainProps = AppStore & { data: AppData }
 function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFocusEntry, replaceData }: MainProps) {
   const t = useT()
   const { tasks, settings } = data
-  const hf = useHyperFocus(data.hyperFocus, setHyperFocus, settings.pomodoro, settings.language, { onPhaseEnd: appendFocusEntry })
+  // The Mini App only shows a Hyper Focus session running on the PC; the desktop drives the phases.
+  const hf = useHyperFocus(data.hyperFocus, setHyperFocus, settings.pomodoro, settings.language, { driver: !IS_TG, onPhaseEnd: appendFocusEntry })
   const cal = useCalendar()
   const now = useNow(CLOCK_MS)
   const celebration = useCelebration(settings.celebrate)
-  const actions = useTaskActions({ tasks, settings, setTasks, setSettings, updateData, onCompleted: celebration.celebrate })
+  const conn = useConnection()
+  const actions = useTaskActions({
+    tasks,
+    settings,
+    setTasks,
+    setSettings,
+    updateData,
+    onCompleted: () => {
+      celebration.celebrate()
+      if (IS_TG) tgHaptic('success')
+    },
+  })
   const [view, setView] = useState<View>(() => {
     const v = VIEW_PARAM as View | null
     return v && VIEW_KEYS.includes(v) ? v : 'today'
@@ -136,6 +170,16 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
     [],
   )
 
+  // "📱 Open in app" from a Telegram reminder / card: ?task=<id> opens that task's editor after the first load
+  useEffect(() => {
+    if (!TASK_PARAM) return
+    const x = tasks.find((y) => y.id === TASK_PARAM)
+    if (!x) return
+    setEditing(x)
+    setHighlight(x.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-update (#18): a downloaded update shows a toast until "Restart now" / "Later"
   useEffect(() => {
     if (!desktop) return
@@ -151,8 +195,8 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
     }
   }, [desktop])
 
-  // Tema: koyu / açık / sistem
-  useTheme(settings.theme)
+  // Tema: koyu / açık / sistem (inside Telegram the client's colour scheme wins)
+  useTheme(IS_TG ? 'telegram' : settings.theme)
 
   const allTags = useMemo(() => {
     const s = new Set<string>()
@@ -261,6 +305,15 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
 
   const viewLabel = (v: View) => t(`view_${v}` as const)
 
+  /** ＋ tab of the Mini App: the quick-add box, focused (it only exists in the list views). */
+  const addFromTab = () => {
+    if (view === 'board' || view === 'done') setView('today')
+    setTimeout(() => {
+      quickRef.current?.focus()
+      quickRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 50)
+  }
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -361,14 +414,19 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
             onComplete={() => actions.complete(focusTask.id)}
             onUnfocus={() => actions.setFocus(focusTask.id, false)}
             onToggleSub={(sid) => actions.toggleSub(focusTask, sid)}
-            onHyperFocus={hf.session ? undefined : () => hf.start(focusTask.id)}
+            onHyperFocus={hf.session || IS_TG ? undefined : () => hf.start(focusTask.id)}
           />
         )}
 
         <header className="content-head">
           <h1>{viewLabel(view)}</h1>
           <div className="head-tools">
-            {!hf.session && (
+            {conn && (conn.state === 'unreachable' || !conn.saved) && (
+              <button className="mini chip-unsaved" title={conn.error ?? ''} onClick={() => platform.connection?.retry()}>
+                {conn.saved ? t('tgapp_offline') : t('tgapp_unsaved')} · {t('tgapp_retry')}
+              </button>
+            )}
+            {!hf.session && !IS_TG && (
               <button className="hf-start" title="Pomodoro" onClick={() => hf.start(focusTask?.id ?? null)}>
                 {t('hf_start')}
               </button>
@@ -385,7 +443,8 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
               </button>
             )}
             {settings.mutedUntil !== null && settings.mutedUntil > now && (
-              <button className="ghost small" title={t('tg_unmuted')} onClick={() => setSettings((s) => ({ ...s, mutedUntil: null }))}>
+              // Settings are never saved from the Mini App, so there the chip only informs (unmute on the PC or with /mute off)
+              <button className="ghost small" title={t('tg_unmuted')} disabled={IS_TG} onClick={() => setSettings((s) => ({ ...s, mutedUntil: null }))}>
                 {t('mute_chip', { t: new Date(settings.mutedUntil).toLocaleTimeString(LOCALE[settings.language], { hour: '2-digit', minute: '2-digit' }) })}
               </button>
             )}
@@ -402,7 +461,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 }
               }}
             />
-            {view !== 'board' && view !== 'done' && (
+            {view !== 'board' && view !== 'done' && !IS_TG && (
               <select className="sort" value={settings.sort} title={t('sort_label')} onChange={(e) => setSettings((s) => ({ ...s, sort: e.target.value as SortMode }))}>
                 {SORT_MODES.map((s) => (
                   <option key={s} value={s}>
@@ -428,9 +487,11 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 </button>
               )
             )}
-            <button className="primary" onClick={() => setEditing(newTask({ status: 'todo' }, settings))}>
-              {t('new_task')}
-            </button>
+            {!IS_TG && (
+              <button className="primary" onClick={() => setEditing(newTask({ status: 'todo' }, settings))}>
+                {t('new_task')}
+              </button>
+            )}
           </div>
         </header>
 
@@ -459,6 +520,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
             onReopen={actions.reopen}
             onMove={actions.move}
             onAdd={(status, text) => actions.quickAdd(text, { status })}
+            draggable={!IS_TG}
           />
         ) : visible.length === 0 ? (
           <div className="empty">{view === 'done' ? t('empty_done') : t('empty_open')}</div>
@@ -481,7 +543,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 onDuplicate={() => actions.duplicate(x.id)}
                 onPostpone={() => actions.postpone(x)}
                 drag={
-                  view !== 'done'
+                  view !== 'done' && !IS_TG
                     ? {
                         dragging: dragId === x.id,
                         onDragStart: () => setDragId(x.id),
@@ -495,6 +557,21 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
           </ul>
         )}
       </main>
+
+      {IS_TG && (
+        <nav className="tg-tabs" aria-label="views">
+          {TG_TABS.map((v) => (
+            <button key={v} type="button" className={view === v ? `tg-tab v-${v} active` : `tg-tab v-${v}`} onClick={() => setView(v)}>
+              <span className="tg-tab-dot" />
+              <span className="tg-tab-label">{viewLabel(v)}</span>
+              {v === 'today' && overdueCount > 0 && <span className="badge danger">{overdueCount}</span>}
+            </button>
+          ))}
+          <button type="button" className="tg-tab add" aria-label={t('add')} title={t('add')} onClick={addFromTab}>
+            ＋
+          </button>
+        </nav>
+      )}
 
       {actions.undo && (
         <div className="toast">

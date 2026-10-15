@@ -4,7 +4,7 @@
  * in-memory replacement (backup import, platform-side changes) goes through `normalizeData`,
  * so old records and missing fields are completed in exactly one place.
  */
-import { DEFAULT_SETTINGS, FOCUS_LOG_MAX, SYNC_MODES, TOMBSTONE_TTL_MS, type AppData, type CalendarSettings, type DigestSettings, type FocusEntry, type HfSession, type Settings, type SyncMode, type SyncSettings, type Tombstone } from './types'
+import { DEFAULT_SETTINGS, FOCUS_LOG_MAX, MINI_APP_MODES, SYNC_MODES, TOMBSTONE_TTL_MS, type AppData, type CalendarSettings, type DigestSettings, type FocusEntry, type HfSession, type MiniAppMode, type MiniAppSettings, type Settings, type SyncMode, type SyncSettings, type Tombstone } from './types'
 import { normalizeTask, uid } from './tasks'
 import { detectLang } from './i18n'
 
@@ -111,6 +111,21 @@ export function normalizeSyncSettings(s: Partial<SyncSettings> | null | undefine
   }
 }
 
+/** Public URL of the Mini App as stored: trimmed, without trailing slashes ('' when it is not an https:// address). */
+export function normalizeMiniAppUrl(url: unknown): string {
+  if (typeof url !== 'string') return ''
+  const u = url.trim().replace(/\/+$/, '')
+  return /^https:\/\/[^\s/]+/i.test(u) ? u : ''
+}
+
+/** Mini App settings (Phase D): a known mode and an https URL; anything else falls back to the defaults (off). */
+export function normalizeMiniAppSettings(m: Partial<MiniAppSettings> | null | undefined, base: MiniAppSettings = DEFAULT_SETTINGS.miniApp): MiniAppSettings {
+  return {
+    mode: MINI_APP_MODES.includes(m?.mode as MiniAppMode) ? (m!.mode as MiniAppMode) : base.mode,
+    publicUrl: typeof m?.publicUrl === 'string' ? normalizeMiniAppUrl(m.publicUrl) : base.publicUrl,
+  }
+}
+
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
 /** Digest settings (#17): booleans and `HH:MM` strings, anything else falls back to the defaults. */
@@ -151,6 +166,7 @@ export function normalizeData(d: Partial<AppData> | null | undefined, base: Sett
     mutedUntil: typeof s?.mutedUntil === 'number' && Number.isFinite(s.mutedUntil) && s.mutedUntil > 0 ? s.mutedUntil : base.mutedUntil,
     digest: normalizeDigestSettings(s?.digest, base.digest),
     sync: normalizeSyncSettings(s?.sync, base.sync),
+    miniApp: normalizeMiniAppSettings(s?.miniApp, base.miniApp),
   }
   return {
     tasks: Array.isArray(d?.tasks) ? d.tasks.map(normalizeTask) : [],

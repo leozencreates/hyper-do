@@ -27,9 +27,11 @@ import { escalationLevel, resetNag } from './reminder'
 import { completeInData, doneInLastDays, focusMinutes, recordReopen, streak } from './stats'
 import { buildDigest, type DigestKind } from './digest'
 
+/** One inline button: either a callback (`callback_data`) or a Mini App launcher (`web_app`, Phase D). */
 export interface TgInlineButton {
   text: string
-  callback_data: string
+  callback_data?: string
+  web_app?: { url: string }
 }
 
 /** One outgoing message; `text` is HTML. `taskId` registers the message as that task's live card/confirmation (replies attach to it). */
@@ -70,6 +72,8 @@ export interface TgContext {
   replyToTaskId?: string | null
   /** C5: the message was forwarded (`forward_origin` / `forward_date`). */
   forwarded?: boolean
+  /** D4: public origin of the Mini App while a tunnel is up; keyboards then get the "📱 Open in app" row. */
+  appUrl?: string
 }
 
 export interface TgCallbackResult {
@@ -180,9 +184,23 @@ export function helpText(lang: Lang): string {
 
 // ---- Buttons & reminder text ----
 
-/** Inline buttons under reminders, cards and confirmations: `[Done, Focus]` / `[30 min, 1 h, Tomorrow]` (B4). */
-export function taskButtons(taskId: string, lang: Lang): TgInlineButton[][] {
-  return [
+/** Mini App page for a public origin: `<origin>/tg.html`, with `?task=<id>` when a task should open right away (D4). */
+export function miniAppLink(appUrl: string, taskId?: string): string {
+  const base = `${appUrl.replace(/\/+$/, '')}/tg.html`
+  return taskId ? `${base}?task=${encodeURIComponent(taskId)}` : base
+}
+
+/** The `📱 Open in app` row (a `web_app` button) for keyboards while the Mini App is reachable. */
+export function openAppRow(lang: Lang, appUrl: string, taskId?: string): TgInlineButton[] {
+  return [{ text: translate(lang, 'tg_btn_open_app'), web_app: { url: miniAppLink(appUrl, taskId) } }]
+}
+
+/**
+ * Inline buttons under reminders, cards and confirmations: `[Done, Focus]` / `[30 min, 1 h, Tomorrow]` (B4),
+ * plus `[📱 Open in app]` when `appUrl` is given (D4).
+ */
+export function taskButtons(taskId: string, lang: Lang, appUrl?: string): TgInlineButton[][] {
+  const rows: TgInlineButton[][] = [
     [
       { text: translate(lang, 'tg_btn_done'), callback_data: `done:${taskId}` },
       { text: translate(lang, 'tg_btn_focus'), callback_data: `focus:${taskId}` },
@@ -193,6 +211,8 @@ export function taskButtons(taskId: string, lang: Lang): TgInlineButton[][] {
       { text: translate(lang, 'tg_btn_tomorrow'), callback_data: `snooze:${taskId}:tomorrow` },
     ],
   ]
+  if (appUrl) rows.push(openAppRow(lang, appUrl, taskId))
+  return rows
 }
 
 /** Number buttons under a list (C3): `pick:<id>` for the first `PICK_MAX` tasks, `PICK_ROW` per row. */
@@ -416,8 +436,8 @@ export function renderCard(task: Task, lang: Lang, now: number): string {
   return lines.join('\n')
 }
 
-/** Card keyboard: one row per subtask (toggle), the B4 action rows, then `🗑 Delete · ✏ Priority`. */
-export function cardButtons(task: Task, lang: Lang): TgInlineButton[][] {
+/** Card keyboard: one row per subtask (toggle), the B4 action rows, `🗑 Delete · ✏ Priority`, then `📱 Open in app` (D4) when the Mini App is up. */
+export function cardButtons(task: Task, lang: Lang, appUrl?: string): TgInlineButton[][] {
   const subs = task.subtasks.slice(0, PICK_MAX).map((s) => [{ text: `${s.done ? '☑' : '☐'} ${cut(s.title, BUTTON_TEXT_MAX)}`, callback_data: `sub:${task.id}:${s.id}` }])
   return [
     ...subs,
@@ -426,18 +446,23 @@ export function cardButtons(task: Task, lang: Lang): TgInlineButton[][] {
       { text: translate(lang, 'tg_btn_delete'), callback_data: `del:${task.id}` },
       { text: translate(lang, 'tg_btn_prio'), callback_data: `prio:${task.id}` },
     ],
+    ...(appUrl ? [openAppRow(lang, appUrl, task.id)] : []),
   ]
 }
 
-const cardReply = (task: Task, lang: Lang, now: number): TgReply => ({ text: renderCard(task, lang, now), buttons: cardButtons(task, lang), taskId: task.id })
+const cardReply = (task: Task, lang: Lang, now: number, appUrl?: string): TgReply => ({ text: renderCard(task, lang, now), buttons: cardButtons(task, lang, appUrl), taskId: task.id })
 
 // ---- Digest (C6) & backup (C7) ----
 
-/** Telegram digest message: HTML from `buildDigest` plus `pick:` buttons for the listed tasks (which also become the numbering). */
-export function digestReply(data: AppData, now: number, kind: DigestKind): TgEffect {
+/**
+ * Telegram digest message: HTML from `buildDigest` plus `pick:` buttons for the listed tasks (which also become
+ * the numbering) and, while the Mini App is up, an `📱 Open in app` row without `?task` (D4).
+ */
+export function digestReply(data: AppData, now: number, kind: DigestKind, appUrl?: string): TgEffect {
   const d = buildDigest(data, now, data.settings.language, kind)
   const ids = d.tasks.map((x) => x.id)
-  return { replies: [{ text: d.html, ...(ids.length ? { buttons: numberButtons(ids) } : {}) }], ...(ids.length ? { listIndex: ids } : {}) }
+  const buttons = [...numberButtons(ids), ...(appUrl ? [openAppRow(data.settings.language, appUrl)] : [])]
+  return { replies: [{ text: d.html, ...(buttons.length ? { buttons } : {}) }], ...(ids.length ? { listIndex: ids } : {}) }
 }
 
 /** `/backup`: the data file as JSON with the bot token blanked, named `hyperdo-backup-YYYY-MM-DD.json`. */
@@ -531,7 +556,7 @@ function add(text: string, ctx: TgContext): TgEffect {
   const created = task
   return {
     mutate: (d) => ({ ...d, tasks: [created, ...d.tasks] }),
-    replies: [{ text: lines.join('\n'), buttons: taskButtons(created.id, lang), taskId: created.id }],
+    replies: [{ text: lines.join('\n'), buttons: taskButtons(created.id, lang, ctx.appUrl), taskId: created.id }],
   }
 }
 
@@ -691,7 +716,7 @@ export function handleMessage(text: string, ctx: TgContext): TgEffect {
           if (!cur || cur.completedAt === null) return d
           return recordReopen({ ...d, tasks: d.tasks.map((x) => (x.id === last.id ? { ...x, completedAt: null } : x)) }, cur.completedAt)
         },
-        replies: [{ text, buttons: taskButtons(last.id, lang), taskId: last.id }],
+        replies: [{ text, buttons: taskButtons(last.id, lang, ctx.appUrl), taskId: last.id }],
       }
     }
     case '/mute': {
@@ -788,7 +813,7 @@ export function handleCallback(cbData: string, ctx: TgContext): TgCallbackResult
         append: t('tg_focused', { title: bold(task.title) }),
       }
     case 'pick':
-      return { effect: { replies: [cardReply(task, lang, now)] }, toast: '', keepButtons: true }
+      return { effect: { replies: [cardReply(task, lang, now, ctx.appUrl)] }, toast: '', keepButtons: true }
     case 'sub': {
       if (!task.subtasks.some((s) => s.id === extra)) return { ...none, toast: t('tg_bad_index') }
       const toggled: Task = resetNag({ ...task, subtasks: task.subtasks.map((s) => (s.id === extra ? { ...s, done: !s.done } : s)) })
@@ -796,7 +821,7 @@ export function handleCallback(cbData: string, ctx: TgContext): TgCallbackResult
         effect: { mutate: (d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === id ? toggled : x)) }), replies: [] },
         toast: '',
         keepButtons: true,
-        edit: { text: renderCard(toggled, lang, now), buttons: cardButtons(toggled, lang) },
+        edit: { text: renderCard(toggled, lang, now), buttons: cardButtons(toggled, lang, ctx.appUrl) },
       }
     }
     case 'prio': {
@@ -805,7 +830,7 @@ export function handleCallback(cbData: string, ctx: TgContext): TgCallbackResult
         effect: { mutate: (d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === id ? next : x)) }), replies: [] },
         toast: t('tg_prio_set', { icon: priorityIcon(next.priority), title: task.title, prio: t(`p_${next.priority}` as const) }),
         keepButtons: true,
-        edit: { text: renderCard(next, lang, now), buttons: cardButtons(next, lang) },
+        edit: { text: renderCard(next, lang, now), buttons: cardButtons(next, lang, ctx.appUrl) },
       }
     }
     case 'del': {

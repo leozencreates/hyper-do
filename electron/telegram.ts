@@ -19,6 +19,7 @@ import {
   escapeHtml,
   handleCallback,
   handleMessage,
+  miniAppLink,
   reminderText,
   shouldSendToTelegram,
   taskButtons,
@@ -132,6 +133,10 @@ export class TelegramBot {
   private byMessage = new Map<number, string>()
   /** Task whose callback is being handled: `onDataChanged` leaves its message to the callback path. */
   private handling: string | null = null
+  /** D4: public origin of the Mini App while a tunnel is up (keyboards get the "📱 Open in app" row), else null. */
+  private miniAppUrl: string | null = null
+  /** `<chat>|<url or default>` last pushed with `setChatMenuButton`, so saves / URL changes only call the API on change. */
+  private appliedMenu: string | null = null
 
   constructor(host: TelegramHost, opts: TelegramBotOptions = {}) {
     this.host = host
@@ -172,6 +177,8 @@ export class TelegramBot {
       this.stop()
     }
     if (this.running && !this.halted && this.appliedLang !== null && this.appliedLang !== this.settings.language) void this.applyCommands()
+    // D4: the chat menu button follows the linked chat (re-applied after pairing) and the Mini App URL
+    if (this.running && !this.halted && this.appliedLang !== null) void this.applyMenuButton()
     // Pairing (A5): a fresh 6-digit code whenever the bot is on but nothing is linked and no code exists.
     // `mutate` re-enters `sync()` through the host's save path; by then the code is set, so this is a one-off.
     if (shouldRun && !chatId && !pairCode) {
@@ -186,6 +193,7 @@ export class TelegramBot {
     this.halted = false
     this.activeToken = token
     this.appliedLang = null
+    this.appliedMenu = null
     this.backoff = BACKOFF_MIN
     const ac = new AbortController()
     this.abort = ac
@@ -286,6 +294,38 @@ export class TelegramBot {
     return m ? { chatId: m.chatId, messageId: m.messageId } : null
   }
 
+  // ---- Mini App (D4) ----
+  /** Current Mini App origin (null = none); keyboards built from now on include / omit the "Open in app" row. */
+  get appUrl(): string | undefined {
+    return this.miniAppUrl ?? undefined
+  }
+
+  /**
+   * Called by the host when the tunnel URL changes (null when the Mini App is off). Remembers the origin for every
+   * keyboard built later and sets the linked chat's ☰ menu button to the Mini App (`web_app`) or back to default.
+   */
+  setMiniAppUrl(url: string | null) {
+    const next = url ? url.trim().replace(/\/+$/, '') || null : null
+    if (next === this.miniAppUrl) return
+    this.miniAppUrl = next
+    if (this.running && !this.halted) void this.applyMenuButton()
+  }
+
+  /** `setChatMenuButton` for the linked chat, only when the (chat, url) pair differs from the last successful call. */
+  private async applyMenuButton(signal?: AbortSignal) {
+    const chat = this.linkedChat
+    if (!chat) return
+    const want = `${chat}|${this.miniAppUrl ?? 'default'}`
+    if (want === this.appliedMenu) return
+    const menu_button = this.miniAppUrl ? { type: 'web_app', text: 'Hyper Do', web_app: { url: miniAppLink(this.miniAppUrl) } } : { type: 'default' }
+    try {
+      await this.api('setChatMenuButton', { chat_id: chat, menu_button }, signal)
+      this.appliedMenu = want
+    } catch (e) {
+      if (!signal?.aborted) console.error('[telegram] setChatMenuButton failed:', (e as Error).message)
+    }
+  }
+
   // ---- Dışa açık işlemler ----
   /**
    * Hatırlatma gönder (tick'ten çağrılır). Bağlı sohbet yoksa, bot duruyorsa ya da (B3) bilgisayar kullanımdaysa
@@ -297,7 +337,7 @@ export class TelegramBot {
     try {
       const chat = this.linkedChat
       const html = reminderText(task, title, body, this.settings)
-      const buttons = taskButtons(task.id, this.settings.language)
+      const buttons = taskButtons(task.id, this.settings.language, this.appUrl)
       const sent = await this.send(chat, html, buttons)
       await this.setLive(task.id, { chatId: chat, messageId: sent.message_id, html, sentAt: Date.now(), kind: 'reminder', buttons })
     } catch (e) {
@@ -329,7 +369,7 @@ export class TelegramBot {
   async sendDigest(kind: DigestKind) {
     if (!this.running || this.halted || !this.linkedChat) return
     try {
-      await this.apply(this.linkedChat, digestReply(this.host.getData(), Date.now(), kind))
+      await this.apply(this.linkedChat, digestReply(this.host.getData(), Date.now(), kind, this.appUrl))
     } catch (e) {
       console.error('[telegram] digest failed:', (e as Error).message)
     }
@@ -366,6 +406,7 @@ export class TelegramBot {
       await sleep(delay, signal)
     }
     await this.applyCommands(signal)
+    await this.applyMenuButton(signal)
     await this.pollLoop(signal)
   }
 
@@ -430,7 +471,7 @@ export class TelegramBot {
   }
 
   private ctx(chatId: string, extra: Partial<TgContext> = {}): TgContext {
-    return { data: this.host.getData(), now: Date.now(), chatId, listIndex: this.listIndex, ...extra }
+    return { data: this.host.getData(), now: Date.now(), chatId, listIndex: this.listIndex, appUrl: this.appUrl, ...extra }
   }
 
   /** Applies an effect from the pure layer: numbering, data change (first), then the replies and documents. */
@@ -489,7 +530,7 @@ export class TelegramBot {
       // Rebuild from the HTML we sent (Telegram hands the original back as plain text); unknown messages are re-escaped.
       const base = stored?.html ?? escapeHtml(q.message.text ?? '')
       const text = `${base}\n\n${r.append}`
-      const buttons = r.keepButtons ? (stored?.buttons ?? taskButtons(taskId, this.settings.language)) : undefined
+      const buttons = r.keepButtons ? (stored?.buttons ?? taskButtons(taskId, this.settings.language, this.appUrl)) : undefined
       await this.edit(ref, text, buttons).catch(() => {})
       if (stored) stored.html = text
       if (!r.keepButtons) this.live.delete(taskId)

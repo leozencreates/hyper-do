@@ -62,5 +62,9 @@ contextBridge.exposeInMainWorld('tidi', {
     installUpdate: () => ipcRenderer.invoke('tidi:update-install'),
     onUpdateStatus: listen<unknown>('tidi:update-status'),
     appVersion: () => ipcRenderer.invoke('tidi:app-version'),
+    // Telegram Mini App (Phase D): server + tunnel status (query + push), restart
+    miniAppStatus: () => ipcRenderer.invoke('tidi:miniapp-status'),
+    onMiniAppStatus: listen<unknown>('tidi:miniapp-status'),
+    miniAppRestart: () => ipcRenderer.invoke('tidi:miniapp-restart'),
   },
 })

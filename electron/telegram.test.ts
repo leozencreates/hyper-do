@@ -62,6 +62,7 @@ function fakeApi() {
         case 'deleteMessage':
         case 'answerCallbackQuery':
         case 'setMyCommands':
+        case 'setChatMenuButton':
           return reply(200, { ok: true, result: true })
         default:
           return reply(404, { ok: false, error_code: 404, description: 'Not Found' })
@@ -106,7 +107,7 @@ const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 const NOW = new Date(2026, 9, 13, 10, 0).getTime()
 const task = (o: Partial<Task> & { id: string }): Task => normalizeTask({ title: o.id, createdAt: NOW, order: NOW, remindEveryMin: 20, ...o })
-type Keyboard = { inline_keyboard: { text: string; callback_data: string }[][] }
+type Keyboard = { inline_keyboard: { text: string; callback_data?: string; web_app?: { url: string } }[][] }
 const keyboard = (body: Record<string, unknown>) => (body.reply_markup as Keyboard | undefined)?.inline_keyboard
 
 /** Bot + host with the same save path as the Electron main process: `mutate` commits, reflects (B2) and re-syncs. */
@@ -481,5 +482,65 @@ describe('Phase C: cards, replies, backup, digest', () => {
     h.bot.stop()
     await h.bot.sendDigest('evening')
     expect(h.api.of('sendMessage')).toHaveLength(2)
+  })
+})
+
+describe('Phase D: Mini App menu button and "Open in app" row', () => {
+  const URL = 'https://wide-rows-mean-ok.trycloudflare.com'
+  const openRow = (taskId?: string) => [{ text: translate('en', 'tg_btn_open_app'), web_app: { url: `${URL}/tg.html${taskId ? `?task=${taskId}` : ''}` } }]
+
+  it('D4: setMiniAppUrl sets the chat menu button once (web_app), keyboards gain the last row, null restores the default', async () => {
+    const t = task({ id: 'a', title: 'Pay bill', subtasks: [{ id: 's1', title: 'Book', done: false }] })
+    const h = await running({}, [t])
+    // start without a Mini App: the linked chat gets the default button once (a stale web_app button from an earlier run is cleared)
+    await waitFor(() => h.api.of('setChatMenuButton').length >= 1, 'default button at start')
+    expect(h.api.of('setChatMenuButton')[0].body).toEqual({ chat_id: '42', menu_button: { type: 'default' } })
+    h.bot.setMiniAppUrl(URL + '/')
+    await waitFor(() => h.api.of('setChatMenuButton').length >= 2, 'menu button')
+    expect(h.api.of('setChatMenuButton')[1].body).toEqual({ chat_id: '42', menu_button: { type: 'web_app', text: 'Hyper Do', web_app: { url: `${URL}/tg.html` } } })
+    // repeated saves / the same URL again: no further call
+    h.bot.sync()
+    h.bot.setMiniAppUrl(URL)
+    await pause(60)
+    expect(h.api.of('setChatMenuButton')).toHaveLength(2)
+    // reminder: two action rows + the open row with ?task
+    await h.bot.remind(t, 'Pay bill', 'soon')
+    const rem = keyboard(h.api.of('sendMessage')[0].body)!
+    expect(rem).toHaveLength(3)
+    expect(rem[2]).toEqual(openRow('a'))
+    expect(rem[0].map((b) => b.callback_data)).toEqual(['done:a', 'focus:a'])
+    // card: subtask row, action rows, delete/prio, then the open row
+    h.api.callback('cb1', 'pick:a', 50)
+    await waitFor(() => h.api.of('sendMessage').length >= 2, 'card')
+    const card = keyboard(h.api.of('sendMessage')[1].body)!
+    expect(card).toEqual(cardButtons(t, 'en', URL))
+    expect(card[card.length - 1]).toEqual(openRow('a'))
+    // digest: number buttons then the open row without ?task
+    await h.bot.sendDigest('morning')
+    const digest = keyboard(h.api.of('sendMessage')[2].body)!
+    expect(digest[0]).toEqual([{ text: '1', callback_data: 'pick:a' }])
+    expect(digest[1]).toEqual(openRow())
+    // tunnel gone: default button, plain keyboards again
+    h.bot.setMiniAppUrl(null)
+    await waitFor(() => h.api.of('setChatMenuButton').length >= 3, 'default button')
+    expect(h.api.of('setChatMenuButton')[2].body).toEqual({ chat_id: '42', menu_button: { type: 'default' } })
+    await h.bot.remind(t, 'Pay bill', 'again')
+    expect(keyboard(h.api.of('sendMessage')[3].body)).toEqual(taskButtons('a', 'en'))
+  })
+
+  it('D4: a URL set before pairing is applied to the chat right after /start <code> links it', async () => {
+    const h = await setup({ chatId: '', pairCode: '123456' })
+    h.bot.setMiniAppUrl(URL)
+    h.bot.sync()
+    await waitFor(() => h.api.of('getUpdates').length >= 2, 'polling')
+    expect(h.api.of('setChatMenuButton')).toHaveLength(0) // nothing linked yet
+    h.api.message(777, '/start 123456')
+    await waitFor(() => h.data().settings.telegram.chatId === '777', 'pairing')
+    await waitFor(() => h.api.of('setChatMenuButton').length >= 1, 'menu button after pairing')
+    expect(h.api.of('setChatMenuButton')[0].body).toEqual({ chat_id: '777', menu_button: { type: 'web_app', text: 'Hyper Do', web_app: { url: `${URL}/tg.html` } } })
+    // a restart re-applies it (Telegram keeps it, but the bot cannot know)
+    h.bot.stop()
+    h.bot.sync()
+    await waitFor(() => h.api.of('setChatMenuButton').length >= 2, 'menu button after restart')
   })
 })

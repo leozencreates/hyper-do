@@ -32,6 +32,7 @@ No account, no cloud, no subscription. Your data never leaves your device — un
 - [Natural-language quick add](#natural-language-quick-add)
 - [Settings overview](#settings-overview)
 - [Telegram bot](#telegram-bot-windowsmacos)
+- [Telegram Mini App](#telegram-mini-app)
 - [Calendar connections](#calendar-connections)
 - [Sync between devices](#sync-between-devices)
 - [Updates](#updates)
@@ -89,6 +90,7 @@ Most to-do apps notify you once and go quiet. Hyper Do doesn't. Until you comple
 - 📲 **Reminders on your phone** — every reminder also arrives in your own Telegram bot, one live message per task that updates itself when you finish the task on the desktop. Buttons **✓ Done · 🎯 Focus / ⏰ 30 min · ⏰ 1 h · 🌅 Tomorrow**.
 - 🗂 **Work from the chat** — `/list`, `/today`, `/week`, `/overdue`, `/search`, task cards with tappable subtasks, `/done 1 3 4`, `/snooze 2 tomorrow 09:00`, `/due`, `/prio`, `/every`, `/sub`, `/note`, `/rename`, `/del`, `/undo`, `/stats`, `/mute`, `/quiet`, `/backup`. Reply to any reminder to add a subtask. [Command table](#telegram-bot-windowsmacos).
 - 🔐 **Private by design** — your own bot token, a 6-digit pairing code, and an optional "only when the PC is idle" rule.
+- 📱 **Mini App** — the real Hyper Do screen (Today · Week · Board · Done, quick add, editor) opens *inside* Telegram from the ☰ menu button or an "📱 Open in app" button under any reminder. Your PC serves it through an HTTPS tunnel; nothing is hosted elsewhere. [How it works](#telegram-mini-app).
 
 ### Calendars
 
@@ -130,7 +132,8 @@ Board cards are dragged with the mouse; there are no keyboard shortcuts for movi
 
 | Platform | How | Reminders | Extras |
 |---|---|---|---|
-| Windows (Electron) | Installer from Releases, or `npm run dist` → `Hyper-Do-Setup-x.y.z.exe`; desktop and Start menu shortcuts are created | From the tray even when the window is closed; toasts with **Done / 😴 30 min / Open** buttons; flashes the taskbar entry | Tray, mini window, global quick-add shortcut, launch at login, daily backups, auto-update, Telegram bot, digests, Google (two-way) + ICS feeds, WebDAV + folder sync |
+| Windows (Electron) | Installer from Releases, or `npm run dist` → `Hyper-Do-Setup-x.y.z.exe`; desktop and Start menu shortcuts are created | From the tray even when the window is closed; toasts with **Done / 😴 30 min / Open** buttons; flashes the taskbar entry | Tray, mini window, global quick-add shortcut, launch at login, daily backups, auto-update, Telegram bot + Mini App server, digests, Google (two-way) + ICS feeds, WebDAV + folder sync |
+| Telegram Mini App (any phone with Telegram) | Settings → Telegram → **Mini App** on the desktop app, then the ☰ **Hyper Do** button in your bot chat | None of its own — the desktop app and the bot remind you; the Mini App is the screen you act on | The full UI on the PC's data: Today / Week / Board / Done, quick add, editor, brain dump, stats; changes merge into the desktop within seconds (see [Telegram Mini App](#telegram-mini-app)) |
 | macOS (Electron) | `npm run dist:mac` (must run on a Mac) | Stays in the Dock, notifies when the window is closed; notification actions Done / 30 min | Same as Windows (untested on real hardware) |
 | Android (Capacitor) | `npm run android:apk` → `android/app/build/outputs/apk/debug/app-debug.apk` | Notifies even when the app is closed: reminders are scheduled 48 h ahead as local notifications and extended on every launch; every notification has **✓ Done / 😴 30 min / 🎯 Focus** buttons | Share target ("Share → Hyper Do"), Google Calendar (two-way) when an Android OAuth client is configured, ICS feeds, WebDAV sync. No digest, no nag counting, no Telegram |
 | Web / iPhone / iPad (PWA) | `npm run dev:web` or publish the `dist-web` folder | Only while the tab or the home-screen app is **open** | Google (two-way) + ICS feeds (some providers block CORS), WebDAV sync (server needs CORS) |
@@ -297,6 +300,50 @@ The token is stored only in the local data file (so it is part of JSON exports a
 sent anywhere except to the Telegram Bot API. `/backup` is the one command that sends your data through Telegram's
 servers, and only when you ask for it.
 
+## Telegram Mini App
+
+Text commands are fine for "done" and "snooze", but not for *working* with your list. The Mini App is Hyper Do's own
+React UI opened inside the Telegram client, on the data that lives on your PC. There is no Hyper Do server: the
+desktop app runs a small HTTP server on `127.0.0.1` (the web build `dist-web/tg.html` + a JSON API) and exposes it
+through an HTTPS tunnel. The PC must be running, exactly as for reminders.
+
+Setup (once, on the PC):
+
+1. Pair the bot first ([Telegram bot](#telegram-bot-windowsmacos)); the Mini App only answers the linked Telegram account.
+2. Settings → Telegram → **Mini App** → choose how the phone reaches your PC:
+   - **Cloudflare tunnel (automatic)** — the app looks for `cloudflared` on your PATH, otherwise downloads the official
+     release binary once into `%APPDATA%\hyper-do\bin\` (progress is shown), and starts a *quick tunnel*
+     (`cloudflared tunnel --url http://127.0.0.1:<port>`). A random `https://….trycloudflare.com` address appears in
+     the status line (copy button). No Cloudflare account is needed. The address changes on every restart; the bot's
+     menu button is updated automatically. If the tunnel process dies it is restarted with a 5 s → 60 s backoff.
+   - **My own address** — run any tunnel yourself (ngrok, Tailscale Funnel, a reverse proxy…) to the **local port**
+     shown in the status line and paste its public `https://` address. Non-https addresses are rejected inline.
+     Use this if you want a stable address.
+   - **Restart tunnel** stops and starts everything again (also the way to retry after an error).
+3. The status line reads *Reachable at https://…* and the bot's ☰ menu button in your chat becomes **Hyper Do**.
+
+On the phone:
+
+- Open the chat with your bot and tap the ☰ **Hyper Do** menu button (bottom left, next to the text field), or tap
+  **📱 Open in app** under any reminder, task card or digest — that one opens the task's editor right away.
+- You get the app's phone layout: a bottom tab bar **Today · Week · Board · Done · ＋** (＋ focuses the quick-add
+  box), search, the mute chip, the brain dump, task editor, stats. Telegram's colour scheme (light/dark) and
+  background colours are adopted; the Back button of the client closes dialogs; finishing a task gives a haptic tick.
+- Everything you change is sent to the PC immediately and merged like a sync (newer edit wins per task, deletions
+  travel as tombstones); what changes on the PC (a reminder, a Telegram command, the desktop UI) appears on the phone
+  within about 3 seconds while the Mini App is in front.
+- What the phone cannot do: change settings (they stay on the PC; the mute chip only informs), start a Hyper Focus
+  session, connect calendars, export backups — those live on the desktop. A running Hyper Focus session is shown
+  read-only. If the PC is off or the tunnel is down you see *Hyper Do on your PC is not reachable* with a retry button;
+  a save that could not be delivered is kept locally and shown as a *⚠ Not saved · Retry* chip until it goes through.
+
+Security: every API request carries Telegram's signed `initData` (`Authorization: tma …`); the PC verifies the
+signature with the bot token (HMAC-SHA256 as documented by Telegram), rejects data older than 7 days and only
+serves the user id that is the linked chat (`401` / `403` otherwise). Static files need no login (they are the public
+web build). The data sent to the phone never contains the bot token, the pairing code or the Google client secret.
+The tunnel provider (Cloudflare, or whatever you chose) terminates TLS and can technically see the traffic — see
+[PRIVACY.md](PRIVACY.md).
+
 ## Calendar connections
 
 Settings → **📅 Calendars**. Everything runs on your device; there is no Hyper Do server in between.
@@ -442,8 +489,8 @@ npm install
 npm run dev          # Electron + Vite with hot reload
 npm run dev:web      # Browser only, http://localhost:5180
 npm run build        # Build for Electron (dist/ + dist-electron/), runs tsc --noEmit first
-npm run build:web    # Build the PWA (dist-web/)
-npm test             # Vitest: src/lib/*.test.ts (pure libs) + electron/telegram.test.ts (fake Bot API) + electron/syncfolder.test.ts
+npm run build:web    # Build the PWA + the Telegram Mini App entry (dist-web/index.html + dist-web/tg.html)
+npm test             # Vitest: src/lib/*.test.ts (pure libs) + electron/*.test.ts (fake Bot API, folder sync, Mini App server/auth/tunnel)
 npm run preview:web  # Preview dist-web locally
 npm run dist         # Windows installer → %LOCALAPPDATA%\hyperdo-release\
 npm run dist:mac     # macOS DMG (on a Mac)
@@ -452,7 +499,7 @@ npm run android:apk  # Android debug APK
 
 > `npm run dist` writes its output to `%LOCALAPPDATA%\hyperdo-release\` instead of the project folder because of a folder-naming restriction under Desktop.
 
-`npm test` runs 17 files / 405 tests in a few seconds; the Telegram transport test starts a fake Bot API on `127.0.0.1`, the folder-sync test uses a temp directory. See `docs/` for the roadmap, the Telegram design spec and the manual test plan (`docs/MANUAL-TEST-2026-10.md`, Turkish). `CLAUDE.md` holds the architecture notes and conventions.
+`npm test` runs 20 files / 431 tests in a few seconds; the Telegram transport test starts a fake Bot API on `127.0.0.1`, the Mini App server test serves a temp directory on `127.0.0.1`, the folder-sync test uses a temp directory. The desktop installer (`npm run dist`) needs `dist-web/` as well, so it runs `build:web` itself. See `docs/` for the roadmap, the Telegram design spec and the manual test plan (`docs/MANUAL-TEST-2026-10.md`, Turkish). `CLAUDE.md` holds the architecture notes and conventions.
 
 Tech stack: React 19, TypeScript, Vite, Electron, electron-builder, electron-updater, Capacitor (Android), Web Notifications + Service Worker (PWA), Vitest.
 
@@ -469,6 +516,10 @@ electron/
   telegram.ts         Telegram bot transport: long polling, status, pairing code, "/" menu, live-message bookkeeping,
                       onDataChanged reflection, sendDocument
   telegram.test.ts    Transport test against a fake Bot API on 127.0.0.1
+  miniapp-server.ts   Telegram Mini App server: dist-web static files + /api/data, /api/rev (initData auth, merge on PUT)
+  tg-auth.ts          Telegram initData validation (HMAC "WebAppData", auth_date freshness)
+  tunnel.ts           cloudflared helper: PATH lookup / download, quick tunnel spawn, public URL parsing
+  *.test.ts           miniapp-server (temp static dir on 127.0.0.1), tg-auth (signed fixture), tunnel (pure parts)
   calendar.ts         Google login for the desktop app (PKCE + loopback redirect)
   syncfolder.ts       Folder sync transport: <dir>/hyperdo-sync.json, mtime token, atomic write, fs.watch
   syncfolder.test.ts  Folder transport against a temp directory
@@ -500,7 +551,9 @@ src/lib/              Pure logic (no React, no Electron) shared by Electron main
   sound.ts            Web Audio chimes (Hyper Focus phases, completion)
   download.ts         Browser "save as file" helpers (JSON backup, .ics)
   emitter.ts          Tiny typed event emitter
-  platform.ts         Picks the Electron / Capacitor / web adapter
+  platform.ts         Picks the Electron / Telegram Mini App / Capacitor / web adapter
+  platform.telegram.ts  Telegram Mini App: data on the PC over /api (load, save = merge, 3 s rev poll), connection status
+  tg-bridge.ts        Telegram WebApp SDK bridge: theme → CSS variables, ready/expand, BackButton stack, haptics
   platform.web.ts     Browser: localStorage + Web Notifications, runs the reminder engine itself
   platform.capacitor.ts  Android: local notifications 48 h ahead with Done / 30 min / Focus buttons, share target,
                       Google login via Custom Tab, WebDAV sync
@@ -522,14 +575,16 @@ src/components/
   HyperFocus.tsx      Hyper Focus (Pomodoro) timer hook and bar
   StatsModal.tsx      Streaks, heatmap, focus minutes, top tags
   Celebration.tsx     Completion chime + CSS confetti
-  SettingsPanel.tsx   Settings (+ Desktop, Telegram, Backup, About sections)
+  SettingsPanel.tsx   Settings (+ Desktop, Telegram incl. the Mini App block, Backup, About sections)
+  ConnectionPanel.tsx Mini App full-screen states: PC unreachable (retry) / not the linked account
   CalendarSettings.tsx  Settings → Calendars
   SyncSettings.tsx    Settings → Sync
   CalendarStrip.tsx   Events above Today / This week
   AddToCalendar.tsx   Per-task "Add to calendar" menu
   Modal.tsx, Toggle.tsx   Shared dialog and switch
 
-src/App.tsx           UI shell (views, sidebar, shortcuts, mute chip, update toast, share-target editor)
+src/App.tsx           UI shell (views, sidebar, shortcuts, mute chip, update toast, share-target editor, Mini App tab bar)
+index.html, tg.html   PWA entry / Telegram Mini App entry (loads the Telegram SDK first; both built into dist-web/)
 public/               PWA service worker (sw.js), manifest, icons
 android/              Capacitor Android project; MainActivity.java forwards ACTION_SEND text to the web app
 docs/                 ROADMAP-2026-10.md, 2026-10-13-telegram-bot-design.md, MANUAL-TEST-2026-10.md
@@ -548,6 +603,7 @@ There is no account, no telemetry and no remote server. Outbound connections exi
 | Feature | Talks to | Stored locally |
 |---|---|---|
 | Telegram bot | `api.telegram.org` | Bot token (in the data file). `/backup` uploads the data file (token removed) to your chat, only on request |
+| Telegram Mini App (desktop, off by default) | Your phone ↔ the tunnel (`*.trycloudflare.com` via `cloudflared`, or the tunnel you run) ↔ the local server on `127.0.0.1`. `cloudflared` itself is fetched once from `github.com/cloudflare/cloudflared` | The `cloudflared` binary in `%APPDATA%\hyper-do\bin\`; the mode and manual URL in the data file. The phone receives your tasks and settings minus the bot token, pairing code and Google client secret |
 | Google Calendar | `accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com` | Refresh token + task→event map in `hyperdo-calendar.json` (desktop) or `localStorage` / Preferences (web / Android) — never in backups |
 | ICS / webcal feeds | The provider you pasted | Feed links (in the data file), a cache of upcoming events |
 | Automatic updates (desktop, on by default) | `api.github.com`, `github.com` (GitHub Releases of this repository) | The downloaded installer in the system temp folder until it is installed |

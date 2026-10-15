@@ -1,8 +1,8 @@
 # Hyper Do 0.2.0 — elle test planı (Ekim 2026)
 
-Otomatik testler (`npm test`, 17 dosya / 405 test) saf mantığı kapsıyor; bu belge Vitest'in göremediği her şeyi
-kapsar: Electron pencereleri, Windows bildirimleri, gerçek Telegram API'si, Android, tarayıcı ve iki cihaz arası
-eşitleme. Her bölümde **en riskli maddeler en üstte**. Her maddenin başında, başarısız olursa bakılacak dosya var.
+Otomatik testler (`npm test`, 20 dosya / 431 test) saf mantığı kapsıyor; bu belge Vitest'in göremediği her şeyi
+kapsar: Electron pencereleri, Windows bildirimleri, gerçek Telegram API'si ve Mini App (tünel, telefon), Android,
+tarayıcı ve iki cihaz arası eşitleme. Her bölümde **en riskli maddeler en üstte**. Her maddenin başında, başarısız olursa bakılacak dosya var.
 
 Nasıl kullanılır:
 
@@ -292,6 +292,41 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
    numarayı kullanır.
 2. `/backup` → `hyperdo-backup-YYYY-MM-DD.json` dosyası, açıklama "Hyper Do yedeği · N görev · token çıkarıldı".
    Dosyayı aç: `settings.telegram.token` **boş**; Ayarlar → İçe aktar ile yüklenebilir.
+
+### B7. Mini App — tünel, menü düğmesi, telefon  (📁 `electron/main.ts` → `applyMiniApp`, `spawnTunnel`; `electron/miniapp-server.ts`; `electron/tunnel.ts`; `src/lib/platform.telegram.ts`; `src/lib/tg-bridge.ts`; `src/App.tsx` → `IS_TG`)
+
+Ön koşul: bot eşleşmiş (B1) ve `npm run build:web` çalışmış (`dist-web/tg.html` var). İnternet gerekli.
+
+1. Ayarlar → Telegram → **Mini App** → *Telefon nasıl ulaşsın?* = **Cloudflare tüneli (otomatik)**.
+   → Durum sırayla "Cloudflare yardımcısı indiriliyor… %NN" (ilk kez; `%APPDATA%\hyper-do\bin\cloudflared.exe`
+   oluşur), "Tünel başlatılıyor…", sonra "Erişilebilir:" + `https://….trycloudflare.com` + **Kopyala** + "yerel
+   port NNNNN". `dist-web` yoksa → "Hata: Web derlemesi yok: npm run build:web çalıştır".
+2. Kopyalanan adresi PC'de tarayıcıda aç → `/tg.html`'e yönlenir, boş bir sayfa / "Bilgisayarına bağlanılıyor…"
+   (Telegram dışında `initData` yok: normal). `…/index.html` → 404. `…/api/rev` → 401 JSON.
+3. Telefonda bot sohbetini aç → metin kutusunun solunda ☰ **Hyper Do** düğmesi belirir (gerekirse sohbetten çık-gir).
+   Dokun → Mini App açılır: alt sekme çubuğu **Bugün · Bu hafta · Pano · Bitenler · ＋**, kenar çubuğu yok,
+   "+ Yeni görev" ve sıralama seçicisi yok, Telegram koyu/açık temasına uyar.
+4. Telefonda ＋ → hızlı ekleme kutusu odaklanır; "yarın 18:00 fatura #ev" yaz, Enter → görev listede.
+   → PC'deki pencerede aynı görev **3 sn içinde** görünür (`rev` yoklaması; PC ana penceresi `tidi:data-changed`).
+5. PC'de bir görevi bitir → telefonda 3 sn içinde Bitenler'e düşer. Telefonda bir görevi bitir → titreşim (haptic),
+   PC'de bitti; o görevin canlı Telegram mesajı ~~başlık~~ ✓ olur (B2 yolu).
+6. Telefonda görevin ✎ düğmesi → düzenleyici **alttan açılan sayfa** gibi; Telegram'ın **Geri** düğmesi görünür ve
+   düzenleyiciyi kapatır. Beyin boşaltma (🧠) ve istatistikler de Geri ile kapanır.
+7. Bir hatırlatma gönder (B2 adım 1) → mesajın altında **üçüncü satır** "📱 Uygulamada aç"; dokun → Mini App o
+   görevin düzenleyicisiyle açılır (`?task=<id>`). Kart ve sabah özetinde de aynı satır (özette `?task` yok).
+8. Uçak modu / PC'de **Tüneli yeniden başlat** sırasında telefonda bir görevi değiştir → başlıkta
+   "⚠ Kaydedilmedi · Yeniden dene" çipi; bağlantı dönünce çip kaybolur, değişiklik PC'ye ulaşır. Mini App'i kapatıp
+   açınca, PC kapalıysa tam ekran "Bilgisayarındaki Hyper Do'ya ulaşılamıyor" + **Yeniden dene**.
+9. Başka bir Telegram hesabından aynı bota ☰ düğmesi yok (menü düğmesi yalnız bağlı sohbete kurulur). Adresi elle
+   açsa bile → "Bu hesap için değil" (403).
+10. Görev Yöneticisi'nden `cloudflared.exe`'yi öldür → durum "Hata: Tünel kapandı (çıkış kodu …); 5 sn sonra
+    yeniden denenecek", 5 sn sonra yeni bir adres (ardışık düşüşlerde 10, 20, 40, 60 sn). Yeni adres botun ☰ düğmesine
+    otomatik işlenir. Mod **Kapalı** → durum "Kapalı", `cloudflared` süreci yok, ☰ düğmesi kaybolur.
+11. Mod **Kendi adresim**: durum "Tünel başlatılıyor…" + yerel port; `ngrok http <port>` (ya da Tailscale Funnel)
+    çalıştır, verdiği `https://` adresi alana yapıştır, Enter → "Erişilebilir:"; `http://` yazarsan altında kırmızı
+    "Adres https:// ile başlamalı." ve kaydedilmez. Adres değişince yerel port **değişmez**.
+12. PC'de uygulamayı tepsiden kapat → `cloudflared` süreci biter. Ayarlar → Telegram → Dil değiştir → Mini App
+    durum metinleri yeni dilde.
 
 ---
 

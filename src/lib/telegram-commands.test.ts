@@ -12,7 +12,9 @@ import {
   helpText,
   linkTitle,
   listTaskIds,
+  miniAppLink,
   numberButtons,
+  openAppRow,
   parseEveryArg,
   parseMuteArg,
   parsePriorityWord,
@@ -111,6 +113,19 @@ describe('botCommands / helpText', () => {
       expect(help).toContain('(/l)')
       expect(help).toContain(escapeHtml(translate(lang, 'tg_help_plain')))
     }
+  })
+})
+
+describe('Mini App links (D4)', () => {
+  it('miniAppLink: <origin>/tg.html, ?task=<id> encoded, trailing slashes dropped; openAppRow is a web_app button', () => {
+    expect(miniAppLink('https://abc.trycloudflare.com/')).toBe('https://abc.trycloudflare.com/tg.html')
+    expect(miniAppLink('https://abc.trycloudflare.com', 'a b&c')).toBe('https://abc.trycloudflare.com/tg.html?task=a%20b%26c')
+    expect(openAppRow('en', 'https://x.example', 't1')).toEqual([{ text: translate('en', 'tg_btn_open_app'), web_app: { url: 'https://x.example/tg.html?task=t1' } }])
+    // keyboards: without a URL unchanged, with a URL one extra last row
+    expect(taskButtons('t9', 'tr')).toHaveLength(2)
+    const rows = taskButtons('t9', 'tr', 'https://x.example')
+    expect(rows).toHaveLength(3)
+    expect(rows[2]).toEqual(openAppRow('tr', 'https://x.example', 't9'))
   })
 })
 

@@ -158,6 +158,33 @@ export interface Settings {
   digest: DigestSettings
   /** Cross-device sync (#16): off / shared folder / WebDAV. Settings themselves are never synced. */
   sync: SyncSettings
+  /** Telegram Mini App (Phase D, Electron): how the phone reaches the local Mini App server. */
+  miniApp: MiniAppSettings
+}
+
+export type MiniAppMode = 'off' | 'cloudflare' | 'manual'
+export const MINI_APP_MODES: MiniAppMode[] = ['off', 'cloudflare', 'manual']
+
+/**
+ * Telegram Mini App (Phase D). `cloudflare` = the desktop app downloads / runs `cloudflared` and opens a quick
+ * tunnel to its local server; `manual` = the user runs any tunnel to the shown port and pastes its public URL.
+ */
+export interface MiniAppSettings {
+  mode: MiniAppMode
+  /** Public `https://` origin for `manual` mode (no trailing slash); ignored otherwise. */
+  publicUrl: string
+}
+
+/** Live state of the Mini App server + tunnel (Electron main → Settings → Telegram → Mini App). */
+export interface MiniAppStatus {
+  state: 'off' | 'downloading' | 'starting' | 'up' | 'error'
+  /** Public origin the phone uses ('' until known). */
+  url: string
+  /** Local port of the server on 127.0.0.1 (0 while off). */
+  port: number
+  /** cloudflared download progress 0–100, or null when unknown / not downloading. */
+  progress: number | null
+  error: string | null
 }
 
 /** Daily digest times (`HH:MM` local). Sunday's evening review becomes the weekly one. */
@@ -351,6 +378,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mutedUntil: null,
   digest: { enabled: true, time: '08:00', evening: false, eveningTime: '20:00' },
   sync: { mode: 'off', webdavUrl: '', folder: '' },
+  miniApp: { mode: 'off', publicUrl: '' },
 }
 
 /** Result of registering the global quick-add shortcut (Electron main → Settings). */
@@ -409,6 +437,26 @@ export interface DesktopApi {
   installUpdate(): Promise<void>
   onUpdateStatus(cb: (s: UpdateStatus) => void): () => void
   appVersion(): Promise<string>
+  /** Telegram Mini App (Phase D): server + tunnel state, push on change, restart the tunnel (same mode). */
+  miniAppStatus(): Promise<MiniAppStatus>
+  onMiniAppStatus(cb: (s: MiniAppStatus) => void): () => void
+  miniAppRestart(): Promise<void>
+}
+
+/** Connection to the data owner for adapters that do not hold the data themselves (the Telegram Mini App talks to the PC). */
+export interface ConnectionStatus {
+  /** `forbidden` = the server answered 401/403 (not the linked account / bot not configured). */
+  state: 'connecting' | 'ok' | 'unreachable' | 'forbidden'
+  /** false while a save could not be delivered (the local copy is kept and retried). */
+  saved: boolean
+  error: string | null
+}
+
+export interface ConnectionApi {
+  status(): ConnectionStatus
+  onStatus(cb: (s: ConnectionStatus) => void): () => void
+  /** Retries the load / the pending save right away. */
+  retry(): void
 }
 
 /** Live state of the sync engine (#16) for Settings → Sync. */
@@ -437,7 +485,8 @@ export interface SyncApi {
 
 /** Platform köprüsü: Electron preload veya tarayıcı uyarlaması bunu sağlar. */
 export interface HyperDoApi {
-  readonly kind: 'electron' | 'web' | 'capacitor'
+  /** `telegram` = the Mini App inside the Telegram client: the data lives on the PC, reached over HTTP. */
+  readonly kind: 'electron' | 'web' | 'capacitor' | 'telegram'
   load(): Promise<AppData>
   save(data: AppData): Promise<void>
   notifyTest(): Promise<void>
@@ -464,6 +513,8 @@ export interface HyperDoApi {
   desktop?: DesktopApi
   /** Text shared from another app (Android share target); the UI opens a prefilled task editor. */
   onShare?(cb: (payload: SharePayload) => void): () => void
+  /** Remote data connection (Telegram Mini App). Missing → the data is local and always available. */
+  connection?: ConnectionApi
 }
 
 declare global {

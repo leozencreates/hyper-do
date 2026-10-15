@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self'; connect-src 'self' https:" />
+    <meta name="theme-color" content="#0f1117" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <title>Hyper Do</title>
+    <!-- Telegram Mini App SDK: synchronous, before the app, so window.Telegram.WebApp exists when platform.ts picks the adapter -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

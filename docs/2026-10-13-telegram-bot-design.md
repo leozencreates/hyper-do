@@ -22,8 +22,9 @@ inline buttons under every reminder. Problems seen in the code:
 
 ## Non-goals
 
-Telegram Mini App (the PWA has its own local data — pointless before cross-device sync, roadmap #16), voice
-messages → tasks (needs a speech-to-text API), group chats / several linked chats, webhooks (long polling stays).
+Voice messages → tasks (needs a speech-to-text API), group chats / several linked chats, webhooks (long polling
+stays). The Mini App was a non-goal at first (the PWA has its own local data); Phase D lifts it by letting the
+desktop app serve the Mini App itself.
 
 ---
 
@@ -206,6 +207,139 @@ messages → tasks (needs a speech-to-text API), group chats / several linked ch
 
 ---
 
+## Phase D — Telegram Mini App (the real UI on the phone)
+
+Why: text commands and inline keyboards cannot be *nice*. Telegram Mini Apps are web pages opened inside the
+Telegram client; Hyper Do's own React UI already has a phone layout (it is the Android app). The desktop app
+owns the data, so the desktop app serves the Mini App itself and exposes it through an HTTPS tunnel. Nothing
+new is hosted anywhere; the PC must be running (as for reminders). Earlier non-goal lifted.
+
+Architecture:
+
+```
+phone (Telegram client)                    PC (Electron main process)
+┌─────────────────────────┐   HTTPS tunnel  ┌────────────────────────────────────────┐
+│ tg.html + React UI      │ ──────────────▶ │ electron/miniapp-server.ts (node:http,  │
+│ platform.telegram.ts    │   cloudflared   │   127.0.0.1:<random>): static dist-web/ │
+│ Authorization: tma <initData>             │   + /api/* guarded by electron/tg-auth.ts │
+└─────────────────────────┘                 │ electron/tunnel.ts: cloudflared quick    │
+                                            │   tunnel → public URL → bot menu button  │
+                                            └────────────────────────────────────────┘
+```
+
+- [x] **D1 Local server** `electron/miniapp-server.ts` (no `electron` import; `node:http`, `node:fs`, `node:path`).
+  Binds `127.0.0.1` on a random free port. Static: everything under `dist-web/` (`tg.html`, `assets/*`,
+  icons) with correct content types, `index.html` NOT served at `/` (respond 404 — the PWA is not the Mini App);
+  `/` redirects to `/tg.html`. API (JSON, `cache-control: no-store`):
+  - `GET /api/data` → `{ rev, data }` where `data` is `AppData` with secrets blanked: `settings.telegram.token`,
+    `settings.telegram.pairCode`, `settings.calendar.google.clientSecret` → `''`, `settings.sync` credentials if
+    any → blanked. `rev` is a counter the host increments on every `commit()`.
+  - `PUT /api/data` body `{ tasks, deleted, dailyDone, focusLog }` (= `SyncedData` of `src/lib/sync.ts`) →
+    the host merges it with `applySyncDoc(current, toSyncDoc(body, 'miniapp', now))` (newer `updatedAt`
+    wins per task, tombstones delete), commits, replies `{ rev, data }`. Settings are never accepted from the
+    phone. Invalid JSON / shape → 400.
+  - `GET /api/rev` → `{ rev }` (cheap poll).
+  - Auth on every `/api/*`: header `Authorization: tma <initData>` validated by D2; missing/invalid → 401; valid
+    but `user.id !== settings.telegram.chatId` → 403. Static files need no auth (the shell holds no data).
+  Host interface: `{ getData(), rev(), mutate(fn), staticDir }`. Export `startMiniAppServer(host): Promise<{ port,
+  close() }>`.
+
+- [x] **D2 initData validation** `electron/tg-auth.ts` (no `electron` import; `node:crypto`):
+  `validateInitData(initData: string, botToken: string, nowSec: number, maxAgeSec = 7 * 86400)` →
+  `{ ok: true; userId: number; authDate: number } | { ok: false; error: 'hash' | 'expired' | 'malformed' }`.
+  Algorithm per Telegram docs: parse the query string, remove `hash`, `data_check_string` = `key=value` pairs
+  sorted by key joined with `\n`, `secret = HMAC_SHA256(key = 'WebAppData', msg = botToken)`,
+  `hash' = hex(HMAC_SHA256(key = secret, msg = data_check_string))`, constant-time compare; `auth_date` must be
+  within `maxAgeSec`. `user` is the JSON field `user` → `id`.
+
+- [x] **D3 Tunnel** `electron/tunnel.ts` (no `electron` import; `node:child_process`, `node:fs`):
+  `settings.miniApp: { mode: 'off' | 'cloudflare' | 'manual'; publicUrl: string }` (defaults `'off'`, `''`).
+  - `cloudflare`: find `cloudflared` on `PATH`, else download the release asset for the platform into
+    `<userData>/bin/` (`cloudflared-windows-amd64.exe`, `cloudflared-darwin-amd64.tgz` → extract,
+    `cloudflared-linux-amd64`; URL `https://github.com/cloudflare/cloudflared/releases/latest/download/<asset>`),
+    reporting progress. Spawn `cloudflared tunnel --url http://127.0.0.1:<port> --no-autoupdate`, parse the
+    public URL from stdout/stderr (`https://<name>.trycloudflare.com`, pure `parseTunnelUrl(line)`), restart with
+    backoff (5 s → 60 s) when the process exits while the mode is still `cloudflare`, kill it on quit/mode change.
+  - `manual`: the user runs any tunnel (ngrok, Tailscale Funnel, …) to the shown local port and pastes the
+    public `https://` URL; non-https is rejected with an inline error.
+  - `MiniAppStatus = { state: 'off' | 'downloading' | 'starting' | 'up' | 'error'; url: string; port: number;
+    progress: number | null; error: string | null }` pushed to the renderer (`tidi:miniapp-status`) and readable
+    through `DesktopApi.miniAppStatus()` / `onMiniAppStatus(cb)` / `miniAppRestart()`.
+
+- [x] **D4 Bot integration** (`electron/telegram.ts` + pure layer): `telegram.setMiniAppUrl(url | null)`. With a
+  URL: `setChatMenuButton({ chat_id: linked, menu_button: { type: 'web_app', text: 'Hyper Do', web_app: { url:
+  <url>/tg.html } } })`; with `null`: `{ type: 'default' }`. Called when the tunnel URL changes and after pairing.
+  Reminder, card and digest keyboards gain a last row `📱 Open in app` (`web_app` button, URL
+  `<url>/tg.html?task=<id>`; digests without `?task`) while a URL is active — `taskButtons(id, lang, appUrl?)`.
+  Fake-API tests cover both calls and the extra row.
+
+- [x] **D5 Mini App entry + adapter** (renderer):
+  - `tg.html` at the repo root next to `index.html`: same shell, CSP `script-src 'self' https://telegram.org`
+    (keep the rest), `<script src="https://telegram.org/js/telegram-web-app.js"></script>` **before** the module
+    script, no manifest link, no service worker. `vite.web.config.ts`: `build.rollupOptions.input = { index:
+    'index.html', tg: 'tg.html' }` so `dist-web/tg.html` exists; `vite.config.ts` (Electron build) unchanged.
+  - `src/lib/platform.telegram.ts` → `createTelegramApi()`, `kind: 'telegram'` (extend the union in `types.ts`;
+    audit every `platform.kind` check: no notification-permission banners, no Settings panel, no calendar UI, no
+    Hyper Focus start in this mode — reminders and focus live on the desktop). `load()` = `GET /api/data`;
+    `save(data)` = `PUT /api/data` with the four synced fields (keep the last server reply as the local truth);
+    `onDataChanged` = poll `GET /api/rev` every 3 s while `document.visibilityState === 'visible'` and on
+    `visibilitychange`, fetch `/api/data` when `rev` changed. All requests carry `Authorization: tma
+    ${Telegram.WebApp.initData}`. `platform.ts` picks it when `window.Telegram?.WebApp?.initData` is non-empty.
+  - Failure states as full-screen panels (i18n): server unreachable ("Hyper Do on your PC is not reachable — is it
+    running?") with a retry button; 401/403 ("This Mini App only works for the linked Telegram account").
+    A failed `PUT` keeps the local copy, shows a small "not saved" chip and retries on the next change / when
+    visible again.
+  - Telegram bridge: `WebApp.ready()`, `expand()`, `disableVerticalSwipes?.()`, theme: `colorScheme` → app theme,
+    map `themeParams` (`bg_color`, `secondary_bg_color`, `text_color`, `hint_color`, `link_color`, `button_color`,
+    `button_text_color`) onto the app's CSS variables and react to `themeChanged`; `BackButton` shows while a modal
+    (task editor, stats, brain dump) is open and closes it; `HapticFeedback.notificationOccurred('success')` on
+    complete; `?task=<id>` opens that task's editor after load.
+  - Layout `html.tg`: bottom tab bar **Today · Week · Board · Done · ＋** (44 px targets, safe-area padding from
+    `--tg-safe-area-inset-*` / `--tg-content-safe-area-inset-*`), header reduced to title + search + mute chip,
+    sidebar hidden, desktop-only buttons hidden (mini, settings, calendar, backup). Reuse the existing ≤720 px
+    rules; add only what the tab bar and the Telegram colours need. Lists keep the existing drag/drop disabled on
+    touch if it fights with scrolling.
+
+- [x] **D6 Desktop wiring** `electron/main.ts`: start the server at launch when `settings.miniApp.mode !== 'off'`
+  (and on mode change via `afterSave()`), static dir = `dist-web` next to `dist` (`app.getAppPath()/dist-web`
+  when packaged, repo `dist-web/` in dev — if it is missing, status `error` "run npm run build:web");
+  `rev` counter bumped in `commit()`; tunnel lifecycle per D3; `telegram.setMiniAppUrl` on every URL change;
+  everything stopped in `before-quit`. `package.json`: `build.files` adds `dist-web/**`; `dist` / `dist:mac`
+  run `build:web` before `electron-builder`.
+
+- [x] **D7 Settings UI** (Electron, Settings → Telegram → "Mini App" block): mode select, status line (state,
+  public URL with a copy button, local port, download progress), the hint "In Telegram open the bot chat and tap
+  the ☰ Hyper Do menu button", manual URL field with inline https validation, "Restart tunnel" button. i18n
+  EN/TR/RU.
+
+- [x] **D8 Tests + docs**: `electron/tg-auth.test.ts` (signed fixture built in the test with a dummy token: valid,
+  wrong hash, expired, malformed, missing user); `electron/miniapp-server.test.ts` (port 0, temp static dir:
+  401/403/200, secrets blanked, `PUT` merge — desktop-newer task kept, phone-newer wins, tombstone deletes,
+  settings ignored, 400 on garbage, `rev` increments, `/` → `/tg.html`, `index.html` 404, unknown path 404);
+  `electron/tunnel.test.ts` (`parseTunnelUrl`, asset name per platform, no network); transport tests for D4.
+  README: "Telegram Mini App" section (modes, Cloudflare helper download, manual tunnel, what the phone can and
+  cannot do); PRIVACY.md: the tunnel provider (Cloudflare) terminates TLS and sees the traffic; CLAUDE.md map.
+
+Shipped notes (2026-10-15, deviations from the text above):
+
+- `PUT /api/data` merges with `mergeData(toSyncDoc(desktop), toSyncDoc(phone))` and then `applySyncDoc` — the plain
+  `applySyncDoc(current, toSyncDoc(body))` of the text would have replaced the desktop copy instead of merging.
+  The host commits the result with `bump: false`. The body may omit everything but `tasks` (`parseSyncDoc` defaults).
+- The phone adapter exposes the connection as `HyperDoApi.connection` (`ConnectionStatus { state: connecting | ok |
+  unreachable | forbidden; saved; error }`); `App.tsx` renders `ConnectionPanel` (full screen) and the "⚠ Not saved ·
+  Retry" chip from it. A failed first load auto-retries every 5 s while visible, besides the button.
+- The bot pushes `setChatMenuButton` on every start, also with `{ type: 'default' }` when no URL is set, so a menu
+  button left behind by an earlier run (dead tunnel address) is cleared; repeated saves do not repeat the call.
+- Settings edited on the phone are not sent back (by design); the sort select and the "+ New task" button are hidden
+  in the Mini App, the mute chip is read-only there, the Hyper Focus bar is read-only (`driver: false`).
+- Manual mode keeps the local server (and its port) when the URL is edited; only a mode change restarts everything.
+- Theme mapping: `bg_color → --bg`, `secondary_bg_color → --bg-2`, `section_bg_color (or secondary) → --bg-3`,
+  `text_color → --text`, `hint_color → --text-2`, `subtitle_text_color (or hint) → --text-3`, `link_color → --sky`,
+  `button_color / button_text_color → --tg-button / --tg-button-text` (used by `.primary` and the ＋ tab),
+  `destructive_text_color → --danger`; the brand accent stays.
+
+---
+
 ## i18n keys (EN wording; TR/RU required by the `Key` type)
 
 Phase A: `tg_status_off` "Off", `tg_status_starting` "Starting…", `tg_status_running` "Running as @{u}",
@@ -239,6 +373,8 @@ stays)", `tg_del_confirm` "Delete <b>{title}</b>?", `tg_del_ok` "🗑 Deleted: {
 | `settings.telegram.onlyWhenIdle: boolean` | `false` | B3 |
 | `settings.telegram.idleMinutes: number` | `5` | B3 |
 | `settings.mutedUntil: number \| null` | `null` | B5 |
+| `settings.miniApp.mode: 'off' \| 'cloudflare' \| 'manual'` | `'off'` | D3 |
+| `settings.miniApp.publicUrl: string` | `''` | D3 |
 
 ## Verification checklist per phase
 

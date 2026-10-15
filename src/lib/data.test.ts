@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { browserDefaultSettings, normalizeCalendarSettings, normalizeDailyDone, normalizeData, normalizeDigestSettings, normalizeFocusLog, normalizeHfSession, parseAppData } from './data'
+import { browserDefaultSettings, normalizeCalendarSettings, normalizeDailyDone, normalizeData, normalizeDigestSettings, normalizeFocusLog, normalizeHfSession, normalizeMiniAppSettings, normalizeMiniAppUrl, parseAppData } from './data'
 import { FOCUS_LOG_MAX } from './types'
 import { DEFAULT_SETTINGS } from './types'
 import { detectLang } from './i18n'
@@ -133,6 +133,23 @@ describe('parseAppData: old-version documents', () => {
     expect(off.settings.autoUpdate).toBe(false)
     expect(off.settings.calendar.google.androidClientId).toBe('abc.apps.googleusercontent.com')
     expect(parseAppData(JSON.stringify({ tasks: [], settings: { autoUpdate: 'yes', calendar: { google: { androidClientId: 5 } } } })).settings).toMatchObject({ autoUpdate: true, calendar: { google: { androidClientId: '' } } })
+  })
+
+  it('old documents get the Mini App defaults (off, no URL); stored values are kept, the URL must be https and loses trailing slashes', () => {
+    expect(parseAppData(OLD).settings.miniApp).toEqual({ mode: 'off', publicUrl: '' })
+    expect(DEFAULT_SETTINGS.miniApp).toEqual({ mode: 'off', publicUrl: '' })
+    const set = parseAppData(JSON.stringify({ tasks: [], settings: { miniApp: { mode: 'manual', publicUrl: ' https://abc.trycloudflare.com/ ' } } }))
+    expect(set.settings.miniApp).toEqual({ mode: 'manual', publicUrl: 'https://abc.trycloudflare.com' })
+    expect(parseAppData(JSON.stringify({ tasks: [], settings: { miniApp: { mode: 'cloudflare' } } })).settings.miniApp).toEqual({ mode: 'cloudflare', publicUrl: '' })
+    const bad = parseAppData(JSON.stringify({ tasks: [], settings: { miniApp: { mode: 'ngrok', publicUrl: 'http://insecure.example' } } }))
+    expect(bad.settings.miniApp).toEqual({ mode: 'off', publicUrl: '' })
+    expect(normalizeMiniAppSettings(undefined)).toEqual(DEFAULT_SETTINGS.miniApp)
+    expect(normalizeMiniAppSettings({ publicUrl: 5 } as never)).toEqual(DEFAULT_SETTINGS.miniApp)
+    expect(normalizeMiniAppUrl('https://x.example/path/')).toBe('https://x.example/path')
+    expect(normalizeMiniAppUrl('HTTPS://X.example')).toBe('HTTPS://X.example')
+    expect(normalizeMiniAppUrl('ftp://x')).toBe('')
+    expect(normalizeMiniAppUrl('https://')).toBe('')
+    expect(normalizeMiniAppUrl(null)).toBe('')
   })
 })
 
