@@ -11,7 +11,9 @@ No account, no cloud, no subscription. Your data never leaves your device — un
 
 ## Download
 
-**Windows:** grab the latest installer from the [Releases page](https://github.com/leozencreates/hyper-do/releases/latest) — currently [`Hyper-Do-Setup-0.2.1.exe`](https://github.com/leozencreates/hyper-do/releases/download/v0.2.1/Hyper-Do-Setup-0.2.1.exe). Run it, pick a folder, done. See [Windows installer and uninstall](#windows-installer-and-uninstall) for details.
+**Windows:** grab the latest installer from the [Releases page](https://github.com/leozencreates/hyper-do/releases/latest) — currently [`Hyper-Do-Setup-0.2.2.exe`](https://github.com/leozencreates/hyper-do/releases/download/v0.2.2/Hyper-Do-Setup-0.2.2.exe). Run it, pick a folder, done. See [Windows installer and uninstall](#windows-installer-and-uninstall) for details.
+
+**New in 0.2.2:** sound effects — short synthesized blips for add / done / delete / undo / snooze / focus (no audio assets), a mute switch in the header and in Settings, and a running Hyper Focus work round silences everything, its own closing chime included. 0.2.0 and 0.2.1 installs update automatically.
 
 **New in 0.2.1:** the [Telegram Mini App](#telegram-mini-app) — the full Hyper Do UI inside Telegram on your phone, served by your own desktop app through a tunnel, plus the Telegram bot v2 polish (live reminder hygiene, task cards, views, digests, `/backup`). 0.2.0 installs update automatically.
 
@@ -452,7 +454,7 @@ version on every platform.
 Prebuilt installers are published on the [Releases page](https://github.com/leozencreates/hyper-do/releases). To build one yourself:
 
 ```bash
-npm run dist     # → %LOCALAPPDATA%\hyperdo-release\Hyper-Do-Setup-0.2.1.exe (+ latest.yml for the updater)
+npm run dist     # → %LOCALAPPDATA%\hyperdo-release\Hyper-Do-Setup-0.2.2.exe (+ latest.yml for the updater)
 ```
 
 The installer is a standard NSIS setup wizard:
