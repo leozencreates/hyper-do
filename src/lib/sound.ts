@@ -3,15 +3,13 @@
  * Silently does nothing when audio is blocked or unavailable (autoplay policy, Node).
  *
  * `soundAllowed` is the pure gate (tested): the master switch `settings.sounds` silences everything, and a
- * running Hyper Focus work round silences every UI effect except the phase chimes themselves.
+ * running Hyper Focus work round silences every sound, the chime that ends the round included (the phone-style
+ * notification still fires). The chime that ends a *break* plays, because a break is not focus time.
  */
 import type { HfPhase, HfSession, Settings } from './types'
 
 /** Every sound the UI can play. */
 export type SoundKind = 'complete' | 'add' | 'delete' | 'undo' | 'snooze' | 'focus' | 'phase-work' | 'phase-break'
-
-/** The Hyper Focus phase chimes: the only sounds that still play during a work round (they announce the break). */
-const PHASE_KINDS: SoundKind[] = ['phase-work', 'phase-break']
 
 /**
  * Short sine-blip recipes per sound: frequencies in Hz, seconds between notes, peak gain.
@@ -28,19 +26,20 @@ const RECIPES: Record<SoundKind, { notes: number[]; gapS: number; gain: number }
   'phase-work': { notes: [880, 660, 990], gapS: 0.18, gain: 0.25 },
 }
 
-/** True while a Hyper Focus work round is running (not paused, not in a break). */
-export function inFocusWork(hf: HfSession | null | undefined, now = Date.now()): boolean {
-  return !!hf && hf.phase === 'work' && hf.pausedRemaining === null && hf.endsAt > now
+/**
+ * True while a Hyper Focus work round is running (not paused, not in a break). The end time is deliberately not
+ * checked: the chime that ends the round is evaluated against the round it ends, and must stay silent too.
+ */
+export function inFocusWork(hf: HfSession | null | undefined): boolean {
+  return !!hf && hf.phase === 'work' && hf.pausedRemaining === null
 }
 
 /**
- * Whether `kind` may play right now. `settings.sounds` off = nothing at all; during a Hyper Focus work round
- * only the phase chimes survive (everything else would break the concentration the round is meant to protect).
+ * Whether `kind` may play right now. `settings.sounds` off = nothing at all; a Hyper Focus work round silences
+ * everything (even its own closing chime: nothing may break the concentration the round is meant to protect).
  */
-export function soundAllowed(settings: Pick<Settings, 'sounds'>, hf: HfSession | null | undefined, kind: SoundKind, now = Date.now()): boolean {
-  if (!settings.sounds) return false
-  if (PHASE_KINDS.includes(kind)) return true
-  return !inFocusWork(hf, now)
+export function soundAllowed(settings: Pick<Settings, 'sounds'>, hf: HfSession | null | undefined, _kind: SoundKind): boolean {
+  return settings.sounds && !inFocusWork(hf)
 }
 
 /** Plays `notes` (Hz) as short sine blips, `gapS` seconds apart. */

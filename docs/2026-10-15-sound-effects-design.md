@@ -29,10 +29,11 @@ Windows "Reminder" event sound already, see `deeplink.ts`), and a sound for remi
   phase-work | phase-break`, each a small sine-blip recipe (`RECIPES`: notes in Hz, gap, gain). `playSound(kind)` is
   unconditional; `chimePhase` / `chimeCelebrate` stay as thin wrappers. All effects are quiet (gain ≤ 0.25) and
   under half a second.
-- [x] **Gate** (pure, tested in `src/lib/sound.test.ts`): `soundAllowed(settings, hyperFocus, kind, now)`.
-  `settings.sounds === false` → nothing plays, phase chimes included. While `inFocusWork(hf, now)` (phase `work`, not
-  paused, `endsAt > now`) only `phase-work` / `phase-break` may play: the chime that ends the round is the whole
-  point of the round, every other effect is noise. Breaks and paused rounds let the UI effects through.
+- [x] **Gate** (pure, tested in `src/lib/sound.test.ts`): `soundAllowed(settings, hyperFocus, kind)`.
+  `settings.sounds === false` → nothing plays, phase chimes included. While `inFocusWork(hf)` (phase `work`, not
+  paused; the end time is deliberately ignored) **nothing** plays, the chime that ends the round included: the user
+  asked for complete silence in Hyper Focus, the phase notification still fires. Breaks and paused rounds let every
+  sound through, so the chime that ends a break plays. (First cut kept the phase chimes; dropped on request.)
 - [x] **Setting**: `settings.sounds: boolean`, default `true`; `normalizeData` accepts only booleans. Shown in
   Settings as **Sound effects** right above **Celebrate completions**. `celebrate` keeps its meaning (chime + confetti)
   but its chime now goes through the gate, so `sounds` off = confetti only.
@@ -43,8 +44,9 @@ Windows "Reminder" event sound already, see `deeplink.ts`), and a sound for remi
 - [x] **Wiring**: `useSounds(settings, hyperFocus)` (`src/lib/useSounds.ts`) returns a stable `play(kind)` that
   applies the gate. `useTaskActions` gets an optional `onSound(kind)` dep and calls it from `remove` (delete),
   `undoDelete` (undo), `snooze` / `postpone` (snooze), `setFocus(on)` (focus), `quickAdd` / `quickAddMany` / new task
-  in `save` (add). Completion stays on `onCompleted` → `useCelebration(enabled, chime)`. `useHyperFocus` takes
-  `sounds` in its options for the phase chimes. The mini window (`MiniView`) wires the same hook, so Done / Snooze
+  in `save` (add). Completion stays on `onCompleted` → `useCelebration(enabled, chime)`. `useHyperFocus` takes the
+  same `play` in its options for the phase chimes; it is called before the session advances, so the gate sees the
+  phase being left (work → silent, break → chime). The mini window (`MiniView`) wires the same hook, so Done / Snooze
   there sound too; the Mini App (`IS_TG`) keeps haptics and gets the sounds through the same code path.
 
 ## Hand tests

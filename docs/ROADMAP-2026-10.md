@@ -269,5 +269,6 @@ General rules for every item:
 - [x] **Sound effects + mute switch** (15 Oct 2026, spec `docs/2026-10-15-sound-effects-design.md`): Web Audio
   blips for add / done / delete / undo / snooze / focus next to the existing Hyper Focus chimes (`SoundKind`,
   `playSound` in `sound.ts`); `settings.sounds: boolean` (default `true`) with a 🔊/🔇 button in the header and a
-  Settings toggle; pure gate `soundAllowed` — a running Hyper Focus work round silences every UI effect except the
-  phase chimes. `useSounds` hook, `useTaskActions.onSound`, `useCelebration(enabled, chime)`, mini window wired too.
+  Settings toggle; pure gate `soundAllowed` — a running Hyper Focus work round silences every sound, its own closing
+  chime included (the chime ending a break plays). `useSounds` hook, `useTaskActions.onSound`,
+  `useCelebration(enabled, chime)`, `useHyperFocus({ play })`, mini window wired too.

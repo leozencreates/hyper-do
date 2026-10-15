@@ -86,12 +86,12 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const t = useT()
   const { tasks, settings } = data
   // The Mini App only shows a Hyper Focus session running on the PC; the desktop drives the phases.
-  const hf = useHyperFocus(data.hyperFocus, setHyperFocus, settings.pomodoro, settings.language, { driver: !IS_TG, onPhaseEnd: appendFocusEntry, sounds: settings.sounds })
-  const cal = useCalendar()
-  const now = useNow(CLOCK_MS)
-  // Sound effects: the master switch lives in settings, a Hyper Focus work round silences the UI effects by itself.
+  // Sound effects: the master switch lives in settings, a Hyper Focus work round silences everything by itself.
   const play = useSounds(settings, data.hyperFocus)
   const chimeDone = useCallback(() => play('complete'), [play])
+  const hf = useHyperFocus(data.hyperFocus, setHyperFocus, settings.pomodoro, settings.language, { driver: !IS_TG, onPhaseEnd: appendFocusEntry, play })
+  const cal = useCalendar()
+  const now = useNow(CLOCK_MS)
   const celebration = useCelebration(settings.celebrate, chimeDone)
   const conn = useConnection()
   const actions = useTaskActions({
@@ -450,13 +450,13 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
             )}
             {/* Sound effects switch; during a Hyper Focus work round it shows the automatic silence. Not saved from the Mini App (settings stay on the PC). */}
             <button
-              className={`ghost small snd-btn${settings.sounds && !inFocusWork(data.hyperFocus, now) ? '' : ' off'}`}
-              title={!settings.sounds ? t('snd_unmute') : inFocusWork(data.hyperFocus, now) ? t('snd_focus') : t('snd_mute')}
+              className={`ghost small snd-btn${settings.sounds && !inFocusWork(data.hyperFocus) ? '' : ' off'}`}
+              title={!settings.sounds ? t('snd_unmute') : inFocusWork(data.hyperFocus) ? t('snd_focus') : t('snd_mute')}
               aria-pressed={settings.sounds}
               disabled={IS_TG}
               onClick={() => setSettings((s) => ({ ...s, sounds: !s.sounds }))}
             >
-              {settings.sounds && !inFocusWork(data.hyperFocus, now) ? '🔊' : '🔇'}
+              {settings.sounds && !inFocusWork(data.hyperFocus) ? '🔊' : '🔇'}
             </button>
             {settings.mutedUntil !== null && settings.mutedUntil > now && (
               // Settings are never saved from the Mini App, so there the chip only informs (unmute on the PC or with /mute off)

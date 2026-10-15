@@ -199,9 +199,9 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
    Ertele (30 dk) veya "yarına" → inen iki nota; 🎯 odağa al → tek net nota. Kutuyu işaretle → A6'daki melodi.
 2. Üst çubukta 🔊 düğmesi → tıkla → 🔇 olur, soluklaşır; aynı eylemler **tamamen sessiz** (tur zili dâhil). Ayarlar →
    **Ses efektleri** anahtarı da kapalı görünür. Tekrar tıkla → 🔊, sesler geri gelir.
-3. Hyper Focus başlat (çalışma turu) → düğme kendiliğinden 🔇 olur; ipucunda "Hyper Focus: sesler susturuldu (tur
-   zili hariç)". Görev ekle / bitir / ertele → sessiz, konfeti yine var. Tur bitince (veya **Atla** yerine süreyi
-   kısaltıp bekleyince) tur zili **çalar**. Mola veya duraklatma sırasında sesler tekrar duyulur.
+3. Hyper Focus başlat (çalışma turu) → düğme kendiliğinden 🔇 olur; ipucunda "Hyper Focus: sesler susturuldu".
+   Görev ekle / bitir / ertele → sessiz, konfeti yine var. Çalışma süresi dolunca **zil çalmaz**, yalnız bildirim
+   gelir. Mola veya duraklatma sırasında sesler tekrar duyulur; mola bitince üç notalı zil **çalar**.
 4. Hyper Focus sırasında 🔇'e tıkla → ayar kalıcı kapanır (mola geldiğinde de sessiz); Ayarlar'dan tekrar aç.
 5. Mini pencerede **Bitti** / **Ertele** → aynı sesler mini pencereden de çalar. Uygulamayı kapat-aç → ayar korunur
    (`hyperdo-data.json` → `settings.sounds`).

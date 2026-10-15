@@ -105,10 +105,11 @@ src/lib/stats.ts        Pure: focus log (pushFocusEntry, spentMinByTask, focusMi
                         completeInData — use these wherever completeTask is called), streak, bestStreak, heatmap, topTags
 src/lib/sound.ts        Web Audio sound effects, no assets: SoundKind (complete | add | delete | undo | snooze | focus |
                         phase-work | phase-break), RECIPES, playSound (unconditional, no-op in Node), chimePhase /
-                        chimeCelebrate wrappers; pure gate soundAllowed(settings, hf, kind, now) + inFocusWork
-                        (settings.sounds off = silent; a running Hyper Focus work round silences all but the phase chimes)
+                        chimeCelebrate wrappers; pure gate soundAllowed(settings, hf, kind) + inFocusWork(hf) (phase work,
+                        not paused, end time ignored on purpose): settings.sounds off = silent; a Hyper Focus work round
+                        silences everything, its own closing chime included (the chime ending a break plays)
 src/lib/useSounds.ts    React: useSounds(settings, hyperFocus) → stable play(kind) applying soundAllowed; fed to
-                        useTaskActions.onSound, useCelebration(enabled, chime) and the mini window
+                        useTaskActions.onSound, useCelebration(enabled, chime), useHyperFocus({ play }) and the mini window
 src/lib/deeplink.ts     hyperdo://task/<id>/done|snooze/<min>|open: parse/build, Windows toast XML (pure)
 src/lib/tasks.ts        Pure task helpers: newTask, taskFromQuickAdd (UI + popup + Telegram), normalizeTask,
                         completeTask (+recurrence), sort, reorder, search, pickEasyTask

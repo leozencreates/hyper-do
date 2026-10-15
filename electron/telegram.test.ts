@@ -478,6 +478,8 @@ describe('Phase C: cards, replies, backup, digest', () => {
     expect(keyboard(sent[0].body)).toEqual([[{ text: '1', callback_data: 'pick:a' }, { text: '2', callback_data: 'pick:b' }, { text: '3', callback_data: 'pick:c' }]])
     h.api.message(42, '/done 3')
     await waitFor(() => h.data().tasks.find((t) => t.id === 'c')!.completedAt !== null, 'done by digest number')
+    // apply() mutates first and sends the reply afterwards: wait for it, or stop() races the confirmation
+    await waitFor(() => h.api.of('sendMessage').length >= 2, 'done confirmation')
     // not linked / stopped: silent
     h.bot.stop()
     await h.bot.sendDigest('evening')
