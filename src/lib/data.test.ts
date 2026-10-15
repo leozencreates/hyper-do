@@ -99,14 +99,16 @@ describe('parseAppData: old-version documents', () => {
     const d = parseAppData(OLD)
     expect(d.settings.escalation).toEqual({ enabled: true, telegramAfter: 3, popupAfter: 5 })
     expect(d.settings.celebrate).toBe(true)
+    expect(d.settings.sounds).toBe(true)
     expect(d.focusLog).toEqual([])
     expect(d.dailyDone).toEqual({})
   })
 
   it('a partial escalation object is merged with the defaults', () => {
-    const d = parseAppData(JSON.stringify({ tasks: [], settings: { escalation: { popupAfter: 9 }, celebrate: false } }))
+    const d = parseAppData(JSON.stringify({ tasks: [], settings: { escalation: { popupAfter: 9 }, celebrate: false, sounds: false } }))
     expect(d.settings.escalation).toEqual({ enabled: true, telegramAfter: 3, popupAfter: 9 })
     expect(d.settings.celebrate).toBe(false)
+    expect(d.settings.sounds).toBe(false)
   })
 
   it('old documents get the Telegram v2 / digest defaults: tidy on, idle rule off (5 min), no mute, morning digest 08:00', () => {

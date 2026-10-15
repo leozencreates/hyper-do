@@ -103,7 +103,12 @@ src/lib/reminder.ts     Reminder engine (pure): collectDueReminders, planReminde
                         (markNagged / resetNag / escalationLevel; Android cannot count nags, UI chips only)
 src/lib/stats.ts        Pure: focus log (pushFocusEntry, spentMinByTask, focusMinutes), dailyDone (recordDone / recordReopen /
                         completeInData — use these wherever completeTask is called), streak, bestStreak, heatmap, topTags
-src/lib/sound.ts        Web Audio chimes (phase change, celebration); browser only
+src/lib/sound.ts        Web Audio sound effects, no assets: SoundKind (complete | add | delete | undo | snooze | focus |
+                        phase-work | phase-break), RECIPES, playSound (unconditional, no-op in Node), chimePhase /
+                        chimeCelebrate wrappers; pure gate soundAllowed(settings, hf, kind, now) + inFocusWork
+                        (settings.sounds off = silent; a running Hyper Focus work round silences all but the phase chimes)
+src/lib/useSounds.ts    React: useSounds(settings, hyperFocus) → stable play(kind) applying soundAllowed; fed to
+                        useTaskActions.onSound, useCelebration(enabled, chime) and the mini window
 src/lib/deeplink.ts     hyperdo://task/<id>/done|snooze/<min>|open: parse/build, Windows toast XML (pure)
 src/lib/tasks.ts        Pure task helpers: newTask, taskFromQuickAdd (UI + popup + Telegram), normalizeTask,
                         completeTask (+recurrence), sort, reorder, search, pickEasyTask
@@ -153,9 +158,9 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
                         (`docs/YYYY-MM-DD-<area>-design.md`) before implementation; roadmap items link to it
 ```
 
-Tests: `src/lib/*.test.ts` (calendar-links, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, stats, sync,
-syncengine, tasks, telegram-commands) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
-`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 20 files, 431 tests.
+Tests: `src/lib/*.test.ts` (calendar-links, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
+sync, syncengine, tasks, telegram-commands) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
+`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 21 files, 438 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.

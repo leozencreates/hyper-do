@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppData, type AppStore } from './lib/store'
 import { matchesQuery, newTask, pickEasyTask, sortTasks } from './lib/tasks'
 import { ENERGIES, ENERGY_ICON, SORT_MODES, type AppData, type ConnectionStatus, type Energy, type SortMode, type Task, type UpdateStatus } from './lib/types'
@@ -12,6 +12,8 @@ import { LANGS, LOCALE, translate, type Lang } from './lib/i18n'
 import { useNow, useTheme } from './lib/hooks'
 import { tgHaptic, tgLang } from './lib/tg-bridge'
 import { useTaskActions } from './lib/useTaskActions'
+import { useSounds } from './lib/useSounds'
+import { inFocusWork } from './lib/sound'
 import { useCalendar } from './lib/useCalendar'
 import TaskItem from './components/TaskItem'
 import TaskEditor from './components/TaskEditor'
@@ -84,10 +86,13 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const t = useT()
   const { tasks, settings } = data
   // The Mini App only shows a Hyper Focus session running on the PC; the desktop drives the phases.
-  const hf = useHyperFocus(data.hyperFocus, setHyperFocus, settings.pomodoro, settings.language, { driver: !IS_TG, onPhaseEnd: appendFocusEntry })
+  const hf = useHyperFocus(data.hyperFocus, setHyperFocus, settings.pomodoro, settings.language, { driver: !IS_TG, onPhaseEnd: appendFocusEntry, sounds: settings.sounds })
   const cal = useCalendar()
   const now = useNow(CLOCK_MS)
-  const celebration = useCelebration(settings.celebrate)
+  // Sound effects: the master switch lives in settings, a Hyper Focus work round silences the UI effects by itself.
+  const play = useSounds(settings, data.hyperFocus)
+  const chimeDone = useCallback(() => play('complete'), [play])
+  const celebration = useCelebration(settings.celebrate, chimeDone)
   const conn = useConnection()
   const actions = useTaskActions({
     tasks,
@@ -95,6 +100,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
     setTasks,
     setSettings,
     updateData,
+    onSound: play,
     onCompleted: () => {
       celebration.celebrate()
       if (IS_TG) tgHaptic('success')
@@ -442,6 +448,16 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 ▣
               </button>
             )}
+            {/* Sound effects switch; during a Hyper Focus work round it shows the automatic silence. Not saved from the Mini App (settings stay on the PC). */}
+            <button
+              className={`ghost small snd-btn${settings.sounds && !inFocusWork(data.hyperFocus, now) ? '' : ' off'}`}
+              title={!settings.sounds ? t('snd_unmute') : inFocusWork(data.hyperFocus, now) ? t('snd_focus') : t('snd_mute')}
+              aria-pressed={settings.sounds}
+              disabled={IS_TG}
+              onClick={() => setSettings((s) => ({ ...s, sounds: !s.sounds }))}
+            >
+              {settings.sounds && !inFocusWork(data.hyperFocus, now) ? '🔊' : '🔇'}
+            </button>
             {settings.mutedUntil !== null && settings.mutedUntil > now && (
               // Settings are never saved from the Mini App, so there the chip only informs (unmute on the PC or with /mute off)
               <button className="ghost small" title={t('tg_unmuted')} disabled={IS_TG} onClick={() => setSettings((s) => ({ ...s, mutedUntil: null }))}>

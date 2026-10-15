@@ -263,3 +263,11 @@ General rules for every item:
   outbound connection with what is stored locally; `CLAUDE.md` map, i18n and sync notes corrected;
   `docs/MANUAL-TEST-2026-10.md` added.
 - [x] Bump version to 0.2.0 (`package.json`; Android `versionCode 2`, `versionName "0.2.0"`).
+
+## After 0.2.1 — polish
+
+- [x] **Sound effects + mute switch** (15 Oct 2026, spec `docs/2026-10-15-sound-effects-design.md`): Web Audio
+  blips for add / done / delete / undo / snooze / focus next to the existing Hyper Focus chimes (`SoundKind`,
+  `playSound` in `sound.ts`); `settings.sounds: boolean` (default `true`) with a 🔊/🔇 button in the header and a
+  Settings toggle; pure gate `soundAllowed` — a running Hyper Focus work round silences every UI effect except the
+  phase chimes. `useSounds` hook, `useTaskActions.onSound`, `useCelebration(enabled, chime)`, mini window wired too.

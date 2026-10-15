@@ -41,11 +41,13 @@ export interface HfOptions {
   driver?: boolean
   /** Receives every finished phase (timer, skip, stop) that lasted at least a minute. */
   onPhaseEnd?(entry: FocusEntry): void
+  /** `settings.sounds`: false silences the phase chimes (notifications still fire). Default true. */
+  sounds?: boolean
 }
 
 const phaseMs = (s: HfSession, pomodoro: Settings['pomodoro']) => (s.phase === 'work' ? pomodoro.workMin : pomodoro.breakMin) * 60_000
 
-export function useHyperFocus(session: HfSession | null, setSession: SetSession, pomodoro: Settings['pomodoro'], lang: Lang, { driver = true, onPhaseEnd }: HfOptions = {}) {
+export function useHyperFocus(session: HfSession | null, setSession: SetSession, pomodoro: Settings['pomodoro'], lang: Lang, { driver = true, onPhaseEnd, sounds = true }: HfOptions = {}) {
   const [now, setNow] = useState(() => Date.now())
   const ref = useRef(session)
   ref.current = session
@@ -76,13 +78,13 @@ export function useHyperFocus(session: HfSession | null, setSession: SetSession,
       const mins = nextPhase === 'work' ? pomodoro.workMin : pomodoro.breakMin
       logPhase(s, nowMs)
       if (!skip) {
-        chimePhase(nextPhase)
+        if (sounds) chimePhase(nextPhase)
         if (nextPhase === 'break') notify(translate(lang, 'hf_notif_break'), translate(lang, 'hf_notif_break_d', { n: pomodoro.breakMin }))
         else notify(translate(lang, 'hf_notif_work'), translate(lang, 'hf_notif_work_d', { r: round, n: pomodoro.workMin }))
       }
       return { ...s, phase: nextPhase, round, endsAt: nowMs + mins * 60_000, pausedRemaining: null, startedAt: nowMs }
     },
-    [pomodoro, lang, logPhase],
+    [pomodoro, lang, logPhase, sounds],
   )
 
   // Phase transition (driver window only)

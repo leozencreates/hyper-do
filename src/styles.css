@@ -329,6 +329,8 @@ h2 { margin: 0 0 14px; font-size: 20px; }
 .tg-code { font-family: ui-monospace, Consolas, monospace; font-size: 30px; font-weight: 700; letter-spacing: 6px; color: var(--text); user-select: all; }
 .btn-link { display: inline-block; text-decoration: none; border: 1px solid var(--bg-3); }
 .ghost.small { padding: 6px 10px; font-size: 13px; }
+/* Sound effects switch in the header: dimmed while silent (switched off or auto-muted by a Hyper Focus work round). */
+.snd-btn.off { opacity: .55; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* --- Settings → Desktop / automatic backups (Electron) --- */

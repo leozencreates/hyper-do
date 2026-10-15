@@ -150,6 +150,8 @@ export interface Settings {
   escalation: EscalationSettings
   /** Chime + confetti when a task is completed. */
   celebrate: boolean
+  /** Sound effects (add / done / delete / undo / snooze / focus, Hyper Focus chimes). Off = silent everywhere; the header button toggles it. */
+  sounds: boolean
   /** Check GitHub Releases for new versions and download them in the background (Electron, packaged builds). */
   autoUpdate: boolean
   /** Global mute (B5): no reminders on any channel until this time; null = not muted. `/mute 2h` in Telegram, chip in the header. */
@@ -374,6 +376,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoBackup: true,
   escalation: { enabled: true, telegramAfter: 3, popupAfter: 5 },
   celebrate: true,
+  sounds: true,
   autoUpdate: true,
   mutedUntil: null,
   digest: { enabled: true, time: '08:00', evening: false, eveningTime: '20:00' },

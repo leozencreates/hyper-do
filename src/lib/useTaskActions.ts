@@ -11,6 +11,7 @@ import { addTombstones, dropTombstones } from './sync'
 import { splitBrainDump } from './parse'
 import { DAY } from './dates'
 import { useT } from './useT'
+import type { SoundKind } from './sound'
 
 export type { QuickAddOptions }
 
@@ -25,10 +26,13 @@ interface Deps {
   updateData(fn: (d: AppData) => AppData): void
   /** Called after a task was completed through the UI (celebration). */
   onCompleted?(task: Task): void
+  /** Sound effect for an action (add / delete / undo / snooze / focus); completion goes through `onCompleted`. */
+  onSound?(kind: SoundKind): void
 }
 
-export function useTaskActions({ tasks, settings, setTasks, setSettings, updateData, onCompleted }: Deps) {
+export function useTaskActions({ tasks, settings, setTasks, setSettings, updateData, onCompleted, onSound }: Deps) {
   const t = useT()
+  const sfx = (kind: SoundKind) => onSound?.(kind)
   const [undo, setUndo] = useState<{ task: Task; index: number } | null>(null)
 
   // Geri alma bildirimi 6 sn sonra kaybolur
@@ -49,6 +53,7 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
     if (index < 0) return
     setUndo({ task: tasks[index], index })
     updateData((d) => ({ ...d, tasks: d.tasks.filter((x) => x.id !== id), deleted: addTombstones(d.deleted, [id], Date.now()) }))
+    sfx('delete')
   }
 
   /** Puts the task back, newer than its tombstone, and forgets the tombstone. */
@@ -63,6 +68,7 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
       return { ...d, tasks: out, deleted: dropTombstones(d.deleted, [task.id]) }
     })
     setUndo(null)
+    sfx('undo')
   }
 
   /** Completes a task (nag reset inside `completeTask`), counts it for today's streak, celebrates. */
@@ -78,8 +84,14 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
       if (!task || task.completedAt === null) return d
       return recordReopen({ ...d, tasks: d.tasks.map((x) => (x.id === id ? touchTask({ ...x, completedAt: null }) : x)) }, task.completedAt)
     })
-  const setFocus = (id: string, on: boolean) => setTasks((ts) => ts.map((x) => (x.id === id ? touchTask({ ...x, focused: on, nagCount: 0 }) : x.focused ? touchTask({ ...x, focused: false }) : x)))
-  const snooze = (id: string, minutes: number) => react(id, { snoozedUntil: Date.now() + minutes * 60_000 })
+  const setFocus = (id: string, on: boolean) => {
+    setTasks((ts) => ts.map((x) => (x.id === id ? touchTask({ ...x, focused: on, nagCount: 0 }) : x.focused ? touchTask({ ...x, focused: false }) : x)))
+    if (on) sfx('focus')
+  }
+  const snooze = (id: string, minutes: number) => {
+    react(id, { snoozedUntil: Date.now() + minutes * 60_000 })
+    sfx('snooze')
+  }
   const toggleSub = (task: Task, sid: string) => update(task.id, { subtasks: task.subtasks.map((s) => (s.id === sid ? { ...s, done: !s.done } : s)) })
   const duplicate = (id: string) => setTasks((ts) => duplicateTask(ts, id, t('copy_suffix')))
 
@@ -88,6 +100,7 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
     if (task.dueAt === null) return
     const base = Math.max(task.dueAt, Date.now())
     react(task.id, { dueAt: base + DAY, snoozedUntil: null })
+    sfx('snooze')
   }
 
   /** Removes every completed task and leaves a tombstone for each (#16). */
@@ -101,13 +114,18 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
   /** Create or replace a task edited in the editor dialog (an edit counts as a reaction: nag reset). */
   const save = (task: Task) => {
     const nt = touchTask(resetNag(task))
+    const isNew = !tasks.some((x) => x.id === nt.id)
     setTasks((ts) => (ts.some((x) => x.id === nt.id) ? ts.map((x) => (x.id === nt.id ? nt : x)) : [nt, ...ts]))
+    if (isNew) sfx('add')
   }
 
   /** Hızlı ekleme: doğal dil ayrıştırılır ("yarın 18:00 fatura öde #ev !1 @30dk"). Same helper as the popup and Telegram. */
   const quickAdd = (text: string, opts: Pick<QuickAddOptions, 'status' | 'defaultDueAt'> = {}) => {
     const nt = taskFromQuickAdd(text, settings, { ...opts, tasks })
-    if (nt) setTasks((ts) => [nt, ...ts])
+    if (nt) {
+      setTasks((ts) => [nt, ...ts])
+      sfx('add')
+    }
   }
 
   /**
@@ -121,7 +139,10 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
       if (nt) created.push(nt)
     }
     created.reverse()
-    if (created.length) setTasks((ts) => [...created, ...ts])
+    if (created.length) {
+      setTasks((ts) => [...created, ...ts])
+      sfx('add')
+    }
     return created.length
   }
 

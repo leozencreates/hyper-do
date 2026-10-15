@@ -121,7 +121,8 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 2. Pano'da bir kartı **Bitti** sütununa bırak → aynı kutlama.
 3. Ayarlar → **Bitirince kutla** kapalı → ne ses ne konfeti.
 4. Windows → Erişilebilirlik → Animasyon efektleri kapalı (`prefers-reduced-motion`) → melodi var, konfeti yok.
-5. Mini pencereden veya hızlı ekleme penceresinden bitirme → konfeti yalnız ana pencerede.
+5. Mini pencereden veya hızlı ekleme penceresinden bitirme → konfeti yalnız ana pencerede; melodi mini pencereden de çalar (A13).
+6. Ayarlar → **Ses efektleri** kapalı, **Bitirince kutla** açık → konfeti var, melodi yok.
 
 ### A7. Sabah özeti ve akşam değerlendirmesi  (📁 `src/lib/digest.ts` → `digestDue`; `electron/main.ts` → `checkDigest`; durum `hyperdo-state.json`)
 
@@ -191,6 +192,19 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 7. Kenar çubuğu enerji çipleri etiket filtresiyle birlikte çalışır. `1`–`5` görünüm değiştirir, `/` aramaya gider,
    `Esc` kapatır; alan yazılırken harf kısayolları çalışmaz.
 8. Üst çubukta 🔇 çipi (Telegram'dan `/mute 1sa` sonra) → tıkla → kalkar, hatırlatmalar döner.
+
+### A13. Ses efektleri ve susturma  (📁 `src/lib/sound.ts` → `soundAllowed`; `src/lib/useSounds.ts`; `src/App.tsx` → `snd-btn`; `src/lib/useTaskActions.ts` → `onSound`)
+
+1. Hızlı ekleme ile görev ekle → tek kısa "pop". Görevi sil → alçak, inen iki nota; **Geri al** → yükselen iki nota.
+   Ertele (30 dk) veya "yarına" → inen iki nota; 🎯 odağa al → tek net nota. Kutuyu işaretle → A6'daki melodi.
+2. Üst çubukta 🔊 düğmesi → tıkla → 🔇 olur, soluklaşır; aynı eylemler **tamamen sessiz** (tur zili dâhil). Ayarlar →
+   **Ses efektleri** anahtarı da kapalı görünür. Tekrar tıkla → 🔊, sesler geri gelir.
+3. Hyper Focus başlat (çalışma turu) → düğme kendiliğinden 🔇 olur; ipucunda "Hyper Focus: sesler susturuldu (tur
+   zili hariç)". Görev ekle / bitir / ertele → sessiz, konfeti yine var. Tur bitince (veya **Atla** yerine süreyi
+   kısaltıp bekleyince) tur zili **çalar**. Mola veya duraklatma sırasında sesler tekrar duyulur.
+4. Hyper Focus sırasında 🔇'e tıkla → ayar kalıcı kapanır (mola geldiğinde de sessiz); Ayarlar'dan tekrar aç.
+5. Mini pencerede **Bitti** / **Ertele** → aynı sesler mini pencereden de çalar. Uygulamayı kapat-aç → ayar korunur
+   (`hyperdo-data.json` → `settings.sounds`).
 
 ---
 

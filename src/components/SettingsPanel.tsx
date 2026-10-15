@@ -114,6 +114,7 @@ export default function SettingsPanel({ settings, data, cal, onChange, onImport,
           <span className="hint">{t('s_esc_unit')}</span>
         </div>
       )}
+      <Toggle checked={settings.sounds} onChange={(v) => set('sounds', v)} label={t('s_sounds')} desc={t('s_sounds_d')} />
       <Toggle checked={settings.celebrate} onChange={(v) => set('celebrate', v)} label={t('s_celebrate')} desc={t('s_celebrate_d')} />
       {isElectron && <Toggle checked={settings.flashWindow} onChange={(v) => set('flashWindow', v)} label={t('s_flash')} desc={t('s_flash_d')} />}
       {isElectron && <Toggle checked={settings.showWindowOnRemind} onChange={(v) => set('showWindowOnRemind', v)} label={t('s_show')} desc={t('s_show_d')} />}

@@ -161,6 +161,7 @@ export function normalizeData(d: Partial<AppData> | null | undefined, base: Sett
     quickAddShortcut: typeof s?.quickAddShortcut === 'string' ? s.quickAddShortcut : base.quickAddShortcut,
     escalation: { ...base.escalation, ...s?.escalation },
     celebrate: typeof s?.celebrate === 'boolean' ? s.celebrate : base.celebrate,
+    sounds: typeof s?.sounds === 'boolean' ? s.sounds : base.sounds,
     autoUpdate: typeof s?.autoUpdate === 'boolean' ? s.autoUpdate : base.autoUpdate,
     // B5 / #17: a finite positive timestamp or null; digest times must look like HH:MM
     mutedUntil: typeof s?.mutedUntil === 'number' && Number.isFinite(s.mutedUntil) && s.mutedUntil > 0 ? s.mutedUntil : base.mutedUntil,

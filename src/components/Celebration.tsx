@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { chimeCelebrate } from '../lib/sound'
 
 /** Particles per burst and how long a burst stays in the DOM (matches the CSS animation). */
 const PARTICLES = 24
@@ -8,18 +7,19 @@ const COLORS = ['#ff8a3d', '#ff5fa2', '#a78bfa', '#2dd4bf', '#38bdf8', '#a3e635'
 
 /**
  * Completion celebration (#9): a two-note chime plus a CSS confetti burst.
- * The confetti is skipped under `prefers-reduced-motion`; the chime still plays.
+ * The confetti is skipped under `prefers-reduced-motion`; the chime still plays. The chime itself comes from
+ * `chime` (App: `play('complete')` of `useSounds`), so the sound switch and the Hyper Focus silence apply.
  * Returns the trigger and the element to render once near the root.
  */
-export function useCelebration(enabled: boolean) {
+export function useCelebration(enabled: boolean, chime: () => void) {
   const [burst, setBurst] = useState(0)
 
   const celebrate = useCallback(() => {
     if (!enabled) return
-    chimeCelebrate()
+    chime()
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
     setBurst(Date.now())
-  }, [enabled])
+  }, [enabled, chime])
 
   useEffect(() => {
     if (!burst) return

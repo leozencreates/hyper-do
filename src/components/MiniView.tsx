@@ -6,6 +6,7 @@ import { formatDue } from '../lib/dates'
 import { LangContext, useLang, useT } from '../lib/useT'
 import { useTheme } from '../lib/hooks'
 import { useTaskActions } from '../lib/useTaskActions'
+import { useSounds } from '../lib/useSounds'
 import { fmtCountdown, useHyperFocus } from './HyperFocus'
 
 /**
@@ -34,7 +35,8 @@ function Mini({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   }, [])
 
   const hf = useHyperFocus(data.hyperFocus, setHyperFocus, settings.pomodoro, settings.language, { driver: false, onPhaseEnd: appendFocusEntry })
-  const actions = useTaskActions({ tasks, settings, setTasks, setSettings, updateData })
+  const play = useSounds(settings, data.hyperFocus)
+  const actions = useTaskActions({ tasks, settings, setTasks, setSettings, updateData, onSound: play, onCompleted: () => play('complete') })
   const desktop = platform.desktop
   const session = hf.session
 
