@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calendarLink, recurrenceRrule, taskToIcsEvent, tasksToIcs } from './calendar-links'
+import { calendarLink, googleEventBody, recurrenceRrule, taskToIcsEvent, tasksToIcs } from './calendar-links'
 import { normalizeTask } from './tasks'
 import type { Task } from './types'
 
@@ -51,3 +51,53 @@ describe('task → ICS with recurrence', () => {
     expect(calendarLink('google', task({ id: 'p' }))).not.toContain('recur=')
   })
 })
+
+describe('month-end clamp for monthly rules (anchor on the 29th-31st)', () => {
+  it('BYMONTHDAY=28..d;BYSETPOS=-1 only when the anchor day is 29 or later', () => {
+    expect(recurrenceRrule('monthly', null, local(31, 9, 0, 0))).toBe('FREQ=MONTHLY;BYMONTHDAY=28,29,30,31;BYSETPOS=-1')
+    expect(recurrenceRrule('monthly', null, local(30, 9, 0, 3))).toBe('FREQ=MONTHLY;BYMONTHDAY=28,29,30;BYSETPOS=-1')
+    expect(recurrenceRrule('monthly', null, local(29, 9, 0, 3))).toBe('FREQ=MONTHLY;BYMONTHDAY=28,29;BYSETPOS=-1')
+    expect(recurrenceRrule('monthly', null, local(28, 9, 0, 3))).toBe('FREQ=MONTHLY')
+    expect(recurrenceRrule('monthly', null, null)).toBe('FREQ=MONTHLY')
+    expect(recurrenceRrule('custom', { every: 2, unit: 'month' }, local(31, 9, 0, 0))).toBe('FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=28,29,30,31;BYSETPOS=-1')
+    // other units ignore the anchor
+    expect(recurrenceRrule('weekly', null, local(31, 9, 0, 0))).toBe('FREQ=WEEKLY')
+    expect(recurrenceRrule('custom', { every: 1, unit: 'day' }, local(31, 9, 0, 0))).toBe('FREQ=DAILY')
+  })
+
+  it('the .ics export uses the task due date as the anchor', () => {
+    expect(taskToIcsEvent(task({ id: 'm', recurrence: 'monthly', dueAt: local(31, 9, 0, 0) }))!.rrule).toBe('FREQ=MONTHLY;BYMONTHDAY=28,29,30,31;BYSETPOS=-1')
+  })
+})
+
+describe('googleEventBody (push to the Hyper Do calendar)', () => {
+  const TZ = 'Europe/Istanbul'
+  it('single timed task: dateTime without timeZone, no recurrence, hyperdoId and priority colour', () => {
+    const b = googleEventBody(task({ id: 'p', priority: 'high' }), TZ)!
+    expect(b.start).toEqual({ dateTime: new Date(local(14, 18, 0)).toISOString() })
+    expect(b.end).toEqual({ dateTime: new Date(local(14, 18, 30)).toISOString() })
+    expect('recurrence' in b).toBe(false)
+    expect(b.colorId).toBe('11')
+    expect(b.extendedProperties).toEqual({ private: { hyperdoId: 'p' } })
+    expect(b.description.endsWith('— Hyper Do')).toBe(true)
+  })
+
+  it('recurring timed task: RRULE line and timeZone on start and end (Google needs it to expand the series)', () => {
+    const b = googleEventBody(task({ id: 'w', recurrence: 'custom', recurrenceRule: { every: 2, unit: 'week', weekdays: [1, 3] } }), TZ)!
+    expect(b.recurrence).toEqual(['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE'])
+    expect(b.start).toEqual({ dateTime: new Date(local(14, 18, 0)).toISOString(), timeZone: TZ })
+    expect(b.end).toMatchObject({ timeZone: TZ })
+  })
+
+  it('recurring all-day task (due 23:59) uses dates; "repeat after completion" stays a single event; no due date → null', () => {
+    const b = googleEventBody(task({ id: 'd', recurrence: 'daily', dueAt: local(14, 23, 59) }), TZ)!
+    expect(b.start).toEqual({ date: '2026-10-14' })
+    expect(b.end).toEqual({ date: '2026-10-15' })
+    expect(b.recurrence).toEqual(['RRULE:FREQ=DAILY'])
+    const after = googleEventBody(task({ id: 'a', recurrence: 'custom', recurrenceRule: { every: 3, unit: 'day', afterCompletion: true } }), TZ)!
+    expect('recurrence' in after).toBe(false)
+    expect(after.start).not.toHaveProperty('timeZone')
+    expect(googleEventBody(task({ id: 'n', dueAt: null }), TZ)).toBeNull()
+  })
+})
+

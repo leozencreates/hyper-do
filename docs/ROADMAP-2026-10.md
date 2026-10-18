@@ -27,9 +27,9 @@ collected in `docs/MANUAL-TEST-2026-10.md` (Turkish, by platform, riskiest first
   `2026-10-13-telegram-bot-design.md`) needs the PC running and a tunnel (Cloudflare quick tunnel = a new random
   address on every restart; stable addresses need "My own address"). The live-message map (`live` / `byMessage`)
   survives restarts since 19 Oct 2026 (`userData/hyperdo-telegram.json`).
-- **Google push of recurring tasks**: `calsync.ts` mirrors every open task as a single 30-minute event (no RRULE);
-  the next occurrence appears only after the current one is completed. `.ics` export carries an RRULE, except for
-  "repeat after completion" rules, which cannot be expressed in a calendar.
+- ~~**Google push of recurring tasks**~~: closed on 19 Oct 2026 (`docs/2026-10-19-gcal-recurring-design.md`); still
+  open: snoozed / moved single occurrences are not written as exceptions, "repeat after completion" stays a single
+  event.
 - **Sync**: settings and the running Hyper Focus session are never synced (by design). `markNagged` does not bump
   `updatedAt` and `bumpChanged` ignores nag-only changes, so nag counts may differ per device. Folder mode uses
   `mtimeMs` as its token (a cloud client delivering a different file with an identical mtime goes unnoticed until the
@@ -279,3 +279,7 @@ General rules for every item:
   `suggestNext` / `reasonText` in `src/lib/whatnow.ts` (urgency, priority, momentum, ignored reminders; energy and
   time chips narrow it), dialog `WhatNow.tsx` (header button + `W`, Focus / Hyper Focus / Open / Another), Telegram
   `/next` (`/n`) with ↻ Another.
+- [x] **Recurring tasks on Google Calendar** (19 Oct 2026, spec `docs/2026-10-19-gcal-recurring-design.md`): the push
+  sends `recurrence: ['RRULE:…']` (+ `timeZone` for timed series) via `googleEventBody`; single ↔ recurring switches
+  recreate the event (`pushAction`); monthly anchors on the 29th–31st export with the month-end clamp
+  (`BYMONTHDAY=28..d;BYSETPOS=-1`) in the push, the `.ics` export and the "add to calendar" links.

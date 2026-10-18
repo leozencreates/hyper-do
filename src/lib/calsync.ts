@@ -10,7 +10,7 @@
 import type { AppData, CalendarEvent, CalendarSettings, CalendarStatus, GoogleCalendarInfo, Task } from './types'
 import { GoogleAuthError, GoogleCalendarClient, emailFromIdToken, refreshAccessToken, revokeToken, type GCalendar, type GEvent, type GoogleTokens } from './gcal'
 import { parseIcs } from './ics'
-import { taskDescription, taskEventWindow } from './calendar-links'
+import { googleEventBody, recurrenceRrule, taskDescription } from './calendar-links'
 import { startOfDay, endOfDay, DAY } from './dates'
 import { newTask, touchTask } from './tasks'
 import { translate } from './i18n'
@@ -38,9 +38,22 @@ export interface CalendarSyncHost {
   googleClient?(s: CalendarSettings['google']): { clientId: string; clientSecret: string }
 }
 
-interface PushedEntry {
+export interface PushedEntry {
   eventId: string
   fp: string
+  /** RRULE body the event was pushed with ('' / absent = a single event). */
+  rrule?: string
+}
+
+/**
+ * What to do with one desired task at push time: nothing (unchanged), patch the known event, recreate it (the event
+ * switches between single and recurring — a PATCH cannot reliably drop `recurrence`, and a recurring series must not
+ * linger), or insert / re-link when no event is known yet.
+ */
+export function pushAction(prev: PushedEntry | undefined, fp: string, rrule: string): 'skip' | 'patch' | 'recreate' | 'insert' {
+  if (!prev || !prev.eventId) return 'insert'
+  if (prev.fp === fp) return 'skip'
+  return !(prev.rrule ?? '') === !rrule ? 'patch' : 'recreate'
 }
 
 interface GoogleState {
@@ -66,19 +79,16 @@ interface PersistedState {
 
 const emptyGoogle = (): GoogleState => ({ refreshToken: '', email: '', taskCalendarId: '', pushed: {} })
 
-/** Fingerprint of the parts of a task that are mirrored to the calendar. */
+const taskRrule = (t: Task) => recurrenceRrule(t.recurrence, t.recurrenceRule, t.dueAt) ?? ''
+
+/** Fingerprint of the parts of a task that are mirrored to the calendar (the RRULE only when there is one, so single events keep their old fingerprint). */
 function taskFp(t: Task): string {
-  return JSON.stringify([t.title, t.dueAt, t.priority, taskDescription(t)])
+  const rrule = taskRrule(t)
+  return JSON.stringify([t.title, t.dueAt, t.priority, taskDescription(t), ...(rrule ? [rrule] : [])])
 }
 
 function settingsFp(s: CalendarSettings): string {
   return JSON.stringify([s.feeds.map((f) => [f.id, f.url, f.enabled, f.name, f.color]), s.google.hiddenCalendarIds, s.google.pushTasks, s.autoImport])
-}
-
-function localDate(ts: number): string {
-  const d = new Date(ts)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 function parseGDate(v?: { date?: string; dateTime?: string }): { t: number; allDay: boolean } | null {
@@ -535,16 +545,7 @@ export class CalendarSync {
   }
 
   private eventBody(task: Task) {
-    const w = taskEventWindow(task)!
-    return {
-      summary: task.title,
-      description: taskDescription(task),
-      start: w.allDay ? { date: localDate(w.start) } : { dateTime: new Date(w.start).toISOString() },
-      end: w.allDay ? { date: localDate(w.end) } : { dateTime: new Date(w.end).toISOString() },
-      colorId: task.priority === 'high' ? '11' : task.priority === 'medium' ? '6' : '7',
-      extendedProperties: { private: { hyperdoId: task.id } },
-      reminders: { useDefault: true },
-    }
+    return googleEventBody(task, Intl.DateTimeFormat().resolvedOptions().timeZone)!
   }
 
   private async pushTasks() {
@@ -573,11 +574,16 @@ export class CalendarSync {
 
       for (const [taskId, task] of desired) {
         const fp = taskFp(task)
+        const rrule = taskRrule(task)
         const p = g.pushed[taskId]
-        if (p && p.fp === fp) continue
+        const action = pushAction(p, fp, rrule)
+        if (action === 'skip') continue
         const body = this.eventBody(task)
         let eventId = p?.eventId ?? ''
-        if (eventId) {
+        if (action === 'recreate') {
+          await api.deleteEvent(calId, eventId) // single ↔ recurring: replace the event instead of patching it
+          eventId = (await api.insertEvent(calId, body)).id
+        } else if (eventId) {
           try {
             await api.patchEvent(calId, eventId, body)
           } catch (e) {
@@ -586,16 +592,17 @@ export class CalendarSync {
           }
         }
         if (!eventId) {
-          // Re-link after a reinstall instead of creating a duplicate.
+          // Re-link after a reinstall instead of creating a duplicate (a stale single/recurring mismatch is replaced).
           const existing = (await api.findByHyperdoId(calId, taskId)).find((x) => x.status !== 'cancelled')
-          if (existing) {
+          if (existing && !existing.recurrence?.length === !rrule) {
             await api.patchEvent(calId, existing.id, body)
             eventId = existing.id
           } else {
+            if (existing) await api.deleteEvent(calId, existing.id)
             eventId = (await api.insertEvent(calId, body)).id
           }
         }
-        g.pushed[taskId] = { eventId, fp }
+        g.pushed[taskId] = rrule ? { eventId, fp, rrule } : { eventId, fp }
         this.persist()
       }
       this.googleError = null

@@ -106,7 +106,7 @@ src/lib/synctransport.ts  SyncTransport interface + WebDavTransport (GET/If-None
 src/lib/platform.sync.ts  createBrowserSync(getData, mutate, store) → HyperDoApi.sync for web (localStorage) + Android
                         (Preferences key `hyperdo-sync`); WebDAV only
 src/lib/calsync.ts      Calendar sync engine (pure): Google pull/push + ICS feeds → CalendarEvent[], auto-import tasks
-src/lib/gcal.ts, ics.ts, calendar-links.ts   Google client, iCalendar parser/writer, "add to calendar" links
+src/lib/gcal.ts, ics.ts, calendar-links.ts   Google client, iCalendar parser/writer, "add to calendar" links, googleEventBody
 src/lib/reminder.ts     Reminder engine (pure): collectDueReminders, planReminderTimes, buildNotification, quiet hours, isMuted
                         (settings.mutedUntil — global mute, B5; both engines honour it),
                         activeFocusTaskId / focusSuppressedUntil (Hyper Focus suppression), escalation ladder
@@ -171,9 +171,9 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
                         (`docs/YYYY-MM-DD-<area>-design.md`) before implementation; roadmap items link to it
 ```
 
-Tests: `src/lib/*.test.ts` (calendar-links, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
+Tests: `src/lib/*.test.ts` (calendar-links, calsync, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
 sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
-`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 22 files, 459 tests.
+`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 23 files, 466 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.
@@ -237,7 +237,9 @@ process, the browser build and Vitest.
   also bump `dailyDone` → call `completeInData` (stats.ts) or `recordDone`, never `completeTask` alone.
 - `task.recurrenceRule` exists only when `recurrence === 'custom'` (`normalizeTask` drops it otherwise and supplies
   `DEFAULT_RECURRENCE_RULE` when a custom rule is unreadable). `recurrenceRrule` (calendar-links.ts) maps recurrences
-  to RRULE; `afterCompletion` rules export without one.
+  to RRULE; `afterCompletion` rules export without one. Pass the due date as `anchor` (monthly 29th–31st → month-end
+  clamp via `BYMONTHDAY=28..d;BYSETPOS=-1`). The Google push builds bodies with `googleEventBody` (RRULE + `timeZone`
+  for timed series); `pushAction` recreates an event whose single/recurring kind changed (`PushedEntry.rrule`).
 - Quick-add month names: Turkish/Russian names are only recognised after the day (`15 ekim`), never before it, because
   TR abbreviations like `ara` (= call) and `kas` are everyday words; English allows `oct 15`.
 - Two renderer windows (main + mini) share `useAppData`; `useHyperFocus` must run with `driver: false` everywhere except

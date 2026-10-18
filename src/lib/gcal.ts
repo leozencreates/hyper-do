@@ -47,6 +47,8 @@ export interface GEvent {
   htmlLink?: string
   start?: { date?: string; dateTime?: string }
   end?: { date?: string; dateTime?: string }
+  /** RRULE / EXDATE lines of a recurring event (master events only). */
+  recurrence?: string[]
   extendedProperties?: { private?: Record<string, string> }
   attendees?: { self?: boolean; responseStatus?: string }[]
   eventType?: string

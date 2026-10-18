@@ -477,6 +477,13 @@ geçirmesi test edilmedi.
 1. Web türü OAuth istemcisi, yetkili yönlendirme URI'si = sayfa adresi → **Bağlan** → Google'a gider, geri döner,
    "Bağlı · e-posta". Etkinlikler görev olur; "Görevleri Google Takvim'e gönder" → "Hyper Do" takvimi oluşur.
 2. Yenile (F5) → bağlantı kalır (`hyperdo-calendar` anahtarı); JSON dışa aktarmada token **yok**.
+3. *(Masaüstünde de)* "Her hafta Pzt/Çar 18:00" özel tekrarlı görev → Google'daki "Hyper Do" takviminde **seri**
+   olarak görünür (önümüzdeki haftalar da dolu, saat dilimi doğru, 18:00–18:30). Bir sonraki tekrarlar görev olarak
+   **geri gelmez**.
+4. Görevi bitir → eski seri silinir, yeni kopya bir sonraki tarihten başlayan yeni seri olarak gelir (çift seri yok).
+5. Tekrarı kaldır → takvimde tek etkinlik kalır (seri silinip yeniden oluşturulur). Tekrar ekle → tekrar seri olur.
+6. 31 Ekim tarihli aylık görev → Kasım'da 30'unda, Şubat'ta 28'inde görünür (atlanmaz). "Bitince tekrarla" → tek
+   etkinlik. Gün boyu (23:59) günlük görev → gün boyu seri.
 
 ### D4. Genel
 
