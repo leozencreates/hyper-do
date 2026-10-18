@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { FOCUS_NO_TASK, activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, focusSuppressedUntil, inQuietHours, deliveredNags, isMuted, markNagged, markNaggedBy, parseNagPlan, planReminderTimes, resetNag, syncCounters } from './reminder'
+import { FOCUS_NO_TASK, activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, focusSuppressedUntil, inQuietHours, deliveredNags, isMuted, markNagged, markNaggedBy, parseNagPlan, planReminderTimes, plannedEscalation, resetNag, syncCounters } from './reminder'
 import { normalizeTask } from './tasks'
 import { DEFAULT_SETTINGS, type HfSession, type Settings, type Task } from './types'
 
@@ -385,5 +385,17 @@ describe('Android nag counting (deliveredNags / markNaggedBy / parseNagPlan)', (
     expect(parseNagPlan('{oops')).toEqual({})
     expect(parseNagPlan('[1,2]')).toEqual({})
     expect(parseNagPlan(JSON.stringify({ a: [1, 'x', 2], b: 'no' }))).toEqual({ a: [1, 2] })
+  })
+})
+
+describe('plannedEscalation (Android level per pre-scheduled reminder)', () => {
+  const s = settings({ escalation: { enabled: true, telegramAfter: 3, popupAfter: 5 } })
+  it('the i-th planned reminder counts as nagCount + i ignored ones', () => {
+    expect([0, 1, 2, 3, 4, 5, 6].map((i) => plannedEscalation(task({ nagCount: 0 }), i, s))).toEqual([0, 0, 0, 1, 1, 2, 2])
+    expect(plannedEscalation(task({ nagCount: 4 }), 1, s)).toBe(2)
+    expect(plannedEscalation(task({ nagCount: 4 }), -3, s)).toBe(1) // negative index = no extra nags
+  })
+  it('a disabled ladder never escalates', () => {
+    expect(plannedEscalation(task({ nagCount: 50 }), 10, settings({ escalation: { enabled: false, telegramAfter: 3, popupAfter: 5 } }))).toBe(0)
   })
 })

@@ -393,7 +393,11 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 7. Görev `nag @1dk` (eşik: Ayarlar → Tırmanma, örn. 3), uygulamayı kapat, 4–5 bildirime dokunma, sonra aç.
    → 👀 çipi çalan bildirim sayısını gösterir; eşikten sonraki bildirimlerin gövdesi "👀 N kez görmezden geldin…"
    satırıyla başlar. **😴 30 dk** ya da düzenleme → sayaç 0'dan başlar, eski bildirimler tekrar sayılmaz.
-   Seviye 2 (açılır pencere) Android'de yoktur. *(19 Eki 2026'dan beri; önceden sayaç hiç artmıyordu)*
+   *(19 Eki 2026'dan beri; önceden sayaç hiç artmıyordu)*
+8. Aynı görevde "Acil bildirim şundan sonra" eşiğini (örn. 5) aş → o bildirimden itibaren başlık `🚨 …` ile
+   başlar, ekranın üstünde açılır (heads-up), titrer. Telefon Ayarları → Uygulamalar → Hyper Do → Bildirimler'de
+   **Acil hatırlatmalar** kanalı görünür; sesini değiştir / kapat → yalnız acil olanlar etkilenir. Dili EN yap →
+   kanal adı "Urgent reminders". Ayarlar'da tırmanma açıklaması mini pencereden değil acil bildirimden bahseder.
 
 ### C2. Paylaş → Hyper Do  (📁 `android/app/src/main/java/com/hyperdo/app/MainActivity.java`; `platform.capacitor.ts` → `hyperdoShare`; `src/lib/share.ts`)
 

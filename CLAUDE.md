@@ -87,7 +87,8 @@ src/lib/tg-bridge.ts    Telegram WebApp SDK bridge (every call optional-chained)
 src/lib/platform.web.ts        Browser/PWA adapter: localStorage + Web Notifications, runs collectDueReminders itself
 src/lib/platform.capacitor.ts  Android adapter: Capacitor Preferences + LocalNotifications scheduled 48 h ahead (reminders,
                         i-th built with nagCount + i, plus digests from DIGEST_ID_BASE; nag plan in Preferences
-                        `hyperdo-nag-plan`, counted at the next replan) with action type HYPERDO_TASK (done/snooze30/
+                        `hyperdo-nag-plan`, counted at the next replan; plannedEscalation ≥ 2 → channel `hyperdo-urgent`,
+                        importance 5, 🚨 title = the Android counterpart of the mini window) with action type HYPERDO_TASK (done/snooze30/
                         focus → applyNotificationAction in stats.ts), share target
                         (window event hyperdoShare → onShare), Google login via @capacitor/browser + appUrlOpen on
                         com.hyperdo.app:/oauth2redirect (secret-less settings.calendar.google.androidClientId)
@@ -173,7 +174,7 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 
 Tests: `src/lib/*.test.ts` (calendar-links, calsync, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
 sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
-`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 23 files, 466 tests.
+`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 23 files, 468 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.

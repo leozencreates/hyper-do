@@ -18,7 +18,7 @@ reminders turned into new tasks.
 
 ## Non-goals
 
-Escalation level 2 on Android (there is no mini window; a separate high-importance channel could come later), quiet
+Full-screen (alarm-style) escalation on Android (level 2 got a high-importance channel instead, see 2b), quiet
 hours / mute for digests (the desktop does not apply them either), extending the 48-hour Android planning horizon,
 and syncing nag counts across devices (unchanged: `markNagged` never bumps `updatedAt`).
 
@@ -48,6 +48,20 @@ and syncing nag counts across devices (unchanged: `markNagged` never bumps `upda
   ignored, so the "👀 N times…" line appears on the phone from the right reminder on, even while the app is closed.
 - Known limit: a renderer save inside the debounce window can still overwrite a just-counted increment (the same
   cross-window race the desktop has); the next replan does not recount it.
+
+## 2b. Android escalation level 2 (added the same day)
+
+- [x] The desktop answers level 2 (`popupAfter` ignored reminders) with a critical toast and the mini window. Android
+  has no mini window, so its counterpart is a separate notification channel `hyperdo-urgent`: importance 5
+  (heads-up), vibration, lights, public on the lock screen, default system sound. It is created in `registerActions`
+  and renamed there when the language changes.
+- [x] `plannedEscalation(task, i, settings)` (reminder.ts): the i-th planned reminder counts as `nagCount + i`
+  ignored ones. From level 2 on, the planned notification goes to the urgent channel with a `🚨` title prefix.
+- [x] Settings on Android describe the last step as "Urgent notification after N" (`s_esc_urgent_after`,
+  `s_escalation_d_android`) rather than the mini window.
+- The user keeps control: the channel's sound, importance and "pop on screen" can be changed or muted in the system
+  notification settings, independently of normal reminders. Full-screen intents (alarm-style) are a non-goal: they
+  need native code and a sensitive permission.
 
 ## 3. Telegram message map across restarts
 

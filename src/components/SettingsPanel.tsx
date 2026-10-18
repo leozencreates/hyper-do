@@ -88,7 +88,12 @@ export default function SettingsPanel({ settings, data, cal, onChange, onImport,
 
       <Toggle checked={settings.funTitles} onChange={(v) => set('funTitles', v)} label={t('s_fun')} desc={t('s_fun_d')} />
       <Toggle checked={settings.escalateOverdue} onChange={(v) => set('escalateOverdue', v)} label={t('s_escalate')} desc={t('s_escalate_d')} />
-      <Toggle checked={settings.escalation.enabled} onChange={(v) => set('escalation', { ...settings.escalation, enabled: v })} label={t('s_escalation')} desc={t('s_escalation_d')} />
+      <Toggle
+        checked={settings.escalation.enabled}
+        onChange={(v) => set('escalation', { ...settings.escalation, enabled: v })}
+        label={t('s_escalation')}
+        desc={t(platform.kind === 'capacitor' ? 's_escalation_d_android' : 's_escalation_d')}
+      />
       {settings.escalation.enabled && (
         <div className="row indent pomodoro-row">
           <label className="pomo">
@@ -102,7 +107,7 @@ export default function SettingsPanel({ settings, data, cal, onChange, onImport,
             />
           </label>
           <label className="pomo">
-            <small>{t('s_esc_popup_after')}</small>
+            <small>{t(platform.kind === 'capacitor' ? 's_esc_urgent_after' : 's_esc_popup_after')}</small>
             <input
               type="number"
               min={1}

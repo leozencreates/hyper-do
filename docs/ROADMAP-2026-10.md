@@ -283,3 +283,6 @@ General rules for every item:
   sends `recurrence: ['RRULE:…']` (+ `timeZone` for timed series) via `googleEventBody`; single ↔ recurring switches
   recreate the event (`pushAction`); monthly anchors on the 29th–31st export with the month-end clamp
   (`BYMONTHDAY=28..d;BYSETPOS=-1`) in the push, the `.ics` export and the "add to calendar" links.
+- [x] **Android escalation level 2** (19 Oct 2026, `docs/2026-10-19-known-gaps-design.md` § 2b): from `popupAfter`
+  ignored reminders on, planned notifications use the high-importance channel `hyperdo-urgent` (heads-up, vibration,
+  🚨 title) via `plannedEscalation`; Android Settings name the step "Urgent notification after".

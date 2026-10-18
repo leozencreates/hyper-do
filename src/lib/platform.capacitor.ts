@@ -12,7 +12,7 @@ import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/loc
 import { Preferences } from '@capacitor/preferences'
 import type { AppData, HyperDoApi, NotifyPermission, SharePayload } from './types'
 import type { Lang } from './i18n'
-import { buildNotification, deliveredNags, focusSuppressedUntil, markNaggedBy, parseNagPlan, planReminderTimes, type NagPlan } from './reminder'
+import { buildNotification, deliveredNags, focusSuppressedUntil, markNaggedBy, parseNagPlan, planReminderTimes, plannedEscalation, type NagPlan } from './reminder'
 import { buildDigest, planDigestTimes } from './digest'
 import { translate } from './i18n'
 import { browserDefaultSettings, parseAppData, DATA_STORAGE_KEY } from './data'
@@ -31,6 +31,11 @@ const HORIZON_MS = 48 * 3_600_000 // 48 saat ileriye planla
 const TEST_ID = 999_999
 /** Digest notification ids (above every task block: `hashId` stays below 2 000 000). */
 const DIGEST_ID_BASE = 3_000_000
+/**
+ * Escalation level 2 on Android (the desktop opens the mini window): reminders go to this high-importance channel
+ * (heads-up, vibration, lights). Its sound and importance stay under the user's control in the system settings.
+ */
+const URGENT_CHANNEL_ID = 'hyperdo-urgent'
 /** Preferences key of the last reminder plan (task id → planned times), the basis of Android nag counting. */
 const NAG_PLAN_KEY = 'hyperdo-nag-plan'
 /** Action type carrying the Done / Snooze 30 / Focus buttons (registered with translated titles). */
@@ -151,6 +156,21 @@ export function createCapacitorApi(): HyperDoApi {
     const lang = data.settings.language
     if (actionsLang === lang) return
     try {
+      // the urgent channel (#6 level 2); creating it again with the same id only renames it for the new language
+      await LocalNotifications.createChannel({
+        id: URGENT_CHANNEL_ID,
+        name: translate(lang, 'notif_ch_urgent'),
+        description: translate(lang, 'notif_ch_urgent_d'),
+        importance: 5,
+        visibility: 1,
+        vibration: true,
+        lights: true,
+        lightColor: '#FF5FA2',
+      })
+    } catch {
+      /* Android < 8 / web: no channels, the default notification is used */
+    }
+    try {
       await LocalNotifications.registerActionTypes({
         types: [
           {
@@ -208,10 +228,12 @@ export function createCapacitorApi(): HyperDoApi {
         times.forEach((p, i) => {
           // the i-th one fires only if the i before it were ignored → escalation line from the right count on
           const { title, body } = buildNotification({ ...task, nagCount: task.nagCount + i }, p.overdue, data.settings, p.at)
+          const urgent = plannedEscalation(task, i, data.settings) >= 2
           list.push({
             id: base + i,
-            title,
+            title: urgent ? `🚨 ${title}` : title,
             body,
+            ...(urgent ? { channelId: URGENT_CHANNEL_ID } : {}),
             schedule: { at: new Date(p.at), allowWhileIdle: true },
             extra: { taskId: task.id },
             group: task.id,

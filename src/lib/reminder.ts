@@ -170,6 +170,14 @@ export function escalationLevel(task: Pick<Task, 'nagCount'>, settings: Pick<Set
   return 0
 }
 
+/**
+ * Escalation level of the `i`-th pre-scheduled reminder of a task (Android): it only fires after the `i` before it
+ * were ignored, so it is built as if `nagCount + i` reminders had been ignored already.
+ */
+export function plannedEscalation(task: Pick<Task, 'nagCount'>, i: number, settings: Pick<Settings, 'escalation'>): 0 | 1 | 2 {
+  return escalationLevel({ nagCount: task.nagCount + Math.max(0, i) }, settings)
+}
+
 export function buildNotification(task: Task, overdue: boolean, settings: Settings, nowMs = Date.now()): { title: string; body: string } {
   const lang = settings.language
   const t = (k: Parameters<typeof translate>[1], vars?: Record<string, string | number>) => translate(lang, k, vars)
