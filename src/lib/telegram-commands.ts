@@ -26,6 +26,7 @@ import { addDays, dayKey, endOfDay, formatDue, formatMinutes, isThisWeek, isToda
 import { escalationLevel, resetNag } from './reminder'
 import { completeInData, doneInLastDays, focusMinutes, recordReopen, streak } from './stats'
 import { buildDigest, type DigestKind } from './digest'
+import { ANY_CONTEXT, reasonText, suggestNext } from './whatnow'
 
 /** One inline button: either a callback (`callback_data`) or a Mini App launcher (`web_app`, Phase D). */
 export interface TgInlineButton {
@@ -151,6 +152,7 @@ const COMMANDS: { command: string; alias: string; args: string; key: Key; group:
   { command: 'rename', alias: '', args: 'N <text>', key: 'tg_cmd_rename', group: 'tasks' },
   { command: 'del', alias: '', args: 'N', key: 'tg_cmd_del', group: 'tasks' },
   { command: 'undo', alias: '', args: '', key: 'tg_cmd_undo', group: 'tasks' },
+  { command: 'next', alias: 'n', args: '', key: 'tg_cmd_next', group: 'views' },
   { command: 'list', alias: 'l', args: '', key: 'tg_cmd_list', group: 'views' },
   { command: 'today', alias: '', args: '', key: 'tg_cmd_today', group: 'views' },
   { command: 'week', alias: '', args: '', key: 'tg_cmd_week', group: 'views' },
@@ -513,6 +515,24 @@ function patchIn(d: AppData, id: string, patch: Partial<Task>): AppData {
 const reply = (text: string, buttons?: TgInlineButton[][], taskId?: string): TgEffect => ({ replies: [{ text, ...(buttons ? { buttons } : {}), ...(taskId ? { taskId } : {}) }] })
 const silent: TgEffect = { replies: [] }
 
+/**
+ * "What now?" (`/next`): the `index`-th pick of `rankNext` (no energy / time narrowing in the chat) with up to three
+ * reasons, the usual task buttons and `↻ Another` (`next:<shownId>:<index + 1>`, answered with a new message).
+ */
+export function nextReply(data: AppData, now: number, index: number, appUrl?: string): TgEffect {
+  const lang = data.settings.language
+  const pick = suggestNext(data.tasks, ANY_CONTEXT, now, index)
+  if (!pick) return reply(escapeHtml(translate(lang, 'wn_none')))
+  const { task } = pick
+  const lines = [escapeHtml(translate(lang, 'tg_next_head')), `${priorityIcon(task.priority)} ${bold(task.title)}`]
+  if (task.dueAt !== null) lines.push(`📅 ${escapeHtml(formatDue(task.dueAt, lang, now))}`)
+  for (const r of pick.reasons.slice(0, 3)) lines.push(`• ${escapeHtml(reasonText(r, lang))}`)
+  const rows = taskButtons(task.id, lang)
+  rows.push([{ text: translate(lang, 'wn_another'), callback_data: `next:${task.id}:${index + 1}` }])
+  if (appUrl) rows.push(openAppRow(lang, appUrl, task.id))
+  return reply(lines.join('\n'), rows, task.id)
+}
+
 /** Pairing: `/start <code>` links the chat while nothing is linked; afterwards only the owner chat is greeted. */
 function handleStart(arg: string, ctx: TgContext): TgEffect {
   const { settings } = ctx.data
@@ -612,6 +632,9 @@ export function handleMessage(text: string, ctx: TgContext): TgEffect {
   switch (cmd) {
     case '/help':
       return reply(helpText(lang))
+    case '/next':
+    case '/n':
+      return nextReply(data, now, 0, ctx.appUrl)
     case '/list':
     case '/l':
       return renderView(data, now, 'list')
@@ -814,6 +837,9 @@ export function handleCallback(cbData: string, ctx: TgContext): TgCallbackResult
       }
     case 'pick':
       return { effect: { replies: [cardReply(task, lang, now, ctx.appUrl)] }, toast: '', keepButtons: true }
+    case 'next':
+      // `id` is the task shown in the message being answered; the next pick arrives as a new message
+      return { effect: nextReply(data, now, Math.max(0, Math.floor(Number(extra)) || 0), ctx.appUrl), toast: '', keepButtons: true }
     case 'sub': {
       if (!task.subtasks.some((s) => s.id === extra)) return { ...none, toast: t('tg_bad_index') }
       const toggled: Task = resetNag({ ...task, subtasks: task.subtasks.map((s) => (s.id === extra ? { ...s, done: !s.done } : s)) })

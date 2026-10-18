@@ -69,6 +69,7 @@ Most to-do apps notify you once and go quiet. Hyper Do doesn't. Until you comple
 - ⚡ **Hyper Focus (Pomodoro)** — one click starts a 40-minute deep-work round followed by a 5-minute break, repeating until you stop. Progress ring, countdown in the window title, chime and notification on every phase change. Lengths are adjustable.
 - 🔕 **Hyper Focus silences the rest** — during a work round only the focused task may remind you; everything else waits for the break (toggle in Settings).
 - ⏱ **Estimates and time tracking** — give a task an estimate (5/15/30/60/120 or any number; quick add `~30m`, `~2h`). Hyper Focus logs every finished work round to the task, so the row shows `45m / 30m` and turns orange when you have gone over — gentle feedback against time blindness.
+- 🧭 **What now?** — stuck in front of a long list? Press `W` (or 🧭): Hyper Do picks **one** task for right now, ranked by what is overdue or due today, priority, what you already started and how often it reminded you, and tells you why ("⏰ 2 h overdue · 🔴 High priority"). Tap 🪫/🔋/⚡ and 15/30/60 min to say how much energy and time you have; "Another" walks down the same ranking. Also in Telegram as `/next`.
 - 🪫 **Energy level and "give me an easy one"** — tag tasks 🪫 low / 🔋 medium / ⚡ high (editor or quick add `^low ^med ^high`), filter by energy in the sidebar, and press `E` (or 🎲) when you are stuck: Hyper Do picks a random low-energy, short, low-priority task, scrolls to it and offers "Focus it" / "Another".
 - 🔥 **Streaks, heatmap, celebration** — the sidebar shows your current streak (consecutive days with at least one completion). **📈 Stats** opens the current and best streak, done today / in 7 days, a 12-week GitHub-style heatmap, Hyper Focus minutes and the top tags of the week. Completing a task plays a two-note chime and fires a small confetti burst (toggle; respects reduced-motion).
 
@@ -92,7 +93,7 @@ Most to-do apps notify you once and go quiet. Hyper Do doesn't. Until you comple
 ### Telegram
 
 - 📲 **Reminders on your phone** — every reminder also arrives in your own Telegram bot, one live message per task that updates itself when you finish the task on the desktop. Buttons **✓ Done · 🎯 Focus / ⏰ 30 min · ⏰ 1 h · 🌅 Tomorrow**.
-- 🗂 **Work from the chat** — `/list`, `/today`, `/week`, `/overdue`, `/search`, task cards with tappable subtasks, `/done 1 3 4`, `/snooze 2 tomorrow 09:00`, `/due`, `/prio`, `/every`, `/sub`, `/note`, `/rename`, `/del`, `/undo`, `/stats`, `/mute`, `/quiet`, `/backup`. Reply to any reminder to add a subtask. [Command table](#telegram-bot-windowsmacos).
+- 🗂 **Work from the chat** — `/next`, `/list`, `/today`, `/week`, `/overdue`, `/search`, task cards with tappable subtasks, `/done 1 3 4`, `/snooze 2 tomorrow 09:00`, `/due`, `/prio`, `/every`, `/sub`, `/note`, `/rename`, `/del`, `/undo`, `/stats`, `/mute`, `/quiet`, `/backup`. Reply to any reminder to add a subtask. [Command table](#telegram-bot-windowsmacos).
 - 🔐 **Private by design** — your own bot token, a 6-digit pairing code, and an optional "only when the PC is idle" rule.
 - 📱 **Mini App** — the real Hyper Do screen (Today · Week · Board · Done, quick add, editor) opens *inside* Telegram from the ☰ menu button or an "📱 Open in app" button under any reminder. Your PC serves it through an HTTPS tunnel; nothing is hosted elsewhere. [How it works](#telegram-mini-app).
 
@@ -123,6 +124,7 @@ All single-key shortcuts are ignored while you type in a field or a dialog is op
 | `N` | main window | New task (opens the editor) |
 | `/` | main window | Focus the search box (`Esc` clears it) |
 | `1` … `5` | main window | Switch view: Today · This week · All · Board · Done |
+| `W` | main window | "What now?" — one suggestion with its reasons |
 | `E` | main window | "Give me an easy one" |
 | `B` | main window | Brain dump textarea |
 | `M` | main window, desktop app | Show / hide the mini window |
@@ -286,6 +288,7 @@ Commands (generated from the same list that fills the "/" menu in Telegram; `/he
 | Tasks | `/rename N <text>` | | Rename task N |
 | Tasks | `/del N` | | Delete task N (asks first with 🗑 Delete / Cancel buttons) |
 | Tasks | `/undo` | | Reopen the last finished task (a recurring task's next occurrence stays) |
+| Views | `/next` | `/n` | What now? One suggestion with its reasons and ↻ Another |
 | Views | `/list` | `/l` | Open tasks, numbered, grouped **Overdue · Today · Later · No date**; long lists arrive in several messages |
 | Views | `/today` | | Today and overdue |
 | Views | `/week` | | This week (due within 7 days) and overdue |

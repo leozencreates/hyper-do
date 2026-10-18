@@ -13,6 +13,7 @@ import {
   linkTitle,
   listTaskIds,
   miniAppLink,
+  nextReply,
   numberButtons,
   openAppRow,
   parseEveryArg,
@@ -91,7 +92,7 @@ describe('botCommands / helpText', () => {
   it('lists the same commands in /help in all three languages, with Telegram-valid names and descriptions', () => {
     for (const lang of ['en', 'tr', 'ru'] as Lang[]) {
       const cmds = botCommands(lang)
-      expect(cmds.map((c) => c.command)).toEqual(['add', 'done', 'snooze', 'focus', 'due', 'prio', 'every', 'sub', 'note', 'rename', 'del', 'undo', 'list', 'today', 'week', 'overdue', 'search', 'stats', 'mute', 'quiet', 'backup', 'help'])
+      expect(cmds.map((c) => c.command)).toEqual(['add', 'done', 'snooze', 'focus', 'due', 'prio', 'every', 'sub', 'note', 'rename', 'del', 'undo', 'next', 'list', 'today', 'week', 'overdue', 'search', 'stats', 'mute', 'quiet', 'backup', 'help'])
       const help = helpText(lang)
       expect(help.startsWith(translate(lang, 'tg_help'))).toBe(true)
       // grouped Tasks · Views · Reminders · Other, in that order
@@ -853,5 +854,42 @@ describe('digest reply (C6) and /backup (C7)', () => {
     expect(parsed.tasks).toEqual(d.tasks)
     expect(backupDocument(d, NOW).content).toBe(doc.content)
     expect(d.settings.telegram.token).toBe('SECRET-TOKEN') // input untouched
+  })
+})
+
+describe('/next (What now?)', () => {
+  const kb = (r: { buttons?: { text: string; callback_data?: string; web_app?: { url: string } }[][] }) => r.buttons ?? []
+  it('answers with the top pick, its reasons, the task buttons and ↻ Another; /n is the alias', () => {
+    const d = data([task({ id: 'a', title: 'Later <one>' }), task({ id: 'b', title: 'Pay bill', dueAt: NOW - 2 * 3_600_000, priority: 'high' })])
+    for (const cmd of ['/next', '/n']) {
+      const r = handleMessage(cmd, ctx(d)).replies[0]
+      expect(r.taskId).toBe('b')
+      expect(r.text.split('\n')[0]).toBe(escapeHtml(translate('en', 'tg_next_head')))
+      expect(r.text).toContain('<b>Pay bill</b>')
+      expect(r.text).toContain(`• ${escapeHtml(translate('en', 'wn_r_priority'))}`)
+      const rows = kb(r)
+      expect(rows.slice(0, 2)).toEqual(taskButtons('b', 'en'))
+      expect(rows[2]).toEqual([{ text: translate('en', 'wn_another'), callback_data: 'next:b:1' }])
+    }
+  })
+
+  it('↻ Another sends the next pick as a new message and leaves the old one alone; it wraps around', () => {
+    const d = data([task({ id: 'a', title: 'A' }), task({ id: 'b', title: 'B', priority: 'high' })])
+    const r = handleCallback('next:b:1', ctx(d))
+    expect(r.keepButtons).toBe(true)
+    expect(r.edit).toBeUndefined()
+    expect(r.append).toBeUndefined()
+    expect(r.effect.mutate).toBeUndefined()
+    expect(r.effect.replies[0].taskId).toBe('a')
+    expect(kb(r.effect.replies[0])[2][0].callback_data).toBe('next:a:2')
+    expect(handleCallback('next:a:2', ctx(d)).effect.replies[0].taskId).toBe('b')
+  })
+
+  it('nothing to suggest → a plain line; the Mini App row is last when the app is reachable; foreign chats get nothing', () => {
+    expect(handleMessage('/next', ctx(data([task({ id: 'w', status: 'waiting' })]))).replies[0]).toEqual({ text: escapeHtml(translate('en', 'wn_none')) })
+    const d = data([task({ id: 'a' })])
+    const rows = kb(nextReply(d, NOW, 0, 'https://x.trycloudflare.com').replies[0])
+    expect(rows[rows.length - 1]).toEqual(openAppRow('en', 'https://x.trycloudflare.com', 'a'))
+    expect(handleMessage('/next', ctx(d, [], '999')).replies).toEqual([])
   })
 })

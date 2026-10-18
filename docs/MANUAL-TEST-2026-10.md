@@ -193,6 +193,19 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
    `Esc` kapatır; alan yazılırken harf kısayolları çalışmaz.
 8. Üst çubukta 🔇 çipi (Telegram'dan `/mute 1sa` sonra) → tıkla → kalkar, hatırlatmalar döner.
 
+### A14. 🧭 Şimdi ne yapayım?  (📁 `src/lib/whatnow.ts` → `rankNext`; `src/components/WhatNow.tsx`; `src/App.tsx` → `showNext`)
+
+1. Üst çubukta **🧭 Şimdi ne?** (veya `W`) → pencere: Enerjin / Vaktin çipleri, tek kart (başlık, tarih, en çok 3
+   gerekçe çipi), "1. öneri / N" satırı. Gecikmiş + yüksek öncelikli görev ilk sırada, gerekçesi "⏰ … gecikti".
+2. **↻ Başka** → sıradaki öneri; sona gelince başa döner. Çip değiştirince sıra 1'den başlar.
+3. Enerjiyi **🪫 Düşük** yap → ⚡ etiketli görevler en alta iner; **15 dk** → tahmini 45 dk olanlar en alta, ≤15 dk
+   olan "⏱ … sürer, vaktine sığar" çipiyle öne çıkar.
+4. **🎯 Odağa al** → pencere kapanır, görev odak çubuğunda ve satırı vurgulu. **⏱ Hyper Focus** → tur o görevle başlar
+   (Hyper Focus çalışırken ve Mini App'te düğme yok). **✏ Aç** → düzenleyici.
+5. Ertelenmiş ya da Pano'da "Bekliyor" sütunundaki görevler önerilmez; hiç aday yoksa "Şu an önerilecek görev yok 🌿".
+6. Pencere açıkken diğer harf kısayolları çalışmaz; `Esc` / arka plana tıklama kapatır. Telefon genişliğinde
+   (Mini App) düğmeler alt satıra kayar, yatay kaydırma yok.
+
 ### A13. Ses efektleri ve susturma  (📁 `src/lib/sound.ts` → `soundAllowed`; `src/lib/useSounds.ts`; `src/App.tsx` → `snd-btn`; `src/lib/useTaskActions.ts` → `onSound`)
 
 1. Hızlı ekleme ile görev ekle → tek kısa "pop". Görevi sil → alçak, inen iki nota; **Geri al** → yükselen iki nota.
@@ -282,6 +295,14 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 14. Düz metin `yarın 18:00 fatura öde #ev !1 @30dk` → "➕ Eklendi: **fatura öde**" + 📅 / 🔴 / #ev / ⏰ satırları.
     Yalnız `yarın` → başlık "yarın", tarih yarın.
 15. 60+ görev varken `/list` → birden çok mesaj, satır ortasından bölünmez, numaralar devam eder.
+
+### B3b. `/next`  (📁 `telegram-commands.ts` → `nextReply`, callback `next:`)
+
+1. `/next` (veya `/n`) → "🧭 Şimdi bunu yap:", kalın başlık, 📅 tarih, en çok 3 "•" gerekçe satırı; düğmeler
+   ✓ Bitirdim · 🎯 Odak / ⏰ 30 dk · 1 sa · Yarın / **↻ Başka** (+ Mini App açıksa 📱 Uygulamada aç).
+2. **↻ Başka** → sıradaki öneri **yeni mesaj** olarak gelir; eski mesajın düğmeleri çalışmaya devam eder.
+3. Önerilen mesajda **✓ Bitirdim** → görev PC'de biter, mesaj "✓ …" satırıyla düzenlenir.
+4. `/help` ve "/" menüsünde `/next` Görünümler grubunun başında.
 
 ### B4. Kartlar, yanıt = ekle, iletme/bağlantı  (📁 `telegram-commands.ts` → `renderCard`, `cardButtons`, `attach`, `linkTitle`; `electron/telegram.ts` → `byMessage`)
 

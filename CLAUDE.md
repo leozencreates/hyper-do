@@ -58,6 +58,10 @@ src/lib/telegram-commands.ts  Pure bot logic: handleMessage / handleCallback →
                         escapeHtml (every user string; callback toasts stay plain), chunkText(3800), /start <pairCode>;
                         D4: TgInlineButton = callback_data | web_app, miniAppLink(url, taskId?) = <url>/tg.html[?task=],
                         openAppRow → last row "📱 Open in app" of taskButtons / cardButtons / digestReply when appUrl is set
+src/lib/whatnow.ts      Pure "What now?" ranking (spec 2026-10-19-what-now-design.md): isNextCandidate (open, not snoozed, not
+                        waiting), rankNext(tasks, {energy, minutes}, now) → NextPick {task, score, reasons} best first,
+                        suggestNext(…, index) wraps, typed NextReason + reasonText(reason, lang). Used by WhatNow.tsx and
+                        Telegram /next (nextReply, callback next:<shownId>:<k> → new message)
 src/lib/digest.ts       Pure digest (#17): buildDigest(data, now, lang, 'morning'|'evening'|'weekly') → {title, body, html, tasks},
                         digestDue(settings, state, now) (morning: from digest.time for 12 h; evening: from eveningTime; Sunday
                         → weekly; once per local day), markDigestSent, parseDigestState, planDigestTimes (Android
@@ -145,6 +149,7 @@ src/components/         Board (Kanban DnD), QuickAdd (textarea + live preview + 
                         window ?view=quick), MiniView (mini window ?view=mini), BrainDump (modal), TaskItem (row + chips),
                         TaskEditor (panel incl. recurrence rule, estimate, energy), FocusBanner, HyperFocus (useHyperFocus
                         hook + bar; `driver` option), StatsModal, Celebration (useCelebration: chime + confetti),
+                        WhatNow (🧭 dialog: energy / time chips, one pick + reasons, Focus / Hyper Focus / Open / Another),
                         SettingsPanel (+ DesktopSection, TelegramSection (+ MiniAppBlock: mode select, status/URL/copy/port/
                         progress, manual URL with https validation, Restart tunnel), AutoBackupSection, AboutSection,
                         BackupSection), CalendarSettings, CalendarStrip (events above Today/Week), AddToCalendar (per-task
@@ -152,7 +157,7 @@ src/components/         Board (Kanban DnD), QuickAdd (textarea + live preview + 
                         ConnectionPanel (Mini App: PC unreachable / wrong account), Board (`draggable` prop, off in the Mini App)
 src/App.tsx             Shell; `?view=today|week|all|board|done` selects the initial view, `?view=quick` renders the
                         quick-add popup, `?view=mini` the mini window, `?task=<id>` opens that editor after load (Telegram
-                        "Open in app"). Keyboard: N / E B M 1-5 (Esc via Modal). Hosts the mute chip, the "easy one" toast,
+                        "Open in app"). Keyboard: N / W E B M 1-5 (Esc via Modal). Hosts the mute chip, the "easy one" toast,
                         the update toast and the share-target editor. `IS_TG` (platform.kind === 'telegram'): bottom tab bar
                         Today · Week · Board · Done · ＋, no sidebar / sort / "+ New task" / Hyper Focus start, hf driver off,
                         haptic on complete, "⚠ Not saved · Retry" chip from platform.connection
@@ -167,8 +172,8 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 ```
 
 Tests: `src/lib/*.test.ts` (calendar-links, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
-sync, syncengine, tasks, telegram-commands) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
-`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 21 files, 447 tests.
+sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
+`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 22 files, 459 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.

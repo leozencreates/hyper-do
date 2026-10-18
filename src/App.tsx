@@ -24,6 +24,7 @@ import QuickCapture from './components/QuickCapture'
 import MiniView from './components/MiniView'
 import StatsModal from './components/StatsModal'
 import BrainDump from './components/BrainDump'
+import WhatNow from './components/WhatNow'
 import Board from './components/Board'
 import CalendarStrip from './components/CalendarStrip'
 import ConnectionPanel from './components/ConnectionPanel'
@@ -117,6 +118,8 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const [showSettings, setShowSettings] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showBrain, setShowBrain] = useState(false)
+  /** 🧭 What now? dialog. */
+  const [showNext, setShowNext] = useState(false)
   const [highlight, setHighlight] = useState<string | null>(null)
   /** "Give me an easy one": the suggested task id, or null for "nothing open". */
   const [easy, setEasy] = useState<{ id: string | null } | null>(null)
@@ -267,7 +270,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   }, [easy])
 
   // Klavye kısayolları (bir alan yazılırken ya da pencere açıkken devre dışı)
-  const modalOpen = !!editing || showSettings || showStats || showBrain
+  const modalOpen = !!editing || showSettings || showStats || showBrain || showNext
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (modalOpen || e.ctrlKey || e.metaKey || e.altKey) return
@@ -283,6 +286,9 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
       } else if (k === 'e') {
         e.preventDefault()
         pickEasyRef.current()
+      } else if (k === 'w') {
+        e.preventDefault()
+        setShowNext(true)
       } else if (k === 'b') {
         e.preventDefault()
         setShowBrain(true)
@@ -437,6 +443,9 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 {t('hf_start')}
               </button>
             )}
+            <button className="ghost small" title={t('wn_btn_title')} onClick={() => setShowNext(true)}>
+              {t('wn_btn')}
+            </button>
             <button className="ghost small" title={t('easy_title')} onClick={() => pickEasy()}>
               {t('easy_btn')}
             </button>
@@ -651,6 +660,28 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
         />
       )}
 
+      {showNext && (
+        <WhatNow
+          tasks={tasks}
+          now={now}
+          onFocus={(x) => {
+            actions.setFocus(x.id, true)
+            setShowNext(false)
+            setHighlight(x.id)
+            scrollTo(x.id)
+          }}
+          onHyperFocus={hf.session || IS_TG ? undefined : (x) => {
+            actions.setFocus(x.id, true)
+            hf.start(x.id)
+            setShowNext(false)
+          }}
+          onOpen={(x) => {
+            setShowNext(false)
+            setEditing(x)
+          }}
+          onClose={() => setShowNext(false)}
+        />
+      )}
       {showBrain && <BrainDump onAdd={(lines) => actions.quickAddMany(lines, { defaultDueAt: view === 'today' ? endOfDay(now) : null })} onClose={() => setShowBrain(false)} />}
 
       {showStats && <StatsModal data={data} now={now} onClose={() => setShowStats(false)} />}

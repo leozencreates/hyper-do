@@ -275,3 +275,7 @@ General rules for every item:
   counting from the previous plan (`deliveredNags` / `markNaggedBy`, plan in Preferences `hyperdo-nag-plan`, escalation
   line on planned notifications); Telegram `live` / `byMessage` persisted in `userData/hyperdo-telegram.json` with a
   `reconcile()` pass on start for tasks finished while the app was closed.
+- [x] **🧭 What now?** (19 Oct 2026, spec `docs/2026-10-19-what-now-design.md`): pure ranking `rankNext` /
+  `suggestNext` / `reasonText` in `src/lib/whatnow.ts` (urgency, priority, momentum, ignored reminders; energy and
+  time chips narrow it), dialog `WhatNow.tsx` (header button + `W`, Focus / Hyper Focus / Open / Another), Telegram
+  `/next` (`/n`) with ↻ Another.
