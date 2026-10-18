@@ -38,6 +38,12 @@ export interface TelegramHost {
   onStatus?(s: TelegramStatus): void
   /** B3: seconds since the last input on the PC; `Infinity` while the session is locked. Absent = always "idle". */
   idleSeconds?(): number
+  /**
+   * The message bookkeeping (`live` + `byMessage`) across restarts, as JSON (`userData/hyperdo-telegram.json`, not in
+   * backups). Both absent = memory only (old messages keep their buttons but are no longer edited after a restart).
+   */
+  loadMessages?(): string | null
+  saveMessages?(json: string): void
 }
 
 export interface TelegramBotOptions {
@@ -94,6 +100,49 @@ const DELETE_MAX_AGE = 47 * 3_600_000
 /** The reverse map (message id → task id) keeps this many newest entries. */
 const MESSAGE_MAP_MAX = 500
 
+/** On-disk shape of the message bookkeeping (`TelegramHost.saveMessages`). */
+interface StoredMessages {
+  version: 1
+  live: [string, LiveMessage][]
+  byMessage: [number, string][]
+}
+
+export function serializeMessages(live: Map<string, LiveMessage>, byMessage: Map<number, string>): string {
+  const doc: StoredMessages = { version: 1, live: [...live], byMessage: [...byMessage] }
+  return JSON.stringify(doc)
+}
+
+/** Reads `serializeMessages` output tolerantly: unreadable input or entries are dropped, the order (oldest first) is kept. */
+export function parseMessages(raw: string | null | undefined): { live: Map<string, LiveMessage>; byMessage: Map<number, string> } {
+  const live = new Map<string, LiveMessage>()
+  const byMessage = new Map<number, string>()
+  let o: Partial<StoredMessages> | null = null
+  try {
+    o = raw ? (JSON.parse(raw) as Partial<StoredMessages> | null) : null
+  } catch {
+    o = null
+  }
+  for (const e of Array.isArray(o?.live) ? o.live : []) {
+    const [taskId, m] = Array.isArray(e) ? e : []
+    if (typeof taskId !== 'string' || !m || typeof m !== 'object') continue
+    if (typeof m.chatId !== 'string' || typeof m.messageId !== 'number' || typeof m.html !== 'string') continue
+    live.set(taskId, {
+      chatId: m.chatId,
+      messageId: m.messageId,
+      html: m.html,
+      sentAt: typeof m.sentAt === 'number' ? m.sentAt : 0,
+      kind: m.kind === 'card' ? 'card' : 'reminder',
+      ...(Array.isArray(m.buttons) ? { buttons: m.buttons } : {}),
+    })
+  }
+  for (const e of Array.isArray(o?.byMessage) ? o.byMessage : []) {
+    const [messageId, taskId] = Array.isArray(e) ? e : []
+    if (typeof messageId === 'number' && typeof taskId === 'string') byMessage.set(messageId, taskId)
+  }
+  while (byMessage.size > MESSAGE_MAP_MAX) byMessage.delete(byMessage.keys().next().value as number)
+  return { live, byMessage }
+}
+
 /** Resolves after `ms` or as soon as `signal` aborts. */
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -127,10 +176,16 @@ export class TelegramBot {
   /** /list çıktısındaki numara → görev id (komutlarda /done 2 gibi kullanılır) */
   private listIndex: string[] = []
   private st: TelegramStatus = { state: 'off', error: null, username: '', lastPollAt: null }
-  /** B1/C3: the one message with live buttons per task (restart loses it — acceptable). */
+  /** B1/C3: the one message with live buttons per task (kept across restarts through `host.saveMessages`). */
   private live = new Map<string, LiveMessage>()
   /** C4: every message id the bot sent about a task → task id (newest `MESSAGE_MAP_MAX`). */
   private byMessage = new Map<number, string>()
+  /** The stored bookkeeping was read (once, on the first start). */
+  private restored = false
+  /** Restored live messages still have to be checked against the data (tasks finished while the app was closed). */
+  private reconcilePending = false
+  /** A save of the bookkeeping is queued (coalesces the bursts of one reply / callback). */
+  private saveQueued = false
   /** Task whose callback is being handled: `onDataChanged` leaves its message to the callback path. */
   private handling: string | null = null
   /** D4: public origin of the Mini App while a tunnel is up (keyboards get the "📱 Open in app" row), else null. */
@@ -188,6 +243,7 @@ export class TelegramBot {
   }
 
   private start(token: string) {
+    this.restore()
     if (token !== this.activeToken) this.offset = 0
     this.running = true
     this.halted = false
@@ -256,6 +312,55 @@ export class TelegramBot {
   }
 
   // ---- Message bookkeeping (B1 / C3 / C4) ----
+  /** Reads the stored bookkeeping once; what is already in memory (sent before the first start) wins. */
+  private restore() {
+    if (this.restored) return
+    this.restored = true
+    let raw: string | null = null
+    try {
+      raw = this.host.loadMessages?.() ?? null
+    } catch {
+      raw = null
+    }
+    const stored = parseMessages(raw)
+    for (const [taskId, m] of stored.live) if (!this.live.has(taskId)) this.live.set(taskId, m)
+    this.byMessage = new Map([...stored.byMessage, ...this.byMessage])
+    this.reconcilePending = stored.live.size > 0
+  }
+
+  /** Queues one save of the bookkeeping (microtask: all changes of the current step land in one write). */
+  private changed() {
+    if (!this.host.saveMessages || this.saveQueued) return
+    this.saveQueued = true
+    queueMicrotask(() => {
+      this.saveQueued = false
+      try {
+        this.host.saveMessages?.(serializeMessages(this.live, this.byMessage))
+      } catch (e) {
+        console.error('[telegram] message state save failed:', (e as Error).message)
+      }
+    })
+  }
+
+  /**
+   * After a restart: restored live messages whose task was completed or deleted while the app was closed are tidied
+   * the same way `onDataChanged` would have done it (strike-through ✓ / buttons removed). Never mutates the data.
+   */
+  private async reconcile(signal?: AbortSignal) {
+    if (!this.reconcilePending) return
+    this.reconcilePending = false
+    const tasks = this.host.getData().tasks
+    for (const [taskId, msg] of [...this.live]) {
+      if (signal?.aborted) return
+      const t = tasks.find((x) => x.id === taskId)
+      if (t && t.completedAt === null) continue
+      this.live.delete(taskId)
+      this.changed()
+      if (t) await this.edit(msg, completedHtml(msg.html, t.title)).catch(() => {})
+      else await this.removeButtons(msg).catch(() => {})
+    }
+  }
+
   private remember(messageId: number, taskId: string) {
     this.byMessage.delete(messageId)
     this.byMessage.set(messageId, taskId)
@@ -264,6 +369,12 @@ export class TelegramBot {
       if (oldest === undefined) break
       this.byMessage.delete(oldest)
     }
+    this.changed()
+  }
+
+  /** Drops the live entry of a task and queues a save. */
+  private forget(taskId: string) {
+    if (this.live.delete(taskId)) this.changed()
   }
 
   /**
@@ -280,6 +391,7 @@ export class TelegramBot {
       try {
         await this.api('deleteMessage', { chat_id: prev.chatId, message_id: prev.messageId })
         this.byMessage.delete(prev.messageId)
+        this.changed()
         return
       } catch {
         /* too old or already gone: fall back to removing the keyboard */
@@ -356,10 +468,10 @@ export class TelegramBot {
       const before = prev.tasks.find((t) => t.id === taskId)
       const after = next.tasks.find((t) => t.id === taskId)
       if (after && after.completedAt !== null && (!before || before.completedAt === null)) {
-        this.live.delete(taskId)
+        this.forget(taskId)
         void this.edit(msg, completedHtml(msg.html, after.title)).catch(() => {})
       } else if (!after && before) {
-        this.live.delete(taskId)
+        this.forget(taskId)
         void this.removeButtons(msg).catch(() => {})
       }
     }
@@ -407,6 +519,7 @@ export class TelegramBot {
     }
     await this.applyCommands(signal)
     await this.applyMenuButton(signal)
+    await this.reconcile(signal)
     await this.pollLoop(signal)
   }
 
@@ -521,6 +634,7 @@ export class TelegramBot {
       if (stored) {
         stored.html = r.edit.text
         stored.buttons = r.edit.buttons
+        this.changed()
       } else if (taskId) {
         await this.setLive(taskId, { ...ref, html: r.edit.text, sentAt: Date.now(), kind: 'card', buttons: r.edit.buttons })
       }
@@ -532,13 +646,16 @@ export class TelegramBot {
       const text = `${base}\n\n${r.append}`
       const buttons = r.keepButtons ? (stored?.buttons ?? taskButtons(taskId, this.settings.language, this.appUrl)) : undefined
       await this.edit(ref, text, buttons).catch(() => {})
-      if (stored) stored.html = text
-      if (!r.keepButtons) this.live.delete(taskId)
+      if (stored) {
+        stored.html = text
+        this.changed()
+      }
+      if (!r.keepButtons) this.forget(taskId)
       return
     }
     if (!r.keepButtons) {
       await this.removeButtons(ref).catch(() => {})
-      if (stored) this.live.delete(taskId)
+      if (stored) this.forget(taskId)
     }
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDigest, digestDue, markDigestSent, parseDigestState, parseHHMM, type DigestState } from './digest'
+import { buildDigest, digestDue, markDigestSent, parseDigestState, parseHHMM, planDigestTimes, type DigestState } from './digest'
 import { normalizeData } from './data'
 import { normalizeTask } from './tasks'
 import { DEFAULT_SETTINGS, type AppData, type Settings, type Task } from './types'
@@ -114,5 +114,33 @@ describe('digestDue', () => {
     const ev = s({ evening: true, eveningTime: '19:00' })
     expect(digestDue(ev, never, at(13, 19, 30))).toBe('morning')
     expect(digestDue(ev, markDigestSent(never, 'morning', at(13, 19, 30)), at(13, 19, 30))).toBe('evening')
+  })
+})
+
+describe('planDigestTimes (Android)', () => {
+  const s = (digest: Partial<Settings['digest']> = {}) => settings({ digest: { ...DEFAULT_SETTINGS.digest, ...digest } })
+
+  it('plans every morning / evening in the window, oldest first, skipping times already passed', () => {
+    // Tuesday 13 Oct 10:00, 48 h → Wed + Thu morning (today's 08:00 is gone), Tue + Wed evening
+    expect(planDigestTimes(s({ evening: true }), NOW, 48 * H)).toEqual([
+      { at: at(13, 20, 0), kind: 'evening' },
+      { at: at(14, 8, 0), kind: 'morning' },
+      { at: at(14, 20, 0), kind: 'evening' },
+      { at: at(15, 8, 0), kind: 'morning' },
+    ])
+  })
+
+  it('Sunday evening is the weekly review; disabled parts are left out', () => {
+    // Saturday 17 Oct 21:00 → Sunday 08:00 + Sunday 20:00 weekly
+    expect(planDigestTimes(s({ evening: true, time: '08:00' }), at(17, 21, 0), 24 * H)).toEqual([
+      { at: at(18, 8, 0), kind: 'morning' },
+      { at: at(18, 20, 0), kind: 'weekly' },
+    ])
+    expect(planDigestTimes(s({ enabled: false, evening: true }), at(17, 21, 0), 24 * H)).toEqual([{ at: at(18, 20, 0), kind: 'weekly' }])
+    expect(planDigestTimes(s({ enabled: false, evening: false }), NOW, 48 * H)).toEqual([])
+  })
+
+  it('a time exactly at the start of the window is not planned again (it just fired)', () => {
+    expect(planDigestTimes(s(), at(14, 8, 0), 24 * H)).toEqual([{ at: at(15, 8, 0), kind: 'morning' }])
   })
 })

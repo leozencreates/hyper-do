@@ -3,6 +3,8 @@
  * Uygulama kapalıyken de dürtebilmek için hatırlatmalar yerel bildirim olarak ÖNCEDEN planlanır:
  * her kayıtta ve uygulama öne geldiğinde bekleyen bildirimler iptal edilip yeniden kurulur.
  * Bildirim düğmeleri (Bitirdim / 30 dk / Odak), "Paylaş → Hyper Do" ve Google girişi (Custom Tab) de burada.
+ * Sabah özeti / akşam değerlendirmesi (#17) de önceden planlanır; ısrar sayacı (#6) her yeniden planlamada
+ * önceki planın çalmış bildirimlerinden sayılır (`deliveredNags`).
  */
 import { App as CapApp } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
@@ -10,7 +12,8 @@ import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/loc
 import { Preferences } from '@capacitor/preferences'
 import type { AppData, HyperDoApi, NotifyPermission, SharePayload } from './types'
 import type { Lang } from './i18n'
-import { buildNotification, focusSuppressedUntil, planReminderTimes } from './reminder'
+import { buildNotification, deliveredNags, focusSuppressedUntil, markNaggedBy, parseNagPlan, planReminderTimes, type NagPlan } from './reminder'
+import { buildDigest, planDigestTimes } from './digest'
 import { translate } from './i18n'
 import { browserDefaultSettings, parseAppData, DATA_STORAGE_KEY } from './data'
 import { bumpChanged } from './tasks'
@@ -26,6 +29,10 @@ const PER_TASK_MAX = 48 // görev başına en fazla planlanan bildirim
 const TOTAL_MAX = 400 // Android alarm sınırının (500) altında kal
 const HORIZON_MS = 48 * 3_600_000 // 48 saat ileriye planla
 const TEST_ID = 999_999
+/** Digest notification ids (above every task block: `hashId` stays below 2 000 000). */
+const DIGEST_ID_BASE = 3_000_000
+/** Preferences key of the last reminder plan (task id → planned times), the basis of Android nag counting. */
+const NAG_PLAN_KEY = 'hyperdo-nag-plan'
 /** Action type carrying the Done / Snooze 30 / Focus buttons (registered with translated titles). */
 const ACTION_TYPE_ID = 'HYPERDO_TASK'
 /** Window event fired by MainActivity.java for "Share → Hyper Do" (`triggerWindowJSEvent`). */
@@ -52,6 +59,7 @@ export function createCapacitorApi(): HyperDoApi {
   let perm: NotifyPermission = 'default'
   let scheduling: Promise<void> | null = null
   let actionsLang: Lang | null = null
+  let nagPlan: NagPlan = {}
 
   const persist = () => Preferences.set({ key: DATA_STORAGE_KEY, value: JSON.stringify(data) }).catch(() => {})
 
@@ -161,6 +169,11 @@ export function createCapacitorApi(): HyperDoApi {
     }
   }
 
+  function saveNagPlan(plan: NagPlan) {
+    nagPlan = plan
+    void Preferences.set({ key: NAG_PLAN_KEY, value: JSON.stringify(plan) }).catch(() => {})
+  }
+
   /** Tüm bekleyen bildirimleri iptal edip güncel görevlere göre yeniden planlar. */
   async function reschedule() {
     if (perm !== 'granted') return
@@ -173,6 +186,15 @@ export function createCapacitorApi(): HyperDoApi {
         /* yoksay */
       }
       const now = Date.now()
+      // #6: whatever the previous plan scheduled before now (and after the task's last reaction) has fired
+      const nags = deliveredNags(nagPlan, data.tasks, now)
+      if (nags.size) {
+        data = { ...data, tasks: markNaggedBy(data.tasks, nags) } // no updatedAt bump: never wins a sync conflict
+        void persist()
+        changed.emit(data)
+      }
+      saveNagPlan({}) // the old plan is consumed; cancelled leftovers must never count
+      const plan: NagPlan = {}
       const active = data.tasks.filter((t) => t.completedAt === null && t.remindEveryMin > 0)
       // Öncelik: odak > gecikmiş > yüksek öncelik; kota dolarsa en az önemliler düşer
       active.sort((a, b) => Number(b.focused) - Number(a.focused) || Number(b.dueAt !== null && b.dueAt < now) - Number(a.dueAt !== null && a.dueAt < now))
@@ -181,8 +203,11 @@ export function createCapacitorApi(): HyperDoApi {
       for (const task of active) {
         const base = hashId(task.id)
         // Hyper Focus work round: other tasks stay quiet until it ends (the plan is rebuilt on every save anyway)
-        planReminderTimes(task, data.settings, now, perTask, HORIZON_MS, focusSuppressedUntil(data, task.id, now)).forEach((p, i) => {
-          const { title, body } = buildNotification(task, p.overdue, data.settings, p.at)
+        const times = planReminderTimes(task, data.settings, now, perTask, HORIZON_MS, focusSuppressedUntil(data, task.id, now))
+        plan[task.id] = times.map((p) => p.at)
+        times.forEach((p, i) => {
+          // the i-th one fires only if the i before it were ignored → escalation line from the right count on
+          const { title, body } = buildNotification({ ...task, nagCount: task.nagCount + i }, p.overdue, data.settings, p.at)
           list.push({
             id: base + i,
             title,
@@ -196,7 +221,14 @@ export function createCapacitorApi(): HyperDoApi {
           })
         })
       }
+      // #17: morning digest / evening (Sunday: weekly) review, rendered as of their fire time
+      planDigestTimes(data.settings, now, HORIZON_MS).forEach((p, i) => {
+        const d = buildDigest(data, p.at, data.settings.language, p.kind)
+        list.push({ id: DIGEST_ID_BASE + i, title: d.title, body: d.body, largeBody: d.body, schedule: { at: new Date(p.at), allowWhileIdle: true }, extra: { digest: p.kind }, autoCancel: true })
+      })
+      // the plan only counts once it is really scheduled (a failed schedule must not turn into phantom nags)
       if (list.length) await LocalNotifications.schedule({ notifications: list })
+      saveNagPlan(plan)
     }
     scheduling = (scheduling ?? Promise.resolve()).then(run).catch(() => {})
     return scheduling
@@ -257,6 +289,7 @@ export function createCapacitorApi(): HyperDoApi {
       try {
         const { value } = await Preferences.get({ key: DATA_STORAGE_KEY })
         data = parseAppData(value, defaults)
+        nagPlan = parseNagPlan((await Preferences.get({ key: NAG_PLAN_KEY })).value)
       } catch {
         /* varsayılan */
       }

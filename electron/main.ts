@@ -279,7 +279,8 @@ const sync = new SyncEngine({
 })
 
 // ---- Telegram botu: veriyi okur; komutla değiştirdiğinde kaydeder ve arayüzü günceller;
-//      durumunu (çalışıyor / hata / eşleştirme) ayarlar paneline iletir ----
+//      durumunu (çalışıyor / hata / eşleştirme) ayarlar paneline iletir. Mesaj defteri: userData/hyperdo-telegram.json ----
+const telegramFile = () => path.join(app.getPath('userData'), 'hyperdo-telegram.json')
 const telegram = new TelegramBot({
   getData: () => data,
   mutate(fn) {
@@ -288,6 +289,22 @@ const telegram = new TelegramBot({
   },
   onStatus: (s) => broadcast('tidi:tg-status', s),
   idleSeconds,
+  // live reminder / card per task + message → task map survive restarts (not part of backups)
+  loadMessages() {
+    try {
+      return fs.readFileSync(telegramFile(), 'utf8')
+    } catch {
+      return null
+    }
+  },
+  saveMessages(json) {
+    try {
+      fs.mkdirSync(path.dirname(telegramFile()), { recursive: true })
+      fs.writeFileSync(telegramFile(), json, 'utf8')
+    } catch (e) {
+      console.error('[telegram] message state save failed:', (e as Error).message)
+    }
+  },
 })
 
 // ---- Telegram Mini App (Phase D): local server (dist-web + /api) + tunnel; the public URL feeds the bot's

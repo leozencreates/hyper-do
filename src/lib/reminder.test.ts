@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { FOCUS_NO_TASK, activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, focusSuppressedUntil, inQuietHours, isMuted, markNagged, planReminderTimes, resetNag, syncCounters } from './reminder'
+import { FOCUS_NO_TASK, activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, focusSuppressedUntil, inQuietHours, deliveredNags, isMuted, markNagged, markNaggedBy, parseNagPlan, planReminderTimes, resetNag, syncCounters } from './reminder'
 import { normalizeTask } from './tasks'
 import { DEFAULT_SETTINGS, type HfSession, type Settings, type Task } from './types'
 
@@ -347,5 +347,43 @@ describe('escalation ladder', () => {
     expect(escalationLevel(task({ nagCount: 99 }), settings({ escalation: { enabled: false, telegramAfter: 1, popupAfter: 2 } }))).toBe(0)
     expect(escalationLevel(task({ nagCount: 0 }), settings({ escalation: { enabled: true, telegramAfter: 0, popupAfter: 0 } }))).toBe(0)
     expect(escalationLevel(task({ nagCount: 1 }), settings({ escalation: { enabled: true, telegramAfter: 0, popupAfter: 0 } }))).toBe(2)
+  })
+})
+
+describe('Android nag counting (deliveredNags / markNaggedBy / parseNagPlan)', () => {
+  it('counts the planned reminders that fired after the last reaction, per open task', () => {
+    const tasks = [
+      task({ id: 'a', updatedAt: NOW - H }),
+      task({ id: 'b', updatedAt: NOW - 10 * MIN }), // reacted (snooze / edit) after two of its reminders fired
+      task({ id: 'c', updatedAt: NOW - H, completedAt: NOW - 5 * MIN }),
+    ]
+    const plan = {
+      a: [NOW - 40 * MIN, NOW - 20 * MIN, NOW, NOW + 20 * MIN],
+      b: [NOW - 40 * MIN, NOW - 20 * MIN, NOW - 5 * MIN, NOW + 15 * MIN],
+      c: [NOW - 40 * MIN],
+      gone: [NOW - 40 * MIN],
+    }
+    expect([...deliveredNags(plan, tasks, NOW)]).toEqual([
+      ['a', 3],
+      ['b', 1],
+    ])
+    expect(deliveredNags({}, tasks, NOW).size).toBe(0)
+  })
+
+  it('markNaggedBy adds the counts without bumping updatedAt and keeps untouched tasks', () => {
+    const a = task({ id: 'a', nagCount: 2, updatedAt: NOW - H })
+    const b = task({ id: 'b' })
+    const next = markNaggedBy([a, b], new Map([['a', 3]]))
+    expect(next[0]).toMatchObject({ nagCount: 5, updatedAt: NOW - H })
+    expect(next[1]).toBe(b)
+    const same = [a, b]
+    expect(markNaggedBy(same, new Map())).toBe(same)
+  })
+
+  it('parseNagPlan tolerates garbage', () => {
+    expect(parseNagPlan(null)).toEqual({})
+    expect(parseNagPlan('{oops')).toEqual({})
+    expect(parseNagPlan('[1,2]')).toEqual({})
+    expect(parseNagPlan(JSON.stringify({ a: [1, 'x', 2], b: 'no' }))).toEqual({ a: [1, 2] })
   })
 })

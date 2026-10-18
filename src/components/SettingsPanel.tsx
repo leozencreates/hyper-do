@@ -131,7 +131,8 @@ export default function SettingsPanel({ settings, data, cal, onChange, onImport,
           <input type="time" value={settings.quietHours.to} onChange={(e) => set('quietHours', { ...settings.quietHours, to: e.target.value })} />
         </div>
       )}
-      {isElectron && (
+      {/* digest (#17): desktop tick + Telegram, Android pre-scheduled local notifications; not in the browser / Mini App */}
+      {(isElectron || platform.kind === 'capacitor') && (
         <>
           <Toggle checked={settings.digest.enabled} onChange={(v) => set('digest', { ...settings.digest, enabled: v })} label={t('s_digest')} desc={t('s_digest_d')} />
           {settings.digest.enabled && (

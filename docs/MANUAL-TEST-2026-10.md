@@ -251,8 +251,11 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 7. A5'teki eşik aşılınca Telegram mesajı "👀 N kez görmezden geldin — hâlâ bitmedi mi?" satırıyla başlar; gövdede
    aynı satır **tekrar** yoktur.
 8. Başlığı `<b>&test` olan görev → mesajda düz metin olarak görünür, Telegram hata vermez.
-9. Uygulamayı yeniden başlat → eski mesajlardaki düğmeler hâlâ çalışır (id yoksa "bilinmeyen görev" toast'u) ama
-   bellekteki canlı-mesaj eşlemesi gittiği için PC'den bitirme eski mesajı **düzenlemez** (bilinen sınır).
+9. Uygulamayı yeniden başlat → eski mesajlardaki düğmeler hâlâ çalışır (id yoksa "bilinmeyen görev" toast'u) ve
+   canlı-mesaj eşlemesi `%APPDATA%\hyper-do\hyperdo-telegram.json`'dan geri yüklenir: PC'den bitirince eski mesaj
+   ~~başlık~~ ✓ olur; eski bir hatırlatmaya "yanıtla" → alt görev o göreve eklenir. *(19 Eki 2026'dan beri)*
+10. Uygulama **kapalıyken** görevi başka cihazda bitir (eşitleme) ya da sil, sonra uygulamayı aç → bot başlarken o
+   mesajı üstü çizili ✓ yapar / düğmelerini kaldırır. `hyperdo-telegram.json` yedeklere (`backups/`) **girmez**.
 
 ### B3. Komutlar  (📁 `src/lib/telegram-commands.ts` → `handleMessage`, `renderView`, `parseMuteArg`)
 
@@ -366,7 +369,10 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 4. **🎯 Odak** → görev odakta ve vurgulu. Bildirim gövdesine dokun → uygulama görevde açılır, değişiklik yok.
 5. Dili TR→EN değiştir, yeni hatırlatma → düğme adları İngilizce (tür yeniden kaydedilir).
 6. Uygulamayı 2+ gün açma → hatırlatmalar durur (48 saatlik plan, bilinen sınır); açınca plan uzar.
-7. 👀 çipi Android'de **artmaz** (sayaç yok); PC'den eşitlenen sayaç çip olarak görünür.
+7. Görev `nag @1dk` (eşik: Ayarlar → Tırmanma, örn. 3), uygulamayı kapat, 4–5 bildirime dokunma, sonra aç.
+   → 👀 çipi çalan bildirim sayısını gösterir; eşikten sonraki bildirimlerin gövdesi "👀 N kez görmezden geldin…"
+   satırıyla başlar. **😴 30 dk** ya da düzenleme → sayaç 0'dan başlar, eski bildirimler tekrar sayılmaz.
+   Seviye 2 (açılır pencere) Android'de yoktur. *(19 Eki 2026'dan beri; önceden sayaç hiç artmıyordu)*
 
 ### C2. Paylaş → Hyper Do  (📁 `android/app/src/main/java/com/hyperdo/app/MainActivity.java`; `platform.capacitor.ts` → `hyperdoShare`; `src/lib/share.ts`)
 
@@ -409,10 +415,20 @@ geçirmesi test edilmedi.
 ### C5. Genel Android kontrolleri
 
 1. Ayarlar'da Masaüstü ve Telegram grupları **yok**; Hakkında "sürüm 0.2.0" + "Bu platformda güncellemeler elle
-   yapılır…"; Sabah özeti anahtarı yok (Android özet planlamaz — bilinen eksik).
+   yapılır…"; **Sabah özeti** ve **Akşam değerlendirmesi** anahtarları var (C6).
 2. Sessiz saatler ve `/mute` (PC'den eşitlenmez — ayar) → telefonda ayrı ayarlanır; sessiz saatte planlanan bildirim yok.
 3. Hyper Focus çalışma turunda diğer görevlerin planlı bildirimleri tur sonuna kadar atlanır (plan yeniden kurulur).
 4. "Bildirimi dene" düğmesi → test bildirimi. JSON dışa/içe aktarma çalışır.
+
+### C6. Sabah özeti / akşam değerlendirmesi  (📁 `src/lib/digest.ts` → `planDigestTimes`, `buildDigest`; `platform.capacitor.ts` → `reschedule`)
+
+1. Ayarlar → **Sabah özeti** açık, saat şimdi + 2 dk; uygulamayı kapat, telefonu kilitle.
+   → Saatinde "Günaydın"lı bildirim: gecikmiş / bugün / açık sayıları + ilk 3 görev (genişletince tam metin).
+2. **Akşam değerlendirmesi** açık, saat şimdi + 2 dk → "Bugün N bitti…" bildirimi. Pazar günü aynı saat → haftalık özet.
+3. Özetten önce bir görevi bitir → özetteki sayılar güncel (her kayıtta plan yeniden kurulur).
+4. Özet bildirimine dokun → uygulama açılır, değişiklik yok. Anahtarları kapat → planlı özet bildirimi kalmaz.
+5. Bilinen sınır: uygulama 2+ gün açılmazsa özetler de durur (48 saatlik plan). Sessiz saatler özeti bastırmaz
+   (masaüstüyle aynı).
 
 ---
 

@@ -104,6 +104,53 @@ export function markNagged(tasks: Task[], ids: Iterable<string>): Task[] {
   return tasks.map((t) => (set.has(t.id) ? { ...t, nagCount: t.nagCount + 1 } : t))
 }
 
+/** Adds `counts.get(id)` to the `nagCount` of each listed task (Android: several pre-scheduled reminders fired). No `updatedAt` bump, like `markNagged`. */
+export function markNaggedBy(tasks: Task[], counts: ReadonlyMap<string, number>): Task[] {
+  if (counts.size === 0) return tasks
+  return tasks.map((t) => {
+    const n = counts.get(t.id) ?? 0
+    return n > 0 ? { ...t, nagCount: t.nagCount + n } : t
+  })
+}
+
+/**
+ * Android nag counting (#6): the reminder times scheduled per task at the last (re)plan, kept in Preferences.
+ * Every replan cancels what is still pending and plans anew from `now`, so the past entries of the previous plan
+ * are exactly the notifications that fired in between.
+ */
+export type NagPlan = Record<string, number[]>
+
+/**
+ * How many planned reminders of each open task fired in `(task.updatedAt, nowMs]`. A reaction (done, snooze, edit,
+ * `resetNag`) bumps `updatedAt`, so reminders from before it never count against the fresh ladder; `markNagged`
+ * does not bump it, so repeated replans keep counting.
+ */
+export function deliveredNags(plan: NagPlan, tasks: Task[], nowMs: number): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const t of tasks) {
+    if (t.completedAt !== null) continue
+    const n = (plan[t.id] ?? []).filter((at) => at <= nowMs && at > t.updatedAt).length
+    if (n > 0) out.set(t.id, n)
+  }
+  return out
+}
+
+/** Reads a stored `NagPlan` tolerantly (anything unreadable → empty plan). */
+export function parseNagPlan(raw: string | null | undefined): NagPlan {
+  const out: NagPlan = {}
+  if (!raw) return out
+  try {
+    const o = JSON.parse(raw) as unknown
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return out
+    for (const [id, v] of Object.entries(o)) {
+      if (Array.isArray(v)) out[id] = v.filter((x): x is number => typeof x === 'number' && Number.isFinite(x))
+    }
+  } catch {
+    /* empty plan */
+  }
+  return out
+}
+
 /** The user reacted (done, snooze, postpone, focus, edit…): the ladder starts over. Keeps identity when already 0. */
 export function resetNag<T extends Task>(task: T, nowMs = Date.now()): T {
   return task.nagCount === 0 ? task : touchTask({ ...task, nagCount: 0 }, nowMs)
@@ -147,8 +194,8 @@ export function buildNotification(task: Task, overdue: boolean, settings: Settin
  * Uygulama kapalıyken de dürtebilmek için gelecekteki zamanlar şimdiden hesaplanır.
  * Sessiz saatlere ve genel susturmaya (`mutedUntil`) düşenler atlanır; son tarih geçtikten sonra aralık yarıya iner.
  * `suppressUntilMs` (see `focusSuppressedUntil`): times before it are skipped (Hyper Focus work phase).
- * The escalation ladder (#6) is not applied here: pre-scheduled notifications cannot know whether the
- * earlier ones were ignored, so Android never increments `nagCount` and shows the ladder only in the UI.
+ * The escalation ladder (#6) is applied by the caller: the i-th planned reminder is built with `nagCount + i`
+ * (it fires only if the earlier ones were ignored), and `deliveredNags` counts the fired ones at the next replan.
  */
 export function planReminderTimes(task: Task, settings: Settings, fromMs: number, maxCount: number, horizonMs: number, suppressUntilMs: number | null = null): { at: number; overdue: boolean }[] {
   const out: { at: number; overdue: boolean }[] = []

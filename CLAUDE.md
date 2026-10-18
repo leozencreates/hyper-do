@@ -43,7 +43,10 @@ electron/telegram.ts    Telegram bot transport only: long polling (getUpdates), 
                         runs it under Vitest against a fake Bot API (node:http on 127.0.0.1, options apiBase/pollTimeoutSec).
                         D4: setMiniAppUrl(url | null) → setChatMenuButton for the linked chat (web_app "Hyper Do" →
                         <url>/tg.html, or default), applied on start / after pairing / on change (`appliedMenu` =
-                        "<chat>|<url>"); `appUrl` getter feeds taskButtons / cardButtons / digestReply / ctx.appUrl
+                        "<chat>|<url>"); `appUrl` getter feeds taskButtons / cardButtons / digestReply / ctx.appUrl.
+                        `live` + `byMessage` persist via host.loadMessages / saveMessages (userData/hyperdo-telegram.json,
+                        serializeMessages / parseMessages, microtask-coalesced saves); reconcile() once after start tidies
+                        messages of tasks finished / deleted while the app was closed
 src/lib/telegram-commands.ts  Pure bot logic: handleMessage / handleCallback → TgEffect { mutate, replies[{text,buttons,taskId}],
                         listIndex, documents }, callback result { toast, keepButtons, append | edit }. botCommands(lang) grouped
                         Tasks·Views·Reminders·Other (feeds setMyCommands AND /help); views /list /today /week /overdue /search
@@ -57,7 +60,8 @@ src/lib/telegram-commands.ts  Pure bot logic: handleMessage / handleCallback →
                         openAppRow → last row "📱 Open in app" of taskButtons / cardButtons / digestReply when appUrl is set
 src/lib/digest.ts       Pure digest (#17): buildDigest(data, now, lang, 'morning'|'evening'|'weekly') → {title, body, html, tasks},
                         digestDue(settings, state, now) (morning: from digest.time for 12 h; evening: from eveningTime; Sunday
-                        → weekly; once per local day), markDigestSent, parseDigestState. State lives in
+                        → weekly; once per local day), markDigestSent, parseDigestState, planDigestTimes (Android
+                        pre-scheduling, no state). State lives in
                         userData/hyperdo-state.json (main.ts checkDigest inside tick(); toast + telegram.sendDigest)
 electron/syncfolder.ts  FolderTransport (#16): <dir>/hyperdo-sync.json, token = mtimeMs, temp+rename write, fs.watch(dir);
                         no `electron` import (electron/syncfolder.test.ts runs it against a temp dir)
@@ -77,8 +81,10 @@ src/lib/tg-bridge.ts    Telegram WebApp SDK bridge (every call optional-chained)
                         --bg-3/--text/--text-2/--text-3/--sky/--tg-button/--tg-button-text/--danger, themeChanged),
                         pushBackButton (stack; Modal.tsx registers once per mount), tgHaptic
 src/lib/platform.web.ts        Browser/PWA adapter: localStorage + Web Notifications, runs collectDueReminders itself
-src/lib/platform.capacitor.ts  Android adapter: Capacitor Preferences + LocalNotifications scheduled 48 h ahead with action
-                        type HYPERDO_TASK (done/snooze30/focus → applyNotificationAction in stats.ts), share target
+src/lib/platform.capacitor.ts  Android adapter: Capacitor Preferences + LocalNotifications scheduled 48 h ahead (reminders,
+                        i-th built with nagCount + i, plus digests from DIGEST_ID_BASE; nag plan in Preferences
+                        `hyperdo-nag-plan`, counted at the next replan) with action type HYPERDO_TASK (done/snooze30/
+                        focus → applyNotificationAction in stats.ts), share target
                         (window event hyperdoShare → onShare), Google login via @capacitor/browser + appUrlOpen on
                         com.hyperdo.app:/oauth2redirect (secret-less settings.calendar.google.androidClientId)
 src/lib/platform.calendar.ts   Browser-side calendar bridge (CalendarSync in the page, state in localStorage)
@@ -100,7 +106,8 @@ src/lib/gcal.ts, ics.ts, calendar-links.ts   Google client, iCalendar parser/wri
 src/lib/reminder.ts     Reminder engine (pure): collectDueReminders, planReminderTimes, buildNotification, quiet hours, isMuted
                         (settings.mutedUntil — global mute, B5; both engines honour it),
                         activeFocusTaskId / focusSuppressedUntil (Hyper Focus suppression), escalation ladder
-                        (markNagged / resetNag / escalationLevel; Android cannot count nags, UI chips only)
+                        (markNagged / resetNag / escalationLevel); Android nag counting: NagPlan (planned times per task),
+                        deliveredNags (fired after task.updatedAt) + markNaggedBy, parseNagPlan
 src/lib/stats.ts        Pure: focus log (pushFocusEntry, spentMinByTask, focusMinutes), dailyDone (recordDone / recordReopen /
                         completeInData — use these wherever completeTask is called), streak, bestStreak, heatmap, topTags
 src/lib/sound.ts        Web Audio sound effects, no assets: SoundKind (complete | add | delete | undo | snooze | focus |
@@ -161,7 +168,7 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 
 Tests: `src/lib/*.test.ts` (calendar-links, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
 sync, syncengine, tasks, telegram-commands) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
-`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 21 files, 438 tests.
+`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 21 files, 447 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.
@@ -208,7 +215,8 @@ process, the browser build and Vitest.
   pushed/imported maps) in `hyperdo-calendar.json` next to it and it is **not** part of backups. Browser/Android keep
   the same two documents under the keys `hyperdo-data` / `hyperdo-calendar` (localStorage / Capacitor Preferences).
   `hyperdo-state.json` (Electron only) holds platform state that must survive restarts but never enter AppData or
-  backups: the digest timestamps (`lastDigestAt` / `lastEveningAt`).
+  backups: the digest timestamps (`lastDigestAt` / `lastEveningAt`). `hyperdo-telegram.json` (Electron only, not in
+  backups) holds the bot's message bookkeeping (live message per task, message → task map).
 - `commit()` in `electron/main.ts` calls `telegram.onDataChanged(prev, next)` after every save (any source). It only
   edits Telegram messages, never the data — keep it that way or completions loop back into saves.
 - Telegram callbacks run with `handling = taskId` so `onDataChanged` leaves that task's message to the callback path

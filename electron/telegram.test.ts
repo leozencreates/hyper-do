@@ -546,3 +546,102 @@ describe('Phase D: Mini App menu button and "Open in app" row', () => {
     await waitFor(() => h.api.of('setChatMenuButton').length >= 2, 'menu button after restart')
   })
 })
+
+describe('Message bookkeeping across restarts', () => {
+  /** A bot with an in-memory "file" for loadMessages / saveMessages; `fresh()` simulates an app restart. */
+  async function persisted(tasks: Task[]) {
+    api = fakeApi()
+    const base = await api.listen()
+    let data: AppData = normalizeData({
+      tasks,
+      settings: { ...DEFAULT_SETTINGS, telegram: { ...DEFAULT_SETTINGS.telegram, enabled: true, token: 'TOKEN', chatId: '42' } },
+    })
+    let file: string | null = null
+    const make = () => {
+      const b: TelegramBot = new TelegramBot(
+        {
+          getData: () => data,
+          mutate(fn) {
+            const prev = data
+            data = fn(data)
+            b.onDataChanged(prev, data)
+            b.sync()
+          },
+          loadMessages: () => file,
+          saveMessages: (json) => (file = json),
+        },
+        { apiBase: base, pollTimeoutSec: 0 },
+      )
+      bot = b
+      return b
+    }
+    return {
+      api,
+      make,
+      file: () => file,
+      data: () => data,
+      /** Change made while the bot is not running (the app was closed). */
+      offline: (fn: (d: AppData) => AppData) => (data = fn(data)),
+    }
+  }
+
+  it('live messages and the reply map are saved, restored after a restart and still edited when the task is finished', async () => {
+    const p = await persisted([task({ id: 'a', title: 'Pay bill' }), task({ id: 'b', title: 'Call mom' })])
+    const first = p.make()
+    first.sync()
+    await waitFor(() => first.status().state === 'running', 'running')
+    await first.remind(task({ id: 'a', title: 'Pay bill' }), 'Pay bill', 'due soon')
+    await first.remind(task({ id: 'b', title: 'Call mom' }), 'Call mom', 'today')
+    await pause(0)
+    expect(JSON.parse(p.file()!)).toMatchObject({ version: 1, byMessage: [[100, 'a'], [101, 'b']] })
+    first.stop()
+
+    // b is finished and a is deleted while the app is closed → the restart tidies both messages
+    p.offline((d) => ({ ...completeInData(d, 'b', NOW), tasks: completeInData(d, 'b', NOW).tasks.filter((t) => t.id !== 'a') }))
+    const second = p.make()
+    expect(second.liveMessage('a')).toBeNull() // read on start, not on construction
+    second.sync()
+    await waitFor(() => p.api.of('editMessageText').length >= 1 && p.api.of('editMessageReplyMarkup').length >= 1, 'reconcile')
+    expect(p.api.of('editMessageText')[0].body).toMatchObject({ chat_id: '42', message_id: 101, text: '<s>Call mom</s> ✓\ntoday' })
+    expect(p.api.of('editMessageReplyMarkup')[0].body).toEqual({ chat_id: '42', message_id: 100, reply_markup: { inline_keyboard: [] } })
+    expect(second.liveMessage('a')).toBeNull()
+    expect(second.liveMessage('b')).toBeNull()
+    await pause(0)
+    expect(JSON.parse(p.file()!).live).toEqual([])
+  })
+
+  it('an open task keeps its restored live message; a reply to the old reminder still resolves its task', async () => {
+    const p = await persisted([task({ id: 'a', title: 'Pay bill' })])
+    const first = p.make()
+    first.sync()
+    await waitFor(() => first.status().state === 'running', 'running')
+    await first.remind(task({ id: 'a', title: 'Pay bill' }), 'Pay bill', 'due soon')
+    first.stop()
+
+    const second = p.make()
+    second.sync()
+    await waitFor(() => second.status().state === 'running', 'running again')
+    expect(second.liveMessage('a')).toEqual({ chatId: '42', messageId: 100 })
+    expect(p.api.of('editMessageText')).toHaveLength(0) // still open: nothing to reconcile
+    // C4 after the restart: replying to the old reminder adds a subtask to task a
+    p.api.message(42, 'bring the receipt', { reply_to_message: { message_id: 100 } })
+    await waitFor(() => p.api.of('sendMessage').length >= 2, 'reply confirmation')
+    expect(p.data().tasks.find((t) => t.id === 'a')!.subtasks.map((x) => x.title)).toEqual(['bring the receipt'])
+  })
+
+  it('unreadable or partly broken files are ignored entry by entry', async () => {
+    const { parseMessages } = await import('./telegram')
+    expect(parseMessages('{nope').live.size).toBe(0)
+    expect(parseMessages(null).byMessage.size).toBe(0)
+    const r = parseMessages(
+      JSON.stringify({
+        version: 1,
+        live: [['a', { chatId: '42', messageId: 7, html: 'x', sentAt: 1, kind: 'card' }], ['b', { chatId: 42 }], 'junk'],
+        byMessage: [[7, 'a'], ['8', 'b'], [9]],
+      }),
+    )
+    expect([...r.live.keys()]).toEqual(['a'])
+    expect(r.live.get('a')).toMatchObject({ kind: 'card', messageId: 7 })
+    expect([...r.byMessage]).toEqual([[7, 'a']])
+  })
+})

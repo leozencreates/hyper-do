@@ -108,6 +108,28 @@ export function digestDue(settings: Pick<Settings, 'digest'>, state: DigestState
   return null
 }
 
+/**
+ * Android (#17): the digests to pre-schedule as local notifications in `(fromMs, fromMs + horizonMs]`, oldest first.
+ * Morning at `digest.time`, evening at `eveningTime` (Sundays: the weekly review). No grace window and no state
+ * file: the plan is rebuilt from `now` on every save / resume, so a time already passed is simply not planned again.
+ * The caller renders each with `buildDigest(data, at, …)`, i.e. as of its own fire time.
+ */
+export function planDigestTimes(settings: Pick<Settings, 'digest'>, fromMs: number, horizonMs: number): { at: number; kind: DigestKind }[] {
+  const d = settings.digest
+  const out: { at: number; kind: DigestKind }[] = []
+  if (!d.enabled && !d.evening) return out
+  const end = fromMs + horizonMs
+  const at = (day: Date, hhmm: string) => {
+    const m = parseHHMM(hhmm)
+    return new Date(day.getFullYear(), day.getMonth(), day.getDate(), Math.floor(m / 60), m % 60).getTime()
+  }
+  for (let day = new Date(startOfDay(fromMs)); day.getTime() <= end; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) {
+    if (d.enabled) out.push({ at: at(day, d.time), kind: 'morning' })
+    if (d.evening) out.push({ at: at(day, d.eveningTime), kind: day.getDay() === 0 ? 'weekly' : 'evening' })
+  }
+  return out.filter((p) => p.at > fromMs && p.at <= end).sort((a, b) => a.at - b.at)
+}
+
 /** State after a digest of `kind` went out at `nowMs`. */
 export function markDigestSent(state: DigestState, kind: DigestKind, nowMs: number): DigestState {
   return kind === 'morning' ? { ...state, lastDigestAt: nowMs } : { ...state, lastEveningAt: nowMs }

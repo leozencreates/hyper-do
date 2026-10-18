@@ -19,16 +19,14 @@ collected in `docs/MANUAL-TEST-2026-10.md` (Turkish, by platform, riskiest first
 
 ## Known gaps (left out deliberately or still unverified)
 
-- **Android digest**: `settings.digest` exists and is normalised, but `platform.capacitor.ts` does not schedule the
-  morning digest / evening review as a daily local notification (#17). The Settings toggles are hidden on Android.
-- **Android nag counting**: notifications are pre-scheduled, so `nagCount` never increments on Android; the 👀 chip
-  only shows counts synced from another device, and the escalation line / popup never trigger there (#6).
+- ~~**Android digest**~~ and ~~**Android nag counting**~~: closed on 19 Oct 2026, see
+  `docs/2026-10-19-known-gaps-design.md`. Still open there: escalation level 2 (popup) has no Android equivalent, and
+  digests / reminders stop after 48 hours without opening the app (planning horizon).
 - **Telegram is desktop-only** (Electron main process hosts the bot and the Mini App server); one linked chat, long
   polling only, no voice messages (spec non-goals). The Mini App (Phase D of
   `2026-10-13-telegram-bot-design.md`) needs the PC running and a tunnel (Cloudflare quick tunnel = a new random
   address on every restart; stable addresses need "My own address"). The live-message map (`live` / `byMessage`)
-  lives in memory: after a restart old messages keep their buttons but are no longer edited when a task is finished
-  on the desktop.
+  survives restarts since 19 Oct 2026 (`userData/hyperdo-telegram.json`).
 - **Google push of recurring tasks**: `calsync.ts` mirrors every open task as a single 30-minute event (no RRULE);
   the next occurrence appears only after the current one is completed. `.ics` export carries an RRULE, except for
   "repeat after completion" rules, which cannot be expressed in a calendar.
@@ -272,3 +270,8 @@ General rules for every item:
   Settings toggle; pure gate `soundAllowed` — a running Hyper Focus work round silences every sound, its own closing
   chime included (the chime ending a break plays). `useSounds` hook, `useTaskActions.onSound`,
   `useCelebration(enabled, chime)`, `useHyperFocus({ play })`, mini window wired too.
+- [x] **Three known gaps closed** (19 Oct 2026, spec `docs/2026-10-19-known-gaps-design.md`): Android morning digest /
+  evening review as pre-scheduled local notifications (`planDigestTimes`, toggles visible on Android); Android nag
+  counting from the previous plan (`deliveredNags` / `markNaggedBy`, plan in Preferences `hyperdo-nag-plan`, escalation
+  line on planned notifications); Telegram `live` / `byMessage` persisted in `userData/hyperdo-telegram.json` with a
+  `reconcile()` pass on start for tasks finished while the app was closed.
