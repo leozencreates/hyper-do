@@ -198,7 +198,7 @@ process, the browser build and Vitest.
 | `npm run build`       | `tsc --noEmit` + Vite build for Electron → `dist/`, `dist-electron/`             |
 | `npm run build:web`   | `tsc --noEmit` + PWA build → `dist-web/` (index.html + tg.html, the Mini App entry)  |
 | `npm test`            | `vitest run` (`vitest.config.ts`, node env, `src/**/*.test.ts` + `electron/**/*.test.ts`) |
-| `npm run dist`        | `build` + `build:web` + Windows NSIS installer → `%LOCALAPPDATA%\hyperdo-release\` (not the repo folder) |
+| `npm run dist`        | `build` + `build:web` + Windows NSIS installer → `%LOCALAPPDATA%\hyperdo-release\`, then `scripts/copy-release.mjs` copies the setup .exe into the repo's `release/` |
 | `npm run android:apk` | `build:web` + `cap sync` + Gradle debug APK; uses the portable JDK under `.tools` |
 
 ## Conventions

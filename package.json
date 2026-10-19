@@ -13,7 +13,7 @@
     "build:web": "tsc --noEmit && vite build --config vite.web.config.ts",
     "preview:web": "vite preview --config vite.web.config.ts",
     "test": "vitest run",
-    "dist": "npm run build && npm run build:web && electron-builder --win --config.directories.output=%LOCALAPPDATA%/hyperdo-release",
+    "dist": "npm run build && npm run build:web && electron-builder --win --config.directories.output=%LOCALAPPDATA%/hyperdo-release && node scripts/copy-release.mjs",
     "dist:mac": "npm run build && npm run build:web && electron-builder --mac",
     "android:sync": "npm run build:web && npx cap sync android",
     "android:open": "npx cap open android",
