@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ENERGY_ICON, type Task } from '../lib/types'
 import { formatDue, formatMinutes, isOverdue, recurrenceLabel, recurrenceText, relativeMinutes } from '../lib/dates'
 import { isStuck, startBy } from '../lib/tasks'
+import { isRunnable } from '../lib/routine'
 import { useLang, useT } from '../lib/useT'
 import AddToCalendar from './AddToCalendar'
 
@@ -30,10 +31,12 @@ interface Props {
   onPostpone(): void
   /** 😴 ×N chip (snoozed `SNOOZE_NUDGE`+ times): opens the "stuck?" dialog. Absent = chip not clickable. */
   onStuck?(): void
+  /** ▶ Run (routines with steps): opens the step-by-step runner. */
+  onRun?(): void
   drag?: DragHandlers
 }
 
-export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, onStuck, drag }: Props) {
+export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, onStuck, onRun, drag }: Props) {
   const t = useT()
   const lang = useLang()
   const [open, setOpen] = useState(false)
@@ -88,6 +91,11 @@ export default function TaskItem({ task, highlighted, spentMin = 0, escalation =
         <div className="task-title-row">
           <span className="task-title">{task.title}</span>
           {task.focused && <span className="chip focus">🎯</span>}
+          {task.routine && (
+            <span className="chip routine" title={t('rt_chip_title')}>
+              🔁
+            </span>
+          )}
           {task.status !== 'todo' && !done && <span className="chip">{t(`col_${task.status}` as const)}</span>}
           {task.recurrence !== 'none' && (
             <span className="chip rec" title={recurrenceText(task.recurrence, task.recurrenceRule, lang)}>
@@ -199,6 +207,11 @@ export default function TaskItem({ task, highlighted, spentMin = 0, escalation =
       </div>
 
       <div className="task-actions">
+        {onRun && isRunnable(task) && (
+          <button className="mini rt-run" title={t('rt_run_title')} onClick={onRun}>
+            {t('rt_run')}
+          </button>
+        )}
         {!done && (
           <button className="icon" title={task.focused ? t('focus_off') : t('focus_on')} onClick={onFocus}>
             🎯

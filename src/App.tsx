@@ -26,6 +26,8 @@ import StatsModal from './components/StatsModal'
 import BrainDump from './components/BrainDump'
 import WhatNow from './components/WhatNow'
 import Stuck from './components/Stuck'
+import RoutineRunner from './components/RoutineRunner'
+import { isRunnable, routineFromTemplate, type RoutineTemplate } from './lib/routine'
 import Board from './components/Board'
 import CalendarStrip from './components/CalendarStrip'
 import ConnectionPanel from './components/ConnectionPanel'
@@ -123,6 +125,9 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const [showNext, setShowNext] = useState(false)
   /** 😴 "Stuck?" dialog for this task id. */
   const [stuckId, setStuckId] = useState<string | null>(null)
+  /** 🔁 Routine runner for this task id; `rtMenu` = the "+ Routine" template menu in the sidebar. */
+  const [runId, setRunId] = useState<string | null>(null)
+  const [rtMenu, setRtMenu] = useState(false)
   const [highlight, setHighlight] = useState<string | null>(null)
   /** "Give me an easy one": the suggested task id, or null for "nothing open". */
   const [easy, setEasy] = useState<{ id: string | null } | null>(null)
@@ -245,6 +250,13 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const overdueCount = tasks.filter((x) => x.completedAt === null && isOverdue(x.dueAt, now)).length
   const doneToday = tasks.filter((x) => x.completedAt !== null && isToday(x.completedAt, now)).length
   const doneCount = tasks.length - openCount
+  const runTask = runId ? (tasks.find((x) => x.id === runId && x.completedAt === null) ?? null) : null
+  const routines = tasks.filter((x) => x.routine && x.completedAt === null)
+  /** "+ Routine": the editor opens prefilled (template steps in the current language); nothing is saved before Save. */
+  const newRoutine = (kind: RoutineTemplate | null) => {
+    setRtMenu(false)
+    setEditing(newTask(kind ? { ...routineFromTemplate(kind, settings.language, Date.now()), status: 'todo' } : { routine: true, recurrence: 'daily', status: 'todo' }, settings))
+  }
   const stuckTask = stuckId ? (tasks.find((x) => x.id === stuckId && x.completedAt === null) ?? null) : null
   const easyTask = easy?.id ? (tasks.find((x) => x.id === easy.id && x.completedAt === null) ?? null) : null
 
@@ -274,7 +286,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   }, [easy])
 
   // Klavye kısayolları (bir alan yazılırken ya da pencere açıkken devre dışı)
-  const modalOpen = !!editing || showSettings || showStats || showBrain || showNext || stuckId !== null
+  const modalOpen = !!editing || showSettings || showStats || showBrain || showNext || stuckId !== null || runId !== null
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (modalOpen || e.ctrlKey || e.metaKey || e.altKey) return
@@ -346,6 +358,39 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
             </button>
           ))}
         </nav>
+        <div className="tags-block rt-block">
+          <div className="section-title rt-head">
+            <span>{t('rt_section')}</span>
+            <button className="ghost small" title={t('rt_new_title')} aria-expanded={rtMenu} onClick={() => setRtMenu((v) => !v)}>
+              {t('rt_new')}
+            </button>
+          </div>
+          {rtMenu && (
+            <div className="rt-menu">
+              <button className="tagbtn" onClick={() => newRoutine('morning')}>
+                🌅 {t('rt_morning')}
+              </button>
+              <button className="tagbtn" onClick={() => newRoutine('evening')}>
+                🌙 {t('rt_evening')}
+              </button>
+              <button className="tagbtn" onClick={() => newRoutine(null)}>
+                ＋ {t('rt_empty')}
+              </button>
+            </div>
+          )}
+          {routines.map((r) => (
+            <div key={r.id} className="rt-item">
+              <button className="tagbtn rt-name" title={r.title} onClick={() => setEditing(r)}>
+                🔁 {r.title}
+              </button>
+              {isRunnable(r) && (
+                <button className="mini rt-run" title={t('rt_run_title')} onClick={() => setRunId(r.id)}>
+                  ▶
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
         {allTags.length > 0 && (
           <div className="tags-block">
             <div className="section-title">{t('tags')}</div>
@@ -572,6 +617,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 onDuplicate={() => actions.duplicate(x.id)}
                 onPostpone={() => actions.postpone(x)}
                 onStuck={() => setStuckId(x.id)}
+                onRun={() => setRunId(x.id)}
                 drag={
                   view !== 'done' && !IS_TG
                     ? {
@@ -665,6 +711,17 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
         />
       )}
 
+      {runTask && (
+        <RoutineRunner
+          task={runTask}
+          onSteps={(subtasks) => actions.update(runTask.id, { subtasks, nagCount: 0 })}
+          onComplete={() => {
+            actions.complete(runTask.id)
+            setRunId(null)
+          }}
+          onClose={() => setRunId(null)}
+        />
+      )}
       {stuckTask && (
         <Stuck
           task={stuckTask}

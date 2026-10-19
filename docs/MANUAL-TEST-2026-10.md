@@ -223,6 +223,20 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 2. Saat 16:15'i geçince (veya tahmini 6 saat yap) → turuncu **▶ Şimdi başla · 45 dk**. 🧭 Şimdi ne? bu görevi
    "▶ Başlama zamanı geldi" gerekçesiyle öne alır. Son tarih geçince çip kaybolur (artık "gecikti").
 
+### A17. 🔁 Rutinler  (📁 `src/lib/routine.ts`; `src/components/RoutineRunner.tsx`; `src/App.tsx` → `rt-block`, `runId`)
+
+1. Kenar çubuğu → **Rutinler** → **+ Rutin** → 🌅 Sabah rutini → düzenleyici dolu açılır: başlık "Sabah rutini",
+   7 adım (alt görev), "Her gün", yarın 07:30 (şimdi 07:30'dan önceyse bugün), **Rutin** anahtarı açık. Kaydet.
+2. Kenar çubuğunda "🔁 Sabah rutini ▶"; satırda 🔁 çipi ve **▶ Başlat** düğmesi.
+3. ▶ → büyük harflerle tek adım, "Adım 1 / 7", ilerleme çubuğu, "Bu adımda 0:05" sayacı. **✓ Bitti** (veya Enter) →
+   sonraki adım, sayaç sıfırlanır, satırdaki alt görev işaretlenir. **⏭ Atla** → adım işaretsiz kalır. **↶ Geri** →
+   son işlem geri alınır.
+4. Pencereyi kapat, tekrar ▶ → ilk işaretsiz adımdan devam eder.
+5. Son adımı **Bitti** → kutlama, görev bitti, 🔥 seri sayılır, yarın için yeni kopya (tüm adımlar işaretsiz). Atlanan
+   adım varsa sonda "5/7 adım bitti, 2 adım atlandı" → **Yine de bitir** (tamamlar) / **Sonra devam** (kapatır).
+6. 🌙 Akşam rutini (21:30) ve **Boş rutin** (adım yok → ▶ görünmez, adım ekleyince görünür). Herhangi bir görevi
+   düzenleyicide **Rutin** yapınca da ▶ gelir. Mini App'te kenar çubuğu yok; satırdaki ▶ çalışır.
+
 ### A13. Ses efektleri ve susturma  (📁 `src/lib/sound.ts` → `soundAllowed`; `src/lib/useSounds.ts`; `src/App.tsx` → `snd-btn`; `src/lib/useTaskActions.ts` → `onSound`)
 
 1. Hızlı ekleme ile görev ekle → tek kısa "pop". Görevi sil → alçak, inen iki nota; **Geri al** → yükselen iki nota.

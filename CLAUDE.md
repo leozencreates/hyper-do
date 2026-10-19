@@ -58,6 +58,10 @@ src/lib/telegram-commands.ts  Pure bot logic: handleMessage / handleCallback →
                         escapeHtml (every user string; callback toasts stay plain), chunkText(3800), /start <pairCode>;
                         D4: TgInlineButton = callback_data | web_app, miniAppLink(url, taskId?) = <url>/tg.html[?task=],
                         openAppRow → last row "📱 Open in app" of taskButtons / cardButtons / digestReply when appUrl is set
+src/lib/routine.ts      Routines (spec 2026-10-20-routines-design.md): a routine = task with `routine: true`, subtasks = steps.
+                        ROUTINE_TEMPLATES (morning 07:30 / evening 21:30, step keys rt_*), routineFromTemplate(kind, lang, now),
+                        nextTimeOfDay, isRunnable; run state startRun / advance(done | skip | back) / currentStep /
+                        runProgress / runFinished (pure, used by RoutineRunner.tsx)
 src/lib/whatnow.ts      Pure "What now?" ranking (spec 2026-10-19-what-now-design.md): isNextCandidate (open, not snoozed, not
                         waiting), rankNext(tasks, {energy, minutes}, now) → NextPick {task, score, reasons} best first,
                         suggestNext(…, index) wraps, typed NextReason + reasonText(reason, lang). Used by WhatNow.tsx and
@@ -154,6 +158,7 @@ src/components/         Board (Kanban DnD), QuickAdd (textarea + live preview + 
                         hook + bar; `driver` option), StatsModal, Celebration (useCelebration: chime + confetti),
                         WhatNow (🧭 dialog: energy / time chips, one pick + reasons, Focus / Hyper Focus / Open / Another),
                         Stuck (😴 "stuck on this?": split / real date / do it now / let it go / keep going),
+                        RoutineRunner (one step at a time: Done / Skip / Back, stopwatch, summary),
                         SettingsPanel (+ DesktopSection, TelegramSection (+ MiniAppBlock: mode select, status/URL/copy/port/
                         progress, manual URL with https validation, Restart tunnel), AutoBackupSection, AboutSection,
                         BackupSection), CalendarSettings, CalendarStrip (events above Today/Week), AddToCalendar (per-task
@@ -176,8 +181,8 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 ```
 
 Tests: `src/lib/*.test.ts` (calendar-links, calsync, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
-sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
-`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 23 files, 477 tests.
+routine, sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
+`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 24 files, 486 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.

@@ -50,6 +50,7 @@ describe('normalizeTask', () => {
       estimateMin: null,
       energy: null,
       snoozeCount: 0,
+      routine: false,
       updatedAt: 123,
     })
     expect('calendarEventId' in t).toBe(false)

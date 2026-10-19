@@ -59,6 +59,7 @@ describe('parseAppData: old-version documents', () => {
       estimateMin: null,
       energy: null,
       snoozeCount: 0,
+      routine: false,
       updatedAt: 1000,
     })
     expect(d.tasks[1]).toMatchObject({ id: 'b', priority: 'high', dueAt: 5000, status: 'doing', order: 7 })

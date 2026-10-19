@@ -291,3 +291,7 @@ General rules for every item:
   "Stuck on this?" dialog (split / real date / do it now / let it go / keep going) and reminders carry a nudge line;
   `startBy` chip "▶ Start: 16:15" / "▶ Start now" (+20 in What-now); Android "open the app once" notification at
   +47 h.
+- [x] **🔁 Routines** (20 Oct 2026, spec `docs/2026-10-20-routines-design.md`): `Task.routine` (subtasks = steps),
+  morning / evening templates in TR/EN/RU (`routine.ts`), sidebar block "Routines" (+ Routine, ▶), editor toggle, row
+  🔁 chip + ▶ Run, step-by-step runner `RoutineRunner.tsx` (✓ Done / ⏭ Skip / ↶ Back, stopwatch per step, summary;
+  completing the last step completes the task → streak, next day's copy with fresh steps).

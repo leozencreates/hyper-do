@@ -641,3 +641,18 @@ html.tg body { background: var(--bg); background-attachment: scroll; overscroll-
 button.stuck-opt:not(.primary):hover { border-color: var(--text-3); }
 .stuck-dates .row { display: flex; flex-wrap: wrap; gap: 6px; }
 .stuck-opt.danger-soft { color: var(--danger); }
+
+/* 🔁 Routines (docs/2026-10-20-routines-design.md) */
+.rt-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.rt-head .ghost.small { text-transform: none; letter-spacing: 0; padding: 2px 8px; font-size: 12px; }
+.rt-menu { display: flex; flex-direction: column; gap: 2px; margin: 0 0 4px 8px; padding-left: 6px; border-left: 2px solid var(--border); }
+.rt-item { display: flex; align-items: center; gap: 4px; }
+.rt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini.rt-run { color: var(--teal); font-weight: 700; }
+.chip.routine { background: color-mix(in srgb, var(--teal) 16%, transparent); }
+.rt-progress { height: 6px; border-radius: 999px; background: var(--bg-3); overflow: hidden; }
+.rt-progress span { display: block; height: 100%; background: var(--grad-primary); transition: width .3s; }
+.rt-step { font-size: clamp(24px, 5vw, 34px); font-weight: 800; line-height: 1.2; text-align: center; padding: 18px 4px; word-break: break-word; }
+.rt-clock { text-align: center; font-variant-numeric: tabular-nums; }
+.rt-actions { justify-content: center; flex-wrap: wrap; }
+.rt-summary { text-align: center; font-size: 16px; margin: 8px 0; }

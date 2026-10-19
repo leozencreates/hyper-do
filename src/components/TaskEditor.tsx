@@ -4,6 +4,7 @@ import { formatMinutes, fromLocalInput, recurrenceUnitName, toLocalInput, weekda
 import { uid } from '../lib/tasks'
 import { useLang, useT } from '../lib/useT'
 import Modal from './Modal'
+import Toggle from './Toggle'
 
 interface Props {
   task: Task
@@ -223,6 +224,8 @@ export default function TaskEditor({ task, allTags, onSave, onCancel }: Props) {
           </datalist>
         </div>
       </div>
+
+      <Toggle checked={x.routine} onChange={(v) => set('routine', v)} label={t('rt_toggle')} desc={t('rt_toggle_d')} />
 
       <div className="field">
         <span>{t('subtasks')}</span>

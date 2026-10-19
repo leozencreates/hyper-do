@@ -35,6 +35,7 @@ export function newTask(partial: Partial<Task>, settings: Settings): Task {
     estimateMin: null,
     energy: null,
     snoozeCount: 0,
+    routine: false,
     updatedAt: now,
     ...partial,
   }
@@ -166,6 +167,7 @@ export function normalizeTask(t: Partial<Task> & { id: string }): Task {
     estimateMin: typeof t.estimateMin === 'number' && t.estimateMin > 0 ? Math.round(t.estimateMin) : null,
     energy: ENERGIES.includes(t.energy as Energy) ? (t.energy as Energy) : null,
     snoozeCount: typeof t.snoozeCount === 'number' && t.snoozeCount > 0 ? Math.floor(t.snoozeCount) : 0,
+    routine: t.routine === true,
     updatedAt: typeof t.updatedAt === 'number' && Number.isFinite(t.updatedAt) ? t.updatedAt : createdAt,
   }
 }
