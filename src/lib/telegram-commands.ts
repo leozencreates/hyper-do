@@ -20,7 +20,7 @@
  */
 import type { AppData, Priority, Settings, Task } from './types'
 import { LOCALE, translate, type Key, type Lang } from './i18n'
-import { matchesQuery, openTasksSorted, priorityIcon, taskFromQuickAdd, uid } from './tasks'
+import { matchesQuery, openTasksSorted, priorityIcon, snoozeTask, taskFromQuickAdd, uid } from './tasks'
 import { parseQuickAdd } from './parse'
 import { addDays, dayKey, endOfDay, formatDue, formatMinutes, isThisWeek, isToday, recurrenceText, startOfDay } from './dates'
 import { escalationLevel, resetNag } from './reminder'
@@ -500,7 +500,7 @@ function byIndex(arg: string, ctx: TgContext): Task | undefined {
 
 /** Snooze / focus from the bot are reactions: the escalation ladder starts over for that task. */
 export function snoozeIn(d: AppData, id: string, until: number): AppData {
-  return { ...d, tasks: d.tasks.map((x) => (x.id === id ? resetNag({ ...x, snoozedUntil: until }) : x)) }
+  return { ...d, tasks: d.tasks.map((x) => (x.id === id ? snoozeTask(x, { snoozedUntil: until }) : x)) }
 }
 
 export function focusIn(d: AppData, id: string): AppData {

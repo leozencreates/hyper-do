@@ -31,6 +31,9 @@ const HORIZON_MS = 48 * 3_600_000 // 48 saat ileriye planla
 const TEST_ID = 999_999
 /** Digest notification ids (above every task block: `hashId` stays below 2 000 000). */
 const DIGEST_ID_BASE = 3_000_000
+/** "Open the app once" notification near the end of the planning horizon (only fires when nothing replanned for 47 h). */
+const KEEPALIVE_ID = 3_100_000
+const KEEPALIVE_AFTER_MS = 47 * 3_600_000
 /**
  * Escalation level 2 on Android (the desktop opens the mini window): reminders go to this high-importance channel
  * (heads-up, vibration, lights). Its sound and importance stay under the user's control in the system settings.
@@ -248,6 +251,11 @@ export function createCapacitorApi(): HyperDoApi {
         const d = buildDigest(data, p.at, data.settings.language, p.kind)
         list.push({ id: DIGEST_ID_BASE + i, title: d.title, body: d.body, largeBody: d.body, schedule: { at: new Date(p.at), allowWhileIdle: true }, extra: { digest: p.kind }, autoCancel: true })
       })
+      // keep-alive: every replan moves it 47 h ahead, so it only fires when the app was not opened for that long
+      if (list.length) {
+        const lang = data.settings.language
+        list.push({ id: KEEPALIVE_ID, title: translate(lang, 'notif_keepalive_title'), body: translate(lang, 'notif_keepalive_body'), schedule: { at: new Date(now + KEEPALIVE_AFTER_MS), allowWhileIdle: true }, extra: { keepalive: true }, autoCancel: true })
+      }
       // the plan only counts once it is really scheduled (a failed schedule must not turn into phantom nags)
       if (list.length) await LocalNotifications.schedule({ notifications: list })
       saveNagPlan(plan)

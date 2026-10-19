@@ -3,7 +3,7 @@
  * Electron ana süreci (Telegram botu) ve arayüz aynı mantığı kullanır.
  */
 import { DEFAULT_RECURRENCE_RULE, ENERGIES, RECURRENCES, RECURRENCE_UNITS, STATUSES, type Energy, type Priority, type Recurrence, type RecurrenceRule, type RecurrenceUnit, type Settings, type SortMode, type Status, type Task } from './types'
-import { nextOccurrence } from './dates'
+import { isEndOfDay, nextOccurrence } from './dates'
 import { parseQuickAdd } from './parse'
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
@@ -34,6 +34,7 @@ export function newTask(partial: Partial<Task>, settings: Settings): Task {
     nagCount: 0,
     estimateMin: null,
     energy: null,
+    snoozeCount: 0,
     updatedAt: now,
     ...partial,
   }
@@ -164,6 +165,7 @@ export function normalizeTask(t: Partial<Task> & { id: string }): Task {
     nagCount: typeof t.nagCount === 'number' && t.nagCount > 0 ? Math.floor(t.nagCount) : 0,
     estimateMin: typeof t.estimateMin === 'number' && t.estimateMin > 0 ? Math.round(t.estimateMin) : null,
     energy: ENERGIES.includes(t.energy as Energy) ? (t.energy as Energy) : null,
+    snoozeCount: typeof t.snoozeCount === 'number' && t.snoozeCount > 0 ? Math.floor(t.snoozeCount) : 0,
     updatedAt: typeof t.updatedAt === 'number' && Number.isFinite(t.updatedAt) ? t.updatedAt : createdAt,
   }
 }
@@ -173,7 +175,7 @@ export function completeTask(tasks: Task[], id: string): Task[] {
   const t = tasks.find((x) => x.id === id)
   if (!t) return tasks
   const now = Date.now()
-  const done: Task = touchTask({ ...t, completedAt: now, focused: false, snoozedUntil: null, nagCount: 0 }, now)
+  const done: Task = touchTask({ ...t, completedAt: now, focused: false, snoozedUntil: null, nagCount: 0, snoozeCount: 0 }, now)
   const out = tasks.map((x) => (x.id === id ? done : x))
   if (t.recurrence !== 'none') {
     const base = t.dueAt ?? now
@@ -189,10 +191,56 @@ export function completeTask(tasks: Task[], id: string): Task[] {
       order: now,
       createdAt: now,
       nagCount: 0,
+      snoozeCount: 0,
       updatedAt: now,
     })
   }
   return out
+}
+
+/** From this many snoozes / postpones on, the row offers the "stuck?" dialog and reminders carry a nudge line. */
+export const SNOOZE_NUDGE = 3
+
+/**
+ * The one way to snooze or postpone a task (every platform): applies `snoozedUntil` and/or `dueAt`, resets the nag
+ * ladder (a snooze is a reaction), counts the snooze and bumps `updatedAt`.
+ */
+export function snoozeTask(task: Task, patch: Partial<Pick<Task, 'snoozedUntil' | 'dueAt'>>, nowMs = Date.now()): Task {
+  return touchTask({ ...task, ...patch, nagCount: 0, snoozeCount: task.snoozeCount + 1 }, nowMs)
+}
+
+/** True once a task was snoozed / postponed `SNOOZE_NUDGE` times without being finished or re-planned. */
+export const isStuck = (task: Pick<Task, 'snoozeCount' | 'completedAt'>) => task.completedAt === null && task.snoozeCount >= SNOOZE_NUDGE
+
+/**
+ * "Give it a real date" in the stuck dialog: tomorrow and next Monday (a Monday today → in a week). Timed tasks keep
+ * their time of day; undated and all-day tasks get 09:00.
+ */
+export function stuckDates(task: Pick<Task, 'dueAt'>, nowMs = Date.now()): { tomorrow: number; nextWeek: number } {
+  const timed = task.dueAt !== null && !isEndOfDay(task.dueAt)
+  const ref = timed ? new Date(task.dueAt!) : null
+  const h = ref ? ref.getHours() : 9
+  const m = ref ? ref.getMinutes() : 0
+  const now = new Date(nowMs)
+  const at = (days: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, h, m).getTime()
+  const toMonday = ((8 - now.getDay()) % 7) || 7
+  return { tomorrow: at(1), nextWeek: at(toMonday) }
+}
+
+/** The start time is shown at most this far ahead. */
+const START_BY_AHEAD_MS = 12 * 3_600_000
+
+/**
+ * "Start by" (time blindness): open task with a timed due date still ahead and an estimate → `at = dueAt − estimate`,
+ * `late` once that moment has passed. Null for all-day / undated / overdue tasks, without an estimate, or when the
+ * start is more than 12 h away.
+ */
+export function startBy(task: Task, nowMs = Date.now()): { at: number; late: boolean } | null {
+  if (task.completedAt !== null || task.dueAt === null || task.estimateMin === null) return null
+  if (task.dueAt <= nowMs || isEndOfDay(task.dueAt)) return null
+  const at = task.dueAt - task.estimateMin * 60_000
+  if (at - nowMs > START_BY_AHEAD_MS) return null
+  return { at, late: nowMs >= at }
 }
 
 /**
@@ -231,6 +279,7 @@ export function duplicateTask(tasks: Task[], id: string, suffix: string): Task[]
     order: t.order + 0.5,
     createdAt: now,
     nagCount: 0,
+    snoozeCount: 0,
     updatedAt: now,
   }
   const out = [...tasks]

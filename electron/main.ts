@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { AppData, BackupInfo, MiniAppMode, MiniAppStatus, Task } from '../src/lib/types'
 import { activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, markNagged, resetNag, syncCounters } from '../src/lib/reminder'
-import { bumpChanged, taskFromQuickAdd, touchTask } from '../src/lib/tasks'
+import { bumpChanged, snoozeTask, taskFromQuickAdd, touchTask } from '../src/lib/tasks'
 import { SyncEngine } from '../src/lib/syncengine'
 import { WebDavTransport } from '../src/lib/synctransport'
 import { FolderTransport } from './syncfolder'
@@ -631,7 +631,7 @@ function handleDeepLink(url: string) {
   } else if (link.action === 'snooze') {
     const now = Date.now()
     const until = now + (link.minutes ?? 30) * 60_000
-    commit({ ...data, tasks: data.tasks.map((x) => (x.id === task.id ? touchTask(resetNag({ ...x, snoozedUntil: until }, now), now) : x)) })
+    commit({ ...data, tasks: data.tasks.map((x) => (x.id === task.id ? snoozeTask(x, { snoozedUntil: until }, now) : x)) })
     afterSave()
   } else {
     openTask(task.id)

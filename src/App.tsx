@@ -25,6 +25,7 @@ import MiniView from './components/MiniView'
 import StatsModal from './components/StatsModal'
 import BrainDump from './components/BrainDump'
 import WhatNow from './components/WhatNow'
+import Stuck from './components/Stuck'
 import Board from './components/Board'
 import CalendarStrip from './components/CalendarStrip'
 import ConnectionPanel from './components/ConnectionPanel'
@@ -120,6 +121,8 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const [showBrain, setShowBrain] = useState(false)
   /** 🧭 What now? dialog. */
   const [showNext, setShowNext] = useState(false)
+  /** 😴 "Stuck?" dialog for this task id. */
+  const [stuckId, setStuckId] = useState<string | null>(null)
   const [highlight, setHighlight] = useState<string | null>(null)
   /** "Give me an easy one": the suggested task id, or null for "nothing open". */
   const [easy, setEasy] = useState<{ id: string | null } | null>(null)
@@ -242,6 +245,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const overdueCount = tasks.filter((x) => x.completedAt === null && isOverdue(x.dueAt, now)).length
   const doneToday = tasks.filter((x) => x.completedAt !== null && isToday(x.completedAt, now)).length
   const doneCount = tasks.length - openCount
+  const stuckTask = stuckId ? (tasks.find((x) => x.id === stuckId && x.completedAt === null) ?? null) : null
   const easyTask = easy?.id ? (tasks.find((x) => x.id === easy.id && x.completedAt === null) ?? null) : null
 
   /** 🎲 Easy one (#10): suggest a low-effort open task, bring it into view and highlight it. */
@@ -270,7 +274,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   }, [easy])
 
   // Klavye kısayolları (bir alan yazılırken ya da pencere açıkken devre dışı)
-  const modalOpen = !!editing || showSettings || showStats || showBrain || showNext
+  const modalOpen = !!editing || showSettings || showStats || showBrain || showNext || stuckId !== null
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (modalOpen || e.ctrlKey || e.metaKey || e.altKey) return
@@ -567,6 +571,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 onDelete={() => actions.remove(x.id)}
                 onDuplicate={() => actions.duplicate(x.id)}
                 onPostpone={() => actions.postpone(x)}
+                onStuck={() => setStuckId(x.id)}
                 drag={
                   view !== 'done' && !IS_TG
                     ? {
@@ -660,6 +665,36 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
         />
       )}
 
+      {stuckTask && (
+        <Stuck
+          task={stuckTask}
+          now={now}
+          onSplit={() => {
+            actions.unstick(stuckTask.id)
+            setStuckId(null)
+            setEditing({ ...stuckTask, snoozeCount: 0 })
+          }}
+          onDate={(dueAt) => {
+            actions.unstick(stuckTask.id, { dueAt, snoozedUntil: null })
+            setStuckId(null)
+          }}
+          onNow={() => {
+            actions.unstick(stuckTask.id, { snoozedUntil: null })
+            actions.setFocus(stuckTask.id, true)
+            if (!hf.session && !IS_TG) hf.start(stuckTask.id)
+            setStuckId(null)
+          }}
+          onDrop={() => {
+            actions.remove(stuckTask.id)
+            setStuckId(null)
+          }}
+          onKeep={() => {
+            actions.unstick(stuckTask.id)
+            setStuckId(null)
+          }}
+          onClose={() => setStuckId(null)}
+        />
+      )}
       {showNext && (
         <WhatNow
           tasks={tasks}

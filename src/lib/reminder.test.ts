@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { translate } from './i18n'
 import { FOCUS_NO_TASK, activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, focusSuppressedUntil, inQuietHours, deliveredNags, isMuted, markNagged, markNaggedBy, parseNagPlan, planReminderTimes, plannedEscalation, resetNag, syncCounters } from './reminder'
 import { normalizeTask } from './tasks'
 import { DEFAULT_SETTINGS, type HfSession, type Settings, type Task } from './types'
@@ -397,5 +398,13 @@ describe('plannedEscalation (Android level per pre-scheduled reminder)', () => {
   })
   it('a disabled ladder never escalates', () => {
     expect(plannedEscalation(task({ nagCount: 50 }), 10, settings({ escalation: { enabled: false, telegramAfter: 3, popupAfter: 5 } }))).toBe(0)
+  })
+})
+
+describe('buildNotification: stuck nudge', () => {
+  it('adds the snooze line from SNOOZE_NUDGE on, before the nag line', () => {
+    expect(buildNotification(task({ snoozeCount: 2 }), false, settings(), NOW).body).not.toContain('😴')
+    const body = buildNotification(task({ snoozeCount: 3 }), false, settings(), NOW).body
+    expect(body).toBe(`${translate('en', 'stuck_line', { n: 3 })} · ${translate('en', 'nag_line')}`)
   })
 })

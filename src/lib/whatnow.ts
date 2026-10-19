@@ -8,6 +8,7 @@
 import type { Energy, Task } from './types'
 import { translate, type Lang } from './i18n'
 import { endOfDay, formatMinutes } from './dates'
+import { startBy } from './tasks'
 
 export interface NextContext {
   /** Energy the user has right now (null = any). */
@@ -24,6 +25,7 @@ export const NEXT_MINUTES = [15, 30, 60] as const
 export type NextReason =
   | { kind: 'overdue'; min: number }
   | { kind: 'focused' }
+  | { kind: 'startby'; min: number }
   | { kind: 'today' }
   | { kind: 'soon' }
   | { kind: 'priority' }
@@ -60,6 +62,11 @@ function scoreTask(t: Task, ctx: NextContext, nowMs: number): { score: number; r
   if (t.focused) {
     score += 30
     reasons.push({ kind: 'focused' })
+  }
+  // time blindness: the estimate says it must start now to finish by the due time
+  if (startBy(t, nowMs)?.late) {
+    score += 20
+    reasons.push({ kind: 'startby', min: t.estimateMin! })
   }
   if (t.dueAt !== null && t.dueAt >= nowMs) {
     if (t.dueAt <= endOfDay(nowMs)) {
@@ -131,6 +138,8 @@ export function reasonText(r: NextReason, lang: Lang): string {
       return t('wn_r_overdue', { t: formatMinutes(r.min, lang) })
     case 'focused':
       return t('wn_r_focused')
+    case 'startby':
+      return t('wn_r_startby', { d: formatMinutes(r.min, lang) })
     case 'today':
       return t('wn_r_today')
     case 'soon':

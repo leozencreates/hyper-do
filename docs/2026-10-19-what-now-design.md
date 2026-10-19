@@ -30,6 +30,8 @@ Android app like everywhere else).
 - [x] Energy chip (`low < medium < high`): a task whose energy ≤ the chosen one +10; above it −40; unknown energy 0.
 - [x] Time chip (15 / 30 / 60 min): estimate ≤ chosen time +10; above it −40; no estimate with 15 min −5.
   Without a time chip, an estimate ≤ 15 min is a "quick win" +3.
+- [x] (20 Oct 2026) Start time reached (`startBy(task).late`, see `docs/2026-10-20-stuck-and-start-by-design.md`) +20,
+  reason `startby {min}`.
 - [x] Ties: earlier due date first (no date last), then list order (`order`).
 - [x] `rankNext(tasks, ctx, now)` → `NextPick[] { task, score, reasons }` best first; `suggestNext(…, index)` picks the
   index-th, wrapping around. Reasons are typed (`overdue {min}`, `today`, `soon`, `focused`, `priority`, `doing`,

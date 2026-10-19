@@ -128,3 +128,14 @@ describe('reasonText', () => {
     expect(reasonText({ kind: 'started', done: 2, total: 5 }, 'en')).toBe('☑ 2/5 subtasks done')
   })
 })
+
+describe('rankNext: start-by', () => {
+  it('a task whose start time has come gets +20 and the startby reason, above a plain "due today"', () => {
+    const tasks = [task({ id: 'today', dueAt: NOW + 5 * H }), task({ id: 'start', dueAt: NOW + 5 * H, estimateMin: 360 })]
+    const [first] = rankNext(tasks, ANY_CONTEXT, NOW)
+    expect(first.task.id).toBe('start')
+    expect(first.reasons[0]).toEqual({ kind: 'startby', min: 360 })
+    expect(first.score).toBe(20 + 25)
+    expect(reasonText({ kind: 'startby', min: 45 }, 'en')).toBe(`▶ Time to start (takes ${translate('en', 'dur_m', { n: 45 })})`)
+  })
+})

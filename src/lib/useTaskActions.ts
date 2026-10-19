@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { AppData, Settings, Status, Task } from './types'
-import { duplicateTask, reorderTasks, taskFromQuickAdd, touchTask, type QuickAddOptions } from './tasks'
+import { duplicateTask, reorderTasks, snoozeTask, taskFromQuickAdd, touchTask, type QuickAddOptions } from './tasks'
 import { resetNag } from './reminder'
 import { completeInData, recordReopen } from './stats'
 import { addTombstones, dropTombstones } from './sync'
@@ -88,10 +88,14 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
     setTasks((ts) => ts.map((x) => (x.id === id ? touchTask({ ...x, focused: on, nagCount: 0 }) : x.focused ? touchTask({ ...x, focused: false }) : x)))
     if (on) sfx('focus')
   }
+  /** Snoozes and postpones are counted (`snoozeTask`): from `SNOOZE_NUDGE` on the row asks "stuck?". */
+  const snoozeWith = (id: string, patch: Partial<Pick<Task, 'snoozedUntil' | 'dueAt'>>) => setTasks((ts) => ts.map((x) => (x.id === id ? snoozeTask(x, patch) : x)))
   const snooze = (id: string, minutes: number) => {
-    react(id, { snoozedUntil: Date.now() + minutes * 60_000 })
+    snoozeWith(id, { snoozedUntil: Date.now() + minutes * 60_000 })
     sfx('snooze')
   }
+  /** "Stuck?" dialog: a deliberate choice starts the snooze count over (optionally with a new due date). */
+  const unstick = (id: string, patch: Partial<Task> = {}) => react(id, { ...patch, snoozeCount: 0 })
   const toggleSub = (task: Task, sid: string) => update(task.id, { subtasks: task.subtasks.map((s) => (s.id === sid ? { ...s, done: !s.done } : s)) })
   const duplicate = (id: string) => setTasks((ts) => duplicateTask(ts, id, t('copy_suffix')))
 
@@ -99,7 +103,7 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
   const postpone = (task: Task) => {
     if (task.dueAt === null) return
     const base = Math.max(task.dueAt, Date.now())
-    react(task.id, { dueAt: base + DAY, snoozedUntil: null })
+    snoozeWith(task.id, { dueAt: base + DAY, snoozedUntil: null })
     sfx('snooze')
   }
 
@@ -168,7 +172,7 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
     if (settings.sort !== 'manual') setSettings((s) => ({ ...s, sort: 'manual' }))
   }
 
-  return { undo, undoDelete, update, remove, complete, reopen, setFocus, snooze, toggleSub, duplicate, postpone, clearDone, save, quickAdd, quickAddMany, move, reorder }
+  return { undo, undoDelete, update, remove, complete, reopen, setFocus, snooze, unstick, toggleSub, duplicate, postpone, clearDone, save, quickAdd, quickAddMany, move, reorder }
 }
 
 export type TaskActions = ReturnType<typeof useTaskActions>

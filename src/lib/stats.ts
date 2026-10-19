@@ -5,7 +5,7 @@
  */
 import { FOCUS_LOG_MAX, type AppData, type FocusEntry, type Task } from './types'
 import { DAY, addDays, dayKey, dayKeyToDate, startOfDay } from './dates'
-import { completeTask, touchTask } from './tasks'
+import { completeTask, snoozeTask, touchTask } from './tasks'
 import { resetNag } from './reminder'
 
 const MIN = 60_000
@@ -86,7 +86,7 @@ export function applyNotificationAction(data: AppData, taskId: string, actionId:
     case 'done':
       return completeInData(data, taskId, nowMs)
     case 'snooze30':
-      return { ...data, tasks: data.tasks.map((t) => (t.id === taskId ? touchTask(resetNag({ ...t, snoozedUntil: nowMs + SNOOZE_ACTION_MIN * 60_000 }, nowMs), nowMs) : t)) }
+      return { ...data, tasks: data.tasks.map((t) => (t.id === taskId ? snoozeTask(t, { snoozedUntil: nowMs + SNOOZE_ACTION_MIN * 60_000 }, nowMs) : t)) }
     case 'focus':
       return { ...data, tasks: data.tasks.map((t) => (t.id === taskId ? touchTask(resetNag({ ...t, focused: true }, nowMs), nowMs) : t.focused ? touchTask({ ...t, focused: false }, nowMs) : t)) }
     default:

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { completeTask, duplicateTask, matchesQuery, newTask, normalizeRecurrenceRule, normalizeTask, openTasksSorted, pickEasyTask, priorityIcon, reorderTasks, sortTasks, taskFromQuickAdd } from './tasks'
+import { SNOOZE_NUDGE, completeTask, duplicateTask, isStuck, matchesQuery, newTask, normalizeRecurrenceRule, normalizeTask, openTasksSorted, pickEasyTask, priorityIcon, reorderTasks, snoozeTask, sortTasks, startBy, stuckDates, taskFromQuickAdd } from './tasks'
 import { DEFAULT_SETTINGS, type Task } from './types'
 
 // Tuesday, 13 October 2026, 10:00 local time
@@ -49,6 +49,7 @@ describe('normalizeTask', () => {
       nagCount: 0,
       estimateMin: null,
       energy: null,
+      snoozeCount: 0,
       updatedAt: 123,
     })
     expect('calendarEventId' in t).toBe(false)
@@ -420,5 +421,61 @@ describe('matchesQuery', () => {
     expect(matchesQuery(t, '')).toBe(true)
     expect(matchesQuery(t, '   ')).toBe(true)
     expect(matchesQuery(t, 'groceries')).toBe(false)
+  })
+})
+
+describe('snooze counter (stuck?)', () => {
+  it('snoozeTask applies the patch, counts, resets the nag ladder and bumps updatedAt', () => {
+    const t = task({ id: 'a', nagCount: 4, updatedAt: NOW - H })
+    const s1 = snoozeTask(t, { snoozedUntil: NOW + H }, NOW)
+    expect(s1).toMatchObject({ snoozedUntil: NOW + H, nagCount: 0, snoozeCount: 1, updatedAt: NOW })
+    const s2 = snoozeTask(s1, { dueAt: NOW + 24 * H, snoozedUntil: null }, NOW + 1)
+    expect(s2).toMatchObject({ dueAt: NOW + 24 * H, snoozedUntil: null, snoozeCount: 2 })
+    expect(t.snoozeCount).toBe(0) // not mutated
+  })
+
+  it('isStuck from SNOOZE_NUDGE on, never for finished tasks; normalizeTask repairs bad counts', () => {
+    expect(SNOOZE_NUDGE).toBe(3)
+    expect(isStuck(task({ id: 'a', snoozeCount: 2 }))).toBe(false)
+    expect(isStuck(task({ id: 'a', snoozeCount: 3 }))).toBe(true)
+    expect(isStuck(task({ id: 'a', snoozeCount: 9, completedAt: NOW }))).toBe(false)
+    expect(normalizeTask({ id: 'a', snoozeCount: -1, createdAt: 1 }).snoozeCount).toBe(0)
+    expect(normalizeTask({ id: 'a', snoozeCount: 4.8, createdAt: 1 }).snoozeCount).toBe(4)
+  })
+
+  it('completion and duplicate start the count over (the recurring copy too)', () => {
+    const ts = [task({ id: 'r', recurrence: 'daily', dueAt: NOW, snoozeCount: 5 })]
+    const out = completeTask(ts, 'r')
+    expect(out.every((x) => x.snoozeCount === 0)).toBe(true)
+    expect(duplicateTask([task({ id: 'd', snoozeCount: 4 })], 'd', '(copy)')[1].snoozeCount).toBe(0)
+  })
+
+  it('stuckDates: tomorrow / next Monday, keeping the time of day of timed tasks (09:00 otherwise)', () => {
+    // NOW = Tuesday 13 Oct 2026 10:00
+    expect(stuckDates({ dueAt: null }, NOW)).toEqual({ tomorrow: new Date(2026, 9, 14, 9, 0).getTime(), nextWeek: new Date(2026, 9, 19, 9, 0).getTime() })
+    expect(stuckDates({ dueAt: new Date(2026, 9, 10, 17, 30).getTime() }, NOW)).toEqual({ tomorrow: new Date(2026, 9, 14, 17, 30).getTime(), nextWeek: new Date(2026, 9, 19, 17, 30).getTime() })
+    expect(stuckDates({ dueAt: new Date(2026, 9, 12, 23, 59).getTime() }, NOW).tomorrow).toBe(new Date(2026, 9, 14, 9, 0).getTime()) // all-day → 09:00
+    // on a Monday "next Monday" is a week away
+    const monday = new Date(2026, 9, 19, 8, 0).getTime()
+    expect(stuckDates({ dueAt: null }, monday).nextWeek).toBe(new Date(2026, 9, 26, 9, 0).getTime())
+    // Sunday → the next day
+    expect(stuckDates({ dueAt: null }, new Date(2026, 9, 18, 8, 0).getTime()).nextWeek).toBe(monday + H)
+  })
+})
+
+describe('startBy (time blindness)', () => {
+  const due = NOW + 3 * H // 13:00
+  it('due − estimate; late once that moment passed', () => {
+    expect(startBy(task({ id: 'a', dueAt: due, estimateMin: 60 }), NOW)).toEqual({ at: due - H, late: false })
+    expect(startBy(task({ id: 'a', dueAt: due, estimateMin: 240 }), NOW)).toEqual({ at: due - 4 * H, late: true })
+  })
+  it('null without estimate / due date, for overdue, all-day, finished tasks and starts more than 12 h ahead', () => {
+    expect(startBy(task({ id: 'a', dueAt: due }), NOW)).toBeNull()
+    expect(startBy(task({ id: 'a', estimateMin: 30 }), NOW)).toBeNull()
+    expect(startBy(task({ id: 'a', dueAt: NOW - H, estimateMin: 30 }), NOW)).toBeNull()
+    expect(startBy(task({ id: 'a', dueAt: new Date(2026, 9, 13, 23, 59).getTime(), estimateMin: 30 }), NOW)).toBeNull()
+    expect(startBy(task({ id: 'a', dueAt: due, estimateMin: 30, completedAt: NOW }), NOW)).toBeNull()
+    expect(startBy(task({ id: 'a', dueAt: NOW + 14 * H, estimateMin: 60 }), NOW)).toBeNull()
+    expect(startBy(task({ id: 'a', dueAt: NOW + 13 * H, estimateMin: 60 }), NOW)).toEqual({ at: NOW + 12 * H, late: false })
   })
 })

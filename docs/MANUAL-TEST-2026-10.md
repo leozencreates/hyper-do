@@ -206,6 +206,23 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 6. Pencere açıkken diğer harf kısayolları çalışmaz; `Esc` / arka plana tıklama kapatır. Telefon genişliğinde
    (Mini App) düğmeler alt satıra kayar, yatay kaydırma yok.
 
+### A15. 😴 Takıldın mı?  (📁 `src/lib/tasks.ts` → `snoozeTask`, `isStuck`, `stuckDates`; `src/components/Stuck.tsx`)
+
+1. Bir görevi satırdan 3 kez ertele (15 dk / Yarına at karışık) → satırda mor **😴 ×3** çipi. Sonraki hatırlatmanın
+   gövdesinde "😴 3 kez ertelendi — bölelim mi…" satırı (toast, Telegram mesajı).
+2. Windows bildirimindeki **30 dk** düğmesi ve Telegram'daki ⏰ düğmeleri de sayar (çip artar).
+3. Çipe tıkla → "Buna mı takıldın?" penceresi. **✂ Böl** → düzenleyici açılır, çip kaybolur. **📅 Yarın sabah /
+   Haftaya pazartesi** → tarih o güne (saatli görevde saat korunur, yoksa 09:00), çip kaybolur. **▶ Şimdi yap** →
+   odak + Hyper Focus turu. **🗑 Bırak gitsin** → silinir, "Geri al" çalışır. **Böyle devam** → yalnız sayaç sıfırlanır.
+4. Görevi bitir → tekrarlayan görevin yeni kopyasında çip yok. Kopyala → kopyada çip yok.
+
+### A16. ▶ Başlama saati  (📁 `src/lib/tasks.ts` → `startBy`; `TaskItem.tsx`; `whatnow.ts`)
+
+1. Görev `rapor bugün 17:00 ~45dk` (şimdi 12:00) → satırda **▶ Başla: Bugün 16:15**. Gün boyu (saatsiz) ya da
+   tahminsiz görevde çip yok; 12 saatten uzaktaki başlangıç gösterilmez.
+2. Saat 16:15'i geçince (veya tahmini 6 saat yap) → turuncu **▶ Şimdi başla · 45 dk**. 🧭 Şimdi ne? bu görevi
+   "▶ Başlama zamanı geldi" gerekçesiyle öne alır. Son tarih geçince çip kaybolur (artık "gecikti").
+
 ### A13. Ses efektleri ve susturma  (📁 `src/lib/sound.ts` → `soundAllowed`; `src/lib/useSounds.ts`; `src/App.tsx` → `snd-btn`; `src/lib/useTaskActions.ts` → `onSound`)
 
 1. Hızlı ekleme ile görev ekle → tek kısa "pop". Görevi sil → alçak, inen iki nota; **Geri al** → yükselen iki nota.
@@ -398,6 +415,12 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
    başlar, ekranın üstünde açılır (heads-up), titrer. Telefon Ayarları → Uygulamalar → Hyper Do → Bildirimler'de
    **Acil hatırlatmalar** kanalı görünür; sesini değiştir / kapat → yalnız acil olanlar etkilenir. Dili EN yap →
    kanal adı "Urgent reminders". Ayarlar'da tırmanma açıklaması mini pencereden değil acil bildirimden bahseder.
+
+### C7. "Uygulamayı bir kez aç" bildirimi  (📁 `platform.capacitor.ts` → `KEEPALIVE_ID`)
+
+1. Hatırlatmalı bir görev varken uygulamayı aç-kapat; telefonun saatini 47 saat ileri al → "Hyper Do bekliyor"
+   bildirimi gelir; dokununca uygulama açılır ve plan yeniden kurulur (bildirim bir sonraki 47 saate kayar).
+2. Hiç hatırlatmalı görev ve özet yoksa bu bildirim planlanmaz.
 
 ### C2. Paylaş → Hyper Do  (📁 `android/app/src/main/java/com/hyperdo/app/MainActivity.java`; `platform.capacitor.ts` → `hyperdoShare`; `src/lib/share.ts`)
 

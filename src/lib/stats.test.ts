@@ -212,3 +212,12 @@ describe('topTags', () => {
     expect(topTags(tasks, NOW)).toEqual([])
   })
 })
+
+describe('applyNotificationAction: snooze is counted', () => {
+  it('snooze30 adds one to snoozeCount (stuck? nudge), focus does not', () => {
+    const data = normalizeData({ tasks: [task({ id: 'a', snoozeCount: 2 })] })
+    const out = applyNotificationAction(data, 'a', 'snooze30', NOW)
+    expect(out.tasks[0]).toMatchObject({ snoozeCount: 3, snoozedUntil: NOW + SNOOZE_ACTION_MIN * MIN })
+    expect(applyNotificationAction(data, 'a', 'focus', NOW).tasks[0].snoozeCount).toBe(2)
+  })
+})

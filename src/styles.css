@@ -628,3 +628,16 @@ html.tg body { background: var(--bg); background-attachment: scroll; overscroll-
 .wn-reasons { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip.wn-reason { font-size: 12px; padding: 3px 9px; }
 .wn-actions { flex-wrap: wrap; }
+
+/* 😴 Stuck? + ▶ start-by (docs/2026-10-20-stuck-and-start-by-design.md) */
+.chip.stuck { color: var(--violet); background: color-mix(in srgb, var(--violet) 18%, transparent); font-weight: 700; cursor: pointer; border: none; }
+.chip.stuck:hover { background: color-mix(in srgb, var(--violet) 28%, transparent); }
+.chip.startby { color: var(--teal); background: color-mix(in srgb, var(--teal) 14%, transparent); font-variant-numeric: tabular-nums; }
+.chip.startby.late { color: #1a0d04; background: var(--accent); font-weight: 700; }
+.stuck-options { display: flex; flex-direction: column; gap: 8px; }
+.stuck-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; padding: 10px 14px; border-radius: var(--radius); background: var(--bg-3); border: 1px solid var(--border); }
+.stuck-opt small { color: var(--text-2); font-weight: 400; }
+.stuck-opt.primary small { color: #1a0d04; opacity: .8; }
+button.stuck-opt:not(.primary):hover { border-color: var(--text-3); }
+.stuck-dates .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.stuck-opt.danger-soft { color: var(--danger); }

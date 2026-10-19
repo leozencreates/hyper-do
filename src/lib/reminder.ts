@@ -4,7 +4,7 @@
  */
 import type { AppData, Settings, Task } from './types'
 import { funTitle, translate } from './i18n'
-import { priorityIcon, touchTask } from './tasks'
+import { isStuck, priorityIcon, touchTask } from './tasks'
 
 export interface ReminderHit {
   task: Task
@@ -190,6 +190,7 @@ export function buildNotification(task: Task, overdue: boolean, settings: Settin
     else parts.push(mins < 60 ? t('left_min', { n: mins }) : t('left_hour', { n: Math.floor(mins / 60) }))
   }
   if (open > 0) parts.push(t('open_subs', { n: open }))
+  if (isStuck(task)) parts.push(t('stuck_line', { n: task.snoozeCount }))
   parts.push(t('nag_line'))
 
   const plain = `${priorityIcon(task.priority)} ${task.focused ? '🎯 ' : ''}${task.title}`

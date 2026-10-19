@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ENERGY_ICON, type Task } from '../lib/types'
 import { formatDue, formatMinutes, isOverdue, recurrenceLabel, recurrenceText, relativeMinutes } from '../lib/dates'
+import { isStuck, startBy } from '../lib/tasks'
 import { useLang, useT } from '../lib/useT'
 import AddToCalendar from './AddToCalendar'
 
@@ -27,10 +28,12 @@ interface Props {
   onDelete(): void
   onDuplicate(): void
   onPostpone(): void
+  /** 😴 ×N chip (snoozed `SNOOZE_NUDGE`+ times): opens the "stuck?" dialog. Absent = chip not clickable. */
+  onStuck?(): void
   drag?: DragHandlers
 }
 
-export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, drag }: Props) {
+export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, onStuck, drag }: Props) {
   const t = useT()
   const lang = useLang()
   const [open, setOpen] = useState(false)
@@ -42,6 +45,8 @@ export default function TaskItem({ task, highlighted, spentMin = 0, escalation =
   const snoozed = task.snoozedUntil !== null && task.snoozedUntil > Date.now()
   const est = task.estimateMin
   const overEstimate = est !== null && spentMin > est
+  const start = startBy(task)
+  const stuck = isStuck(task)
 
   const cls = ['task', `p-${task.priority}`, done && 'done', overdue && 'overdue', task.focused && 'focused', highlighted && 'highlight', drag?.dragging && 'dragging', over && 'drag-over']
     .filter(Boolean)
@@ -111,6 +116,25 @@ export default function TaskItem({ task, highlighted, spentMin = 0, escalation =
             <span className={snoozed ? 'chip muted' : 'chip remind'} title={t('remind_interval')}>
               {snoozed ? `😴 ${relativeMinutes(task.snoozedUntil! - Date.now(), lang)}` : `🔔 ${task.remindEveryMin}′`}
             </span>
+          )}
+          {start && (
+            <span className={start.late ? 'chip startby late' : 'chip startby'} title={t('startby_title', { d: formatMinutes(est!, lang) })}>
+              {start.late ? t('startby_now', { d: formatMinutes(est!, lang) }) : t('startby_chip', { t: formatDue(start.at, lang) })}
+            </span>
+          )}
+          {stuck && (
+            <button
+              type="button"
+              className="chip stuck"
+              title={t('stuck_chip_title', { n: task.snoozeCount })}
+              disabled={!onStuck}
+              onClick={(e) => {
+                e.stopPropagation()
+                onStuck?.()
+              }}
+            >
+              {t('stuck_chip', { n: task.snoozeCount })}
+            </button>
           )}
           {!done && escalation >= 1 && (
             <span className={escalation >= 2 ? 'chip nag hot' : 'chip nag'} title={t('nag_chip_title', { n: task.nagCount })}>

@@ -286,3 +286,8 @@ General rules for every item:
 - [x] **Android escalation level 2** (19 Oct 2026, `docs/2026-10-19-known-gaps-design.md` § 2b): from `popupAfter`
   ignored reminders on, planned notifications use the high-importance channel `hyperdo-urgent` (heads-up, vibration,
   🚨 title) via `plannedEscalation`; Android Settings name the step "Urgent notification after".
+- [x] **Stuck? · start-by · Android keep-alive** (20 Oct 2026, spec `docs/2026-10-20-stuck-and-start-by-design.md`):
+  `Task.snoozeCount` counted by `snoozeTask` on every snooze / postpone path; from 3 on a 😴 ×N chip opens the
+  "Stuck on this?" dialog (split / real date / do it now / let it go / keep going) and reminders carry a nudge line;
+  `startBy` chip "▶ Start: 16:15" / "▶ Start now" (+20 in What-now); Android "open the app once" notification at
+  +47 h.

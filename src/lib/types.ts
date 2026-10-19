@@ -79,6 +79,11 @@ export interface Task {
   /** Energy needed (null = not set). Quick add: `^low ^med ^high`. */
   energy: Energy | null
   /**
+   * Snoozes and postpones since the last fresh start (`snoozeTask`); from `SNOOZE_NUDGE` on the row offers the
+   * "stuck?" dialog and reminders carry a nudge line. Reset on completion, duplicate and any choice in that dialog.
+   */
+  snoozeCount: number
+  /**
    * Last change (epoch ms), bumped by every mutation path (#16): the newer copy wins when two devices
    * sync. `touchTask` keeps it strictly increasing even when another device's clock runs ahead. Default: `createdAt`.
    */

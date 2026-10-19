@@ -124,7 +124,9 @@ src/lib/useSounds.ts    React: useSounds(settings, hyperFocus) → stable play(k
                         useTaskActions.onSound, useCelebration(enabled, chime), useHyperFocus({ play }) and the mini window
 src/lib/deeplink.ts     hyperdo://task/<id>/done|snooze/<min>|open: parse/build, Windows toast XML (pure)
 src/lib/tasks.ts        Pure task helpers: newTask, taskFromQuickAdd (UI + popup + Telegram), normalizeTask,
-                        completeTask (+recurrence), sort, reorder, search, pickEasyTask
+                        completeTask (+recurrence), sort, reorder, search, pickEasyTask; snoozeTask (the only snooze /
+                        postpone path: counts Task.snoozeCount, resets nags), isStuck / SNOOZE_NUDGE (3), stuckDates,
+                        startBy (due − estimate, timed tasks, ≤ 12 h ahead)
 src/lib/parse.ts        Natural-language quick-add parser (TR/EN/RU) + splitBrainDump; phrase matcher looks 1–3 words
                         ahead (relative offsets, next week/weekday, month names, 12-hour times, *recurrence tokens)
 src/lib/dates.ts        Date helpers: startOfDay/endOfDay, nextOccurrence(dueAt, rec, now, rule) incl. custom rules
@@ -151,6 +153,7 @@ src/components/         Board (Kanban DnD), QuickAdd (textarea + live preview + 
                         TaskEditor (panel incl. recurrence rule, estimate, energy), FocusBanner, HyperFocus (useHyperFocus
                         hook + bar; `driver` option), StatsModal, Celebration (useCelebration: chime + confetti),
                         WhatNow (🧭 dialog: energy / time chips, one pick + reasons, Focus / Hyper Focus / Open / Another),
+                        Stuck (😴 "stuck on this?": split / real date / do it now / let it go / keep going),
                         SettingsPanel (+ DesktopSection, TelegramSection (+ MiniAppBlock: mode select, status/URL/copy/port/
                         progress, manual URL with https validation, Restart tunnel), AutoBackupSection, AboutSection,
                         BackupSection), CalendarSettings, CalendarStrip (events above Today/Week), AddToCalendar (per-task
@@ -174,7 +177,7 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 
 Tests: `src/lib/*.test.ts` (calendar-links, calsync, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
 sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
-`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 23 files, 468 tests.
+`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 23 files, 477 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.
@@ -245,7 +248,8 @@ process, the browser build and Vitest.
   TR abbreviations like `ara` (= call) and `kas` are everyday words; English allows `oct 15`.
 - Two renderer windows (main + mini) share `useAppData`; `useHyperFocus` must run with `driver: false` everywhere except
   the main window, otherwise phases advance twice. Reminder delivery increments `task.nagCount` (`markNagged`); every
-  user reaction must go through `resetNag` or the ladder never calms down.
+  user reaction must go through `resetNag` or the ladder never calms down. Every snooze / postpone must go through
+  `snoozeTask` (tasks.ts) so `snoozeCount` (the "stuck?" nudge) is counted on every platform.
 - `endOfDay` = 23:59 local; tasks due exactly at 23:59 are treated as all-day when mirrored to calendars.
 - The renderer window is hidden (not closed) on close; `quitting` gates the real quit from the tray menu.
 - Sync (#16): every task mutation must bump `task.updatedAt` (`touchTask`), every deletion must leave a tombstone in
