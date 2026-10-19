@@ -485,6 +485,18 @@ describe('Phase C: cards, replies, backup, digest', () => {
     await h.bot.sendDigest('evening')
     expect(h.api.of('sendMessage')).toHaveLength(2)
   })
+
+  it('paused: no reminders and no digests until resumed; commands still answered', async () => {
+    const h = await running({ paused: true }, [task({ id: 'a' })])
+    await h.bot.remind(task({ id: 'a' }), 'A', 'B')
+    await h.bot.sendDigest('morning')
+    expect(h.api.of('sendMessage')).toHaveLength(0)
+    h.api.message(42, '/list')
+    await waitFor(() => h.api.of('sendMessage').length >= 1, 'command reply while paused')
+    h.mutate((d) => ({ ...d, settings: { ...d.settings, telegram: { ...d.settings.telegram, paused: false } } }))
+    await h.bot.remind(task({ id: 'a' }), 'A', 'B')
+    expect(h.api.of('sendMessage')).toHaveLength(2)
+  })
 })
 
 describe('Phase D: Mini App menu button and "Open in app" row', () => {

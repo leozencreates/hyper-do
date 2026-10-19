@@ -324,6 +324,8 @@ export interface TelegramSettings {
   /** B3: send reminders to Telegram only while the PC has been idle (or locked) for `idleMinutes`. */
   onlyWhenIdle: boolean
   idleMinutes: number
+  /** Telegram reminders and digests are held back until switched off again; the bot keeps answering commands. */
+  paused: boolean
 }
 
 /** Live state of the Telegram bot (Electron main → Settings panel). */
@@ -360,7 +362,7 @@ export const DEFAULT_SETTINGS: Settings = {
   funTitles: true,
   defaultRemindEveryMin: 20,
   quietHours: { enabled: false, from: '23:00', to: '08:00' },
-  telegram: { enabled: false, token: '', chatId: '', botUsername: '', pairCode: '', tidy: true, onlyWhenIdle: false, idleMinutes: 5 },
+  telegram: { enabled: false, token: '', chatId: '', botUsername: '', pairCode: '', tidy: true, onlyWhenIdle: false, idleMinutes: 5, paused: false },
   theme: 'dark',
   sort: 'smart',
   pomodoro: { workMin: 40, breakMin: 5 },

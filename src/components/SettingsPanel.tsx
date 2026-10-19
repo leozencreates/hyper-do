@@ -528,6 +528,12 @@ function TelegramSection({ settings, onChange }: { settings: Settings; onChange(
             </button>
             {result && <span className="hint">{result}</span>}
           </div>
+          <div className="row">
+            <button type="button" className={tg.paused ? 'small' : 'ghost small'} disabled={!tg.chatId} onClick={() => setTg({ paused: !tg.paused })}>
+              {tg.paused ? t('tg_resume') : t('tg_pause')}
+            </button>
+          </div>
+          {tg.paused && <p className="tg-status error">{t('tg_paused')}</p>}
           <Toggle checked={tg.tidy} onChange={(v) => setTg({ tidy: v })} label={t('tg_tidy')} desc="" />
           <Toggle checked={tg.onlyWhenIdle} onChange={(v) => setTg({ onlyWhenIdle: v })} label={t('tg_only_idle')} desc={t('tg_idle_min', { n: tg.idleMinutes })} />
           {tg.onlyWhenIdle && (

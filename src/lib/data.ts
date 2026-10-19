@@ -155,6 +155,7 @@ export function normalizeData(d: Partial<AppData> | null | undefined, base: Sett
       tidy: typeof s?.telegram?.tidy === 'boolean' ? s.telegram.tidy : base.telegram.tidy,
       onlyWhenIdle: typeof s?.telegram?.onlyWhenIdle === 'boolean' ? s.telegram.onlyWhenIdle : base.telegram.onlyWhenIdle,
       idleMinutes: typeof s?.telegram?.idleMinutes === 'number' && s.telegram.idleMinutes >= 1 ? Math.floor(s.telegram.idleMinutes) : base.telegram.idleMinutes,
+      paused: typeof s?.telegram?.paused === 'boolean' ? s.telegram.paused : base.telegram.paused,
     },
     pomodoro: { ...base.pomodoro, ...s?.pomodoro },
     calendar: normalizeCalendarSettings(s?.calendar),

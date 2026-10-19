@@ -479,7 +479,7 @@ export class TelegramBot {
 
   /** C6: the daily digest to the linked chat, with number buttons for the listed tasks. */
   async sendDigest(kind: DigestKind) {
-    if (!this.running || this.halted || !this.linkedChat) return
+    if (!this.running || this.halted || !this.linkedChat || this.settings.telegram.paused) return
     try {
       await this.apply(this.linkedChat, digestReply(this.host.getData(), Date.now(), kind, this.appUrl))
     } catch (e) {

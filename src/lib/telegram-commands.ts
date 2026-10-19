@@ -256,9 +256,13 @@ export function completedHtml(html: string, title: string): string {
 
 // ---- Pure decisions (B3, B4, B5) ----
 
-/** B3: the Telegram copy of a reminder goes out unless "only when idle" is on and the PC was used recently. */
+/**
+ * B3: the Telegram copy of a reminder goes out unless Telegram is paused, or "only when idle" is on and the PC was
+ * used recently.
+ */
 export function shouldSendToTelegram(settings: Pick<Settings, 'telegram'>, idleSeconds: number): boolean {
   const tg = settings.telegram
+  if (tg.paused) return false
   if (!tg.onlyWhenIdle) return true
   return idleSeconds >= Math.max(1, tg.idleMinutes ?? 5) * 60
 }

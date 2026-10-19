@@ -191,6 +191,12 @@ describe('pure decisions (B3 / B4 / B5)', () => {
     expect(shouldSendToTelegram(settings({}, { onlyWhenIdle: true, idleMinutes: 0 }), 60)).toBe(true) // clamped to ≥ 1 min
   })
 
+  it('shouldSendToTelegram: nothing goes out while Telegram is paused, idle or not', () => {
+    expect(shouldSendToTelegram(settings({}, { paused: true }), Infinity)).toBe(false)
+    expect(shouldSendToTelegram(settings({}, { paused: true, onlyWhenIdle: true }), Infinity)).toBe(false)
+    expect(shouldSendToTelegram(settings({}, { paused: false }), 0)).toBe(true)
+  })
+
   it('tomorrowMorning: next calendar day at 09:00, or at quietHours.to when quiet hours are on; across midnight and DST', () => {
     expect(tomorrowMorning(NOW, settings())).toBe(new Date(2026, 9, 14, 9, 0).getTime())
     expect(tomorrowMorning(new Date(2026, 9, 13, 23, 59).getTime(), settings())).toBe(new Date(2026, 9, 14, 9, 0).getTime())
