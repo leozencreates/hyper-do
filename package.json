@@ -1,7 +1,7 @@
 {
   "name": "hyper-do",
   "productName": "Hyper Do",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "ADHD-friendly personal to-do that keeps reminding you until the task is done",
   "private": true,
   "main": "dist-electron/main.js",
