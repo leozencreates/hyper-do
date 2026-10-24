@@ -44,7 +44,7 @@ export function routineFromTemplate(kind: RoutineTemplate, lang: Lang, nowMs: nu
 }
 
 /** Whether a task can be run step by step. */
-export const isRunnable = (t: Task) => t.routine && t.completedAt === null && t.subtasks.length > 0
+export const isRunnable = (t: Task) => !t.archived && t.routine && t.completedAt === null && t.subtasks.length > 0
 
 export interface RunState {
   taskId: string

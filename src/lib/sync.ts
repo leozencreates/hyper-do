@@ -15,6 +15,7 @@
 import { FOCUS_LOG_MAX, TOMBSTONE_TTL_MS, type AppData, type FocusEntry, type Task, type Tombstone } from './types'
 import { normalizeDailyDone, normalizeDeleted, normalizeFocusLog } from './data'
 import { normalizeTask } from './tasks'
+import { preserveVersions } from './history'
 
 export const SYNC_DOC_VERSION = 1
 /** File name used by the folder transport (and suggested for WebDAV). */
@@ -158,7 +159,7 @@ export function mergeData(local: SyncDoc, remote: SyncDoc, nowMs: number): Merge
   for (const id of ids) {
     const l = localBy.get(id)
     const r = remoteBy.get(id)
-    const winner: Task = l && r ? (r.updatedAt > l.updatedAt ? r : l) : (l ?? r)!
+    let winner: Task = l && r ? (r.updatedAt > l.updatedAt ? r : l) : (l ?? r)!
     const at = tomb.get(id)
     if (at !== undefined) {
       if (at >= winner.updatedAt) {
@@ -169,6 +170,7 @@ export function mergeData(local: SyncDoc, remote: SyncDoc, nowMs: number): Merge
       }
       tomb.delete(id) // edited after the delete → resurrected
     }
+    if (l && r) winner = preserveVersions(winner, winner === l ? r : l)
     if (!l || !sameTask(winner, l)) changedLocal = true
     if (!r || !sameTask(winner, r)) changedRemote = true
     merged.push(winner)

@@ -656,3 +656,36 @@ button.stuck-opt:not(.primary):hover { border-color: var(--text-3); }
 .rt-clock { text-align: center; font-variant-numeric: tabular-nums; }
 .rt-actions { justify-content: center; flex-wrap: wrap; }
 .rt-summary { text-align: center; font-size: 16px; margin: 8px 0; }
+
+/* Attachments (photos / videos on the notes) */
+.attachments { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: -6px; }
+.att-thumb { position: relative; width: 72px; height: 72px; }
+.att-open { width: 100%; height: 100%; padding: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--bg-3); display: grid; place-items: center; cursor: zoom-in; }
+.att-open:disabled { cursor: default; }
+.att-open img, .att-open video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; grid-area: 1 / 1; }
+.att-play { grid-area: 1 / 1; color: #fff; font-size: 20px; text-shadow: 0 1px 6px rgba(0,0,0,.7); }
+.att-missing { font-size: 10px; color: var(--text-3); padding: 4px; text-align: center; }
+.att-remove { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; padding: 0; border-radius: 50%; background: var(--bg-2); border: 1px solid var(--border); line-height: 1; font-size: 13px; }
+.att-add { height: 72px; }
+.att-error { flex-basis: 100%; color: var(--danger); }
+.att-hint { flex-basis: 100%; color: var(--text-3); }
+.att-viewer { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.88); display: grid; place-items: center; cursor: zoom-out; }
+.att-viewer > div { cursor: default; }
+.att-viewer img, .att-viewer video { max-width: 94vw; max-height: 90vh; border-radius: 8px; display: block; }
+/* Planning and recovery tools */
+.planning-toolbar, .planning-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.planning-details { margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
+.planning-details summary { cursor: pointer; color: var(--text-2); }
+.planning-details[open] summary { margin-bottom: 14px; }
+.dependency { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 13px; }
+.dependency input { width: auto; flex: 0 0 auto; }
+.revision { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.revision .mini { justify-self: start; }
+.revision .notes { max-height: 120px; overflow: auto; margin: 0; }
+.review-list { list-style: none; padding: 0; }
+.review-list li { padding: 12px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.review-list li small { margin-left: 10px; color: var(--text-2); }
+.review-list .row { flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.starter-clock { text-align: center; font-size: 64px; font-variant-numeric: tabular-nums; padding: 24px; color: var(--sky); }
+.first-step { text-align: center; font-size: 20px; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .planning-toolbar button { font-size: 12px; } }

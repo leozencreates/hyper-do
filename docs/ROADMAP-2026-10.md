@@ -295,3 +295,6 @@ General rules for every item:
   morning / evening templates in TR/EN/RU (`routine.ts`), sidebar block "Routines" (+ Routine, ▶), editor toggle, row
   🔁 chip + ▶ Run, step-by-step runner `RoutineRunner.tsx` (✓ Done / ⏭ Skip / ↶ Back, stopwatch per step, summary;
   completing the last step completes the task → streak, next day's copy with fresh steps).
+- [x] **📎 Photos and videos on notes** (24 Oct 2026, spec `docs/2026-10-24-attachments-design.md`): `Task.attachments`
+  (metadata), bytes in IndexedDB (`platform.media.ts`, `HyperDoApi.media`, not in backups / sync / Mini App), editor
+  strip with picker / drop / paste, full-screen viewer, row `📎 N` chip, orphan cleanup once per start.

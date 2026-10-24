@@ -5,6 +5,9 @@
 import { DEFAULT_RECURRENCE_RULE, ENERGIES, RECURRENCES, RECURRENCE_UNITS, STATUSES, type Energy, type Priority, type Recurrence, type RecurrenceRule, type RecurrenceUnit, type Settings, type SortMode, type Status, type Task } from './types'
 import { isEndOfDay, nextOccurrence } from './dates'
 import { parseQuickAdd } from './parse'
+import { normalizeAttachments } from './attachments'
+import { rememberChange, mergeHistory, revisionContent } from './history'
+import { isBlocked } from './planning'
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
 
@@ -17,6 +20,7 @@ export function newTask(partial: Partial<Task>, settings: Settings): Task {
   const now = Date.now()
   return {
     id: uid(),
+    firstStep: '', dependsOn: [], followUpAt: null, archived: false, history: [],
     title: '',
     notes: '',
     priority: 'medium',
@@ -36,6 +40,7 @@ export function newTask(partial: Partial<Task>, settings: Settings): Task {
     energy: null,
     snoozeCount: 0,
     routine: false,
+    attachments: [],
     updatedAt: now,
     ...partial,
   }
@@ -75,7 +80,7 @@ export function bumpChanged(prev: Task[], next: Task[], nowMs = Date.now()): Tas
   const out = next.map((t) => {
     const p = before.get(t.id)
     if (p === t || (p && onlyNagChanged(p, t))) return t
-    const touched = touchTask(t, nowMs)
+    const touched = touchTask(p ? rememberChange(p, t) : t, nowMs)
     if (touched !== t) changed = true
     return touched
   })
@@ -146,6 +151,11 @@ export function normalizeTask(t: Partial<Task> & { id: string }): Task {
   const recurrence: Recurrence = RECURRENCES.includes(t.recurrence as Recurrence) ? (t.recurrence as Recurrence) : 'none'
   return {
     id: t.id,
+    firstStep: typeof t.firstStep === 'string' ? t.firstStep : '',
+    dependsOn: Array.isArray(t.dependsOn) ? [...new Set(t.dependsOn.filter((id): id is string => typeof id === 'string' && !!id && id !== t.id))] : [],
+    followUpAt: typeof t.followUpAt === 'number' && Number.isFinite(t.followUpAt) ? t.followUpAt : null,
+    archived: t.archived === true,
+    history: Array.isArray(t.history) ? mergeHistory(t.history.slice(0, 100).filter((h) => h && Number.isFinite(h.at) && h.content && typeof h.content.title === 'string').map((h) => ({ at: h.at, content: revisionContent(normalizeTask({ ...h.content, id: t.id, history: [] })) }))) : [],
     title: t.title ?? '',
     notes: t.notes ?? '',
     priority: t.priority ?? 'medium',
@@ -168,6 +178,7 @@ export function normalizeTask(t: Partial<Task> & { id: string }): Task {
     energy: ENERGIES.includes(t.energy as Energy) ? (t.energy as Energy) : null,
     snoozeCount: typeof t.snoozeCount === 'number' && t.snoozeCount > 0 ? Math.floor(t.snoozeCount) : 0,
     routine: t.routine === true,
+    attachments: normalizeAttachments(t.attachments),
     updatedAt: typeof t.updatedAt === 'number' && Number.isFinite(t.updatedAt) ? t.updatedAt : createdAt,
   }
 }
@@ -184,6 +195,7 @@ export function completeTask(tasks: Task[], id: string): Task[] {
     out.unshift({
       ...t,
       id: uid(),
+      history: [], dependsOn: [], followUpAt: null,
       dueAt: nextOccurrence(base, t.recurrence, now, t.recurrenceRule),
       subtasks: t.subtasks.map((s) => ({ ...s, done: false })),
       completedAt: null,
@@ -252,7 +264,7 @@ export function startBy(task: Task, nowMs = Date.now()): { at: number; late: boo
  * Returns null when nothing is open.
  */
 export function pickEasyTask(tasks: Task[], rng: () => number = Math.random, nowMs = Date.now()): Task | null {
-  const candidates = tasks.filter((t) => t.completedAt === null && !(t.snoozedUntil !== null && t.snoozedUntil > nowMs))
+  const candidates = tasks.filter((t) => !t.archived && !isBlocked(t, tasks) && t.status !== 'waiting' && t.completedAt === null && !(t.snoozedUntil !== null && t.snoozedUntil > nowMs))
   if (candidates.length === 0) return null
   const score = (t: Task) =>
     (t.energy === 'low' ? 3 : t.energy === 'medium' ? 1 : 0) +
@@ -274,6 +286,7 @@ export function duplicateTask(tasks: Task[], id: string, suffix: string): Task[]
     ...t,
     id: uid(),
     title: `${t.title} ${suffix}`.trim(),
+    history: [], archived: false,
     subtasks: t.subtasks.map((s) => ({ ...s, id: uid(), done: false })),
     completedAt: null,
     snoozedUntil: null,
@@ -341,7 +354,7 @@ export function sortTasks(tasks: Task[], mode: SortMode, nowMs = Date.now()): Ta
 /** Açık görevler: önce odak, sonra öncelik, sonra son tarih. (Telegram /list) */
 export function openTasksSorted(tasks: Task[]): Task[] {
   return sortTasks(
-    tasks.filter((t) => t.completedAt === null),
+    tasks.filter((t) => !t.archived && t.completedAt === null),
     'smart',
   )
 }

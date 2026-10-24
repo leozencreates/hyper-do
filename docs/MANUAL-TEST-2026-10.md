@@ -237,6 +237,19 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 6. 🌙 Akşam rutini (21:30) ve **Boş rutin** (adım yok → ▶ görünmez, adım ekleyince görünür). Herhangi bir görevi
    düzenleyicide **Rutin** yapınca da ▶ gelir. Mini App'te kenar çubuğu yok; satırdaki ▶ çalışır.
 
+### A18. 📎 Fotoğraf ve video ekleri  (📁 `src/components/Attachments.tsx`; `src/lib/platform.media.ts`; `src/lib/attachments.ts`; `TaskEditor.tsx`)
+
+1. Bir görevi aç → Not alanının altında **📎 Fotoğraf / video** → bir fotoğraf ve bir video seç → küçük resimler
+   görünür (videoda ▶), altında "yalnızca bu cihazda" ipucu. Kaydet → satırda `📎 2` çipi.
+2. Küçük resme tıkla → tam ekran; video oynar. Esc / dışarı tıkla → yalnızca görüntüleyici kapanır, düzenleyici açık kalır.
+3. Ekran görüntüsü al (Win+Shift+S) → Not alanına Ctrl+V → ek olarak eklenir, nota metin gelmez. Metin yapıştırma
+   normal çalışır. Gezginden dosyayı şeride sürükle-bırak → eklenir.
+4. PDF seç / 200 MB'tan büyük video → satır altında hata metni, ek eklenmez.
+5. × ile bir eki kaldır → Kaydet. Uygulamayı yeniden başlat → ek geri gelmez; diğeri hâlâ açılır (dosya silinmedi).
+6. Android: 📎 → sistem seçicisi kamera / galeri sunar; çekilen fotoğraf eklenir. Uygulamayı kapat-aç → ek duruyor.
+7. Senkron açıkken diğer cihazda aynı görev: `📎` çipi var, küçük resim yerine "Bu cihazda yok". Mini App'te ek
+   şeridi görünmez; Mini App'ten görevi düzenleyip kaydedince masaüstündeki ekler kaybolmaz.
+
 ### A13. Ses efektleri ve susturma  (📁 `src/lib/sound.ts` → `soundAllowed`; `src/lib/useSounds.ts`; `src/App.tsx` → `snd-btn`; `src/lib/useTaskActions.ts` → `onSound`)
 
 1. Hızlı ekleme ile görev ekle → tek kısa "pop". Görevi sil → alçak, inen iki nota; **Geri al** → yükselen iki nota.

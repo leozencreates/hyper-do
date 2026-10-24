@@ -364,7 +364,7 @@ export function listSections(tasks: Task[], now: number): TgListSection[] {
 
 /** The open tasks a view shows: `/today` = due today or overdue, `/week` = this week or overdue, `/overdue`, `/search`. */
 export function viewTasks(tasks: Task[], now: number, view: TgView, query = ''): Task[] {
-  const open = tasks.filter((t) => t.completedAt === null)
+  const open = tasks.filter((t) => !t.archived && t.completedAt === null)
   switch (view) {
     case 'today':
       return open.filter((t) => t.dueAt !== null && t.dueAt <= endOfDay(now))

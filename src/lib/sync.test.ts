@@ -37,10 +37,11 @@ describe('mergeData: tasks', () => {
     const remoteWins = mergeData(doc({ tasks: [older] }), doc({ tasks: [newer] }, 'B'), NOW)
     expect(remoteWins.merged.tasks[0].title).toBe('new')
     expect(remoteWins.changedLocal).toBe(true)
-    expect(remoteWins.changedRemote).toBe(false)
+    expect(remoteWins.changedRemote).toBe(true) // losing version is now preserved on both devices
+    expect(remoteWins.merged.tasks[0].history[0].content.title).toBe('old')
     const localWins = mergeData(doc({ tasks: [newer] }), doc({ tasks: [older] }, 'B'), NOW)
     expect(localWins.merged.tasks[0].title).toBe('new')
-    expect(localWins.changedLocal).toBe(false)
+    expect(localWins.changedLocal).toBe(true)
     expect(localWins.changedRemote).toBe(true)
   })
 
@@ -49,7 +50,8 @@ describe('mergeData: tasks', () => {
     const r = task({ id: 'a', title: 'theirs', updatedAt: NOW })
     const tie = mergeData(doc({ tasks: [l] }), doc({ tasks: [r] }, 'B'), NOW)
     expect(tie.merged.tasks[0].title).toBe('mine')
-    expect(tie.changedLocal).toBe(false)
+    expect(tie.changedLocal).toBe(true)
+    expect(tie.merged.tasks[0].history[0].content.title).toBe('theirs')
     expect(tie.changedRemote).toBe(true)
     // same content, different objects (one side parsed from JSON) → no change on either side
     const same = mergeData(doc({ tasks: [l] }), doc({ tasks: [JSON.parse(JSON.stringify(l))] }, 'B'), NOW)

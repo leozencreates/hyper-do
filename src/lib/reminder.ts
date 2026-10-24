@@ -5,6 +5,17 @@
 import type { AppData, Settings, Task } from './types'
 import { funTitle, translate } from './i18n'
 import { isStuck, priorityIcon, touchTask } from './tasks'
+import { isBlocked } from './planning'
+
+const deliveryHistory = new WeakMap<Map<string, number>, number[]>()
+export function reminderInterval(task: Task, settings: Settings, overdue: boolean): number {
+  let minutes = task.remindEveryMin
+  if (overdue && settings.escalateOverdue) minutes = Math.max(5, minutes / 2)
+  if (settings.reminderProfile === 'gentle') minutes *= 2
+  if (settings.reminderProfile === 'persistent') minutes = Math.max(5, minutes / 2)
+  return minutes * 60000
+}
+export function reminderSummary(hits: ReminderHit[]) { return { title: 'Hyper Do · ' + hits.length, body: hits.slice(0, 5).map((h) => h.task.title).join(' · ') + (hits.length > 5 ? ' …' : '') } }
 
 export interface ReminderHit {
   task: Task
@@ -63,7 +74,12 @@ export function collectDueReminders(tasks: Task[], settings: Settings, lastNotif
   if (inQuietHours(settings, new Date(nowMs))) return hits
   if (isMuted(settings, nowMs)) return hits
 
-  for (const t of tasks) {
+  const history = (deliveryHistory.get(lastNotified) ?? []).filter((at) => at > nowMs - 3600000)
+  const available = settings.reminderHourlyLimit > 0 ? Math.max(0, settings.reminderHourlyLimit - history.length) : Infinity
+  if (!available) return hits
+  const ordered = [...tasks].sort((a, b) => (lastNotified.get(a.id) ?? 0) - (lastNotified.get(b.id) ?? 0))
+  for (const t of ordered) {
+    if (t.archived || isBlocked(t, tasks) || (t.status === 'waiting' && (t.followUpAt === null || t.followUpAt > nowMs)) || (t.followUpAt !== null && t.followUpAt > nowMs)) continue
     if (t.completedAt !== null) {
       lastNotified.delete(t.id)
       continue
@@ -73,15 +89,17 @@ export function collectDueReminders(tasks: Task[], settings: Settings, lastNotif
     if (activeFocusTaskId !== null && t.id !== activeFocusTaskId) continue
 
     const overdue = t.dueAt !== null && t.dueAt < nowMs
-    let intervalMs = t.remindEveryMin * 60_000
-    if (overdue && settings.escalateOverdue) intervalMs = Math.max(5 * 60_000, intervalMs / 2)
+    const intervalMs = reminderInterval(t, settings, overdue)
 
     const last = lastNotified.get(t.id) ?? 0
     if (nowMs - last >= intervalMs) {
       lastNotified.set(t.id, nowMs)
       hits.push({ task: t, overdue })
+      if (!settings.groupReminders && hits.length >= available) break
     }
   }
+  if (hits.length) history.push(...Array(settings.groupReminders ? 1 : hits.length).fill(nowMs))
+  deliveryHistory.set(lastNotified, history)
   return hits
 }
 
@@ -208,14 +226,13 @@ export function buildNotification(task: Task, overdue: boolean, settings: Settin
  */
 export function planReminderTimes(task: Task, settings: Settings, fromMs: number, maxCount: number, horizonMs: number, suppressUntilMs: number | null = null): { at: number; overdue: boolean }[] {
   const out: { at: number; overdue: boolean }[] = []
-  if (task.completedAt !== null || !task.remindEveryMin || task.remindEveryMin <= 0) return out
-  let t = Math.max(fromMs, task.snoozedUntil ?? 0)
+  if (task.archived || (task.status === 'waiting' && task.followUpAt === null) || task.completedAt !== null || !task.remindEveryMin || task.remindEveryMin <= 0) return out
+  let t = Math.max(fromMs, task.snoozedUntil ?? 0, task.followUpAt ?? 0)
   const end = fromMs + horizonMs
   let guard = 0
   while (out.length < maxCount && guard++ < 5000) {
     const overdue = task.dueAt !== null && task.dueAt < t
-    let interval = task.remindEveryMin * 60_000
-    if (overdue && settings.escalateOverdue) interval = Math.max(5 * 60_000, interval / 2)
+    const interval = reminderInterval(task, settings, overdue)
     t += interval
     if (t > end) break
     if (suppressUntilMs !== null && t < suppressUntilMs) continue

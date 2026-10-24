@@ -443,6 +443,14 @@ export class TelegramBot {
    * Hatırlatma gönder (tick'ten çağrılır). Bağlı sohbet yoksa, bot duruyorsa ya da (B3) bilgisayar kullanımdaysa
    * sessizce geçer. B1: the task's previous reminder is tidied before the new one goes out.
    */
+  async remindGroup(tasks: Task[]) {
+    if (!this.running || this.halted || !this.linkedChat) return
+    if (!shouldSendToTelegram(this.settings, this.host.idleSeconds?.() ?? Infinity)) return
+    try {
+      await this.send(this.linkedChat, '<b>Hyper Do · ' + tasks.length + '</b>\n' + tasks.slice(0, 10).map((t) => escapeHtml(t.title.slice(0, 200))).join('\n'), tasks.slice(0, 10).map((t) => [{ text: t.title.slice(0, 40), callback_data: 'pick:' + t.id }]))
+    } catch (e) { console.error('[telegram] grouped reminder failed:', (e as Error).message) }
+  }
+
   async remind(task: Task, title: string, body: string) {
     if (!this.running || this.halted || !this.linkedChat) return
     if (!shouldSendToTelegram(this.settings, this.host.idleSeconds?.() ?? Infinity)) return

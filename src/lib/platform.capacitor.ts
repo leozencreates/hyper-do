@@ -16,6 +16,7 @@ import { buildNotification, deliveredNags, focusSuppressedUntil, markNaggedBy, p
 import { buildDigest, planDigestTimes } from './digest'
 import { translate } from './i18n'
 import { browserDefaultSettings, parseAppData, DATA_STORAGE_KEY } from './data'
+import { isBlocked } from './planning'
 import { bumpChanged } from './tasks'
 import { createEmitter } from './emitter'
 import { createBrowserCalendar } from './platform.calendar'
@@ -68,6 +69,7 @@ export function createCapacitorApi(): HyperDoApi {
   let scheduling: Promise<void> | null = null
   let actionsLang: Lang | null = null
   let nagPlan: NagPlan = {}
+  let deliveryPlan: number[] = []
 
   const persist = () => Preferences.set({ key: DATA_STORAGE_KEY, value: JSON.stringify(data) }).catch(() => {})
 
@@ -218,7 +220,7 @@ export function createCapacitorApi(): HyperDoApi {
       }
       saveNagPlan({}) // the old plan is consumed; cancelled leftovers must never count
       const plan: NagPlan = {}
-      const active = data.tasks.filter((t) => t.completedAt === null && t.remindEveryMin > 0)
+      const active = data.tasks.filter((t) => !t.archived && !isBlocked(t, data.tasks) && t.completedAt === null && t.remindEveryMin > 0)
       // Öncelik: odak > gecikmiş > yüksek öncelik; kota dolarsa en az önemliler düşer
       active.sort((a, b) => Number(b.focused) - Number(a.focused) || Number(b.dueAt !== null && b.dueAt < now) - Number(a.dueAt !== null && a.dueAt < now))
       const perTask = Math.max(4, Math.min(PER_TASK_MAX, Math.floor(TOTAL_MAX / Math.max(1, active.length))))
@@ -246,6 +248,34 @@ export function createCapacitorApi(): HyperDoApi {
           })
         })
       }
+      // Apply the same device-wide rolling quota to the chronological plan, after grouping.
+      list.sort((a, b) => a.schedule!.at!.getTime() - b.schedule!.at!.getTime())
+      const batched: LocalNotificationSchema[] = []
+      for (const n of list) {
+        const previous = batched[batched.length - 1]
+        if (data.settings.groupReminders && previous && previous.schedule!.at!.getTime() === n.schedule!.at!.getTime()) {
+          const ids: string[] = previous.extra?.taskIds ?? [previous.extra.taskId]
+          ids.push(n.extra.taskId)
+          previous.extra = { taskIds: ids }
+          previous.title = 'Hyper Do · ' + ids.length
+          previous.body = ids.slice(0, 5).map((id) => data.tasks.find((t) => t.id === id)?.title ?? '').join(' · ')
+          previous.actionTypeId = undefined
+          previous.group = 'hyperdo-summary'
+        } else batched.push(n)
+      }
+      const accepted: LocalNotificationSchema[] = []
+      const recentDeliveries = deliveryPlan.filter((at) => at <= now && at > now - 3600000)
+      const deliveryTimes: number[] = [...recentDeliveries]
+      for (const n of batched) {
+        const at = n.schedule!.at!.getTime()
+        while (deliveryTimes.length && deliveryTimes[0] <= at - 3600000) deliveryTimes.shift()
+        if (data.settings.reminderHourlyLimit > 0 && deliveryTimes.length >= data.settings.reminderHourlyLimit) continue
+        deliveryTimes.push(at); accepted.push(n)
+      }
+      list.splice(0, list.length, ...accepted)
+      const nextDeliveries = [...recentDeliveries, ...accepted.map((n) => n.schedule!.at!.getTime())]
+      for (const key of Object.keys(plan)) delete plan[key]
+      for (const n of list) for (const id of (n.extra?.taskIds ?? [n.extra.taskId]) as string[]) (plan[id] ??= []).push(n.schedule!.at!.getTime())
       // #17: morning digest / evening (Sunday: weekly) review, rendered as of their fire time
       planDigestTimes(data.settings, now, HORIZON_MS).forEach((p, i) => {
         const d = buildDigest(data, p.at, data.settings.language, p.kind)
@@ -259,6 +289,8 @@ export function createCapacitorApi(): HyperDoApi {
       // the plan only counts once it is really scheduled (a failed schedule must not turn into phantom nags)
       if (list.length) await LocalNotifications.schedule({ notifications: list })
       saveNagPlan(plan)
+      deliveryPlan = nextDeliveries
+      await Preferences.set({ key: 'hyperdo-delivery-plan', value: JSON.stringify(deliveryPlan) })
     }
     scheduling = (scheduling ?? Promise.resolve()).then(run).catch(() => {})
     return scheduling
@@ -320,6 +352,7 @@ export function createCapacitorApi(): HyperDoApi {
         const { value } = await Preferences.get({ key: DATA_STORAGE_KEY })
         data = parseAppData(value, defaults)
         nagPlan = parseNagPlan((await Preferences.get({ key: NAG_PLAN_KEY })).value)
+        try { const saved = JSON.parse((await Preferences.get({ key: 'hyperdo-delivery-plan' })).value ?? '[]'); deliveryPlan = Array.isArray(saved) ? saved.filter((at): at is number => typeof at === 'number' && Number.isFinite(at)).sort((a, b) => a - b) : [] } catch { deliveryPlan = [] }
       } catch {
         /* varsayılan */
       }

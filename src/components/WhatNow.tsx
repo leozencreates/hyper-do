@@ -4,6 +4,8 @@ import { NEXT_MINUTES, rankNext, reasonText } from '../lib/whatnow'
 import { formatDue, formatMinutes } from '../lib/dates'
 import { priorityIcon } from '../lib/tasks'
 import { useLang, useT } from '../lib/useT'
+import { dayKey } from '../lib/dates'
+import { usePlanningCopy } from '../lib/planning-i18n'
 import Modal from './Modal'
 
 interface Props {
@@ -19,13 +21,14 @@ interface Props {
 /** "What now?": one suggestion with its reasons; energy / time chips re-rank, "Another" walks down the ranking. */
 export default function WhatNow({ tasks, now, onFocus, onHyperFocus, onOpen, onClose }: Props) {
   const t = useT()
+  const c = usePlanningCopy()
   const lang = useLang()
   const [energy, setEnergy] = useState<Energy | null>(null)
   const [minutes, setMinutes] = useState<number | null>(null)
   const [index, setIndex] = useState(0)
   // ranked once per chip change, not on every clock tick (the pick must not jump while the dialog is open)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const ranked = useMemo(() => rankNext(tasks, { energy, minutes }, now), [tasks, energy, minutes])
+  const ranked = useMemo(() => rankNext(tasks, { energy, minutes }, now), [tasks, energy, minutes, now])
   const pick = ranked.length ? ranked[index % ranked.length] : null
 
   const chip = <T,>(active: boolean, label: string, value: T, set: (v: T) => void, cls = '') => (
@@ -94,7 +97,7 @@ export default function WhatNow({ tasks, now, onFocus, onHyperFocus, onOpen, onC
             {t('wn_hf')}
           </button>
         )}
-        {pick ? (
+      {pick ? (
           <button className="primary" autoFocus onClick={() => onFocus(pick.task)}>
             {t('easy_focus')}
           </button>

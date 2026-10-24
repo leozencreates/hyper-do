@@ -2,13 +2,23 @@ import { useState } from 'react'
 import { DEFAULT_RECURRENCE_RULE, ENERGIES, ESTIMATE_PRESETS, PRIORITIES, RECURRENCES, RECURRENCE_UNITS, STATUSES, type Recurrence, type RecurrenceRule, type RecurrenceUnit, type Task } from '../lib/types'
 import { formatMinutes, fromLocalInput, recurrenceUnitName, toLocalInput, weekdayShort } from '../lib/dates'
 import { uid } from '../lib/tasks'
+import type { FocusEntry } from '../lib/types'
+import { dayKey } from '../lib/dates'
+import { estimateSuggestion, wouldCycle } from '../lib/planning'
+import { usePlanningCopy } from '../lib/planning-i18n'
+import { attachmentKind } from '../lib/attachments'
+import { platform } from '../lib/platform'
 import { useLang, useT } from '../lib/useT'
+import Attachments from './Attachments'
 import Modal from './Modal'
 import Toggle from './Toggle'
 
 interface Props {
   task: Task
   allTags: string[]
+  tasks?: Task[]
+  focusLog?: FocusEntry[]
+  onTemplate?(name: string, task: Task): void
   onSave(t: Task): void
   onCancel(): void
 }
@@ -17,12 +27,17 @@ const REMIND_OPTIONS = [0, 5, 10, 15, 20, 30, 45, 60, 120]
 /** Weekday toggles in Monday-first order (0 = Sunday). */
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
-export default function TaskEditor({ task, allTags, onSave, onCancel }: Props) {
+export default function TaskEditor({ task, allTags, tasks = [], focusLog = [], onTemplate, onSave, onCancel }: Props) {
   const t = useT()
+  const c = usePlanningCopy()
+  const [templateName, setTemplateName] = useState('')
+  const [templateSaved, setTemplateSaved] = useState(false)
   const lang = useLang()
   const [x, setX] = useState<Task>(task)
   const [tagInput, setTagInput] = useState('')
   const [subInput, setSubInput] = useState('')
+  const [pasted, setPasted] = useState<File[]>()
+  const media = platform.media
   const set = <K extends keyof Task>(k: K, v: Task[K]) => setX((p) => ({ ...p, [k]: v }))
   const rule: RecurrenceRule = x.recurrenceRule ?? DEFAULT_RECURRENCE_RULE
   const setRule = (patch: Partial<RecurrenceRule>) => set('recurrenceRule', { ...rule, ...patch })
@@ -50,6 +65,7 @@ export default function TaskEditor({ task, allTags, onSave, onCancel }: Props) {
     setSubInput('')
   }
 
+  const suggested = estimateSuggestion(x, tasks, focusLog)
   const canSave = x.title.trim().length > 0
 
   return (
@@ -61,8 +77,36 @@ export default function TaskEditor({ task, allTags, onSave, onCancel }: Props) {
 
       <label className="field">
         <span>{t('note')}</span>
-        <textarea rows={2} value={x.notes} onChange={(e) => set('notes', e.target.value)} placeholder={t('note_ph')} />
+        <textarea
+          rows={2}
+          value={x.notes}
+          onChange={(e) => set('notes', e.target.value)}
+          onPaste={(e) => {
+            // a pasted screenshot / copied photo becomes an attachment; text pastes stay untouched
+            const files = media ? [...e.clipboardData.files].filter((f) => attachmentKind(f.type)) : []
+            if (!files.length) return
+            e.preventDefault()
+            setPasted(files)
+          }}
+          placeholder={t('note_ph')}
+        />
       </label>
+      <details className="planning-details"><summary>{c.first} · {c.dependencies}</summary>
+        <label className="field"><span>{c.first}</span><input value={x.firstStep} placeholder={c.firstHint} onChange={(e) => set('firstStep', e.target.value)} /></label>
+        <label className="field"><span>{c.follow}</span><input type="datetime-local" value={toLocalInput(x.followUpAt)} onChange={(e) => set('followUpAt', fromLocalInput(e.target.value))} /></label>
+        <div className="field"><span>{c.dependencies}</span>
+          {x.dependsOn.map((id) => <label className="dependency" key={id}><input type="checkbox" checked onChange={() => set('dependsOn', x.dependsOn.filter((v) => v !== id))} />{tasks.find((t) => t.id === id)?.title ?? c.missing}</label>)}
+          <select aria-label={c.dependencies} value="" onChange={(e) => e.target.value && set('dependsOn', [...x.dependsOn, e.target.value])}><option value="">＋</option>{tasks.filter((v) => v.id !== x.id && !v.archived && v.completedAt === null && !x.dependsOn.includes(v.id) && !wouldCycle(tasks, x.id, v.id)).map((v) => <option key={v.id} value={v.id}>{v.title}</option>)}</select>
+        </div>
+        <button type="button" className="ghost" onClick={() => set('archived', !x.archived)}>{x.archived ? c.unarchive : c.archived}{x.archived ? ' ✓' : ''}</button>
+      </details>
+      {suggested && <div className="field"><button type="button" className="ghost" onClick={() => set('estimateMin', suggested.minutes)}>{c.suggestion}: {suggested.minutes}</button><small className="hint">{suggested.samples} {c.samples}</small></div>}
+      <details className="planning-details"><summary>{c.history} ({task.history.length})</summary>
+        {!task.history.length && <p className="hint">{c.historyEmpty}</p>}
+        {task.history.map((h, i) => <div className="revision" key={i}><small>{new Date(h.at).toLocaleString()}</small><b>{h.content.title}</b><p className="notes">{h.content.notes}</p><button type="button" className="mini" onClick={() => setX((v) => ({ ...v, ...h.content }))}>{c.restore}</button></div>)}
+      </details>
+      {onTemplate && <details className="planning-details"><summary>{c.saveTemplate}</summary><label className="field"><span>{c.templateName}</span><input value={templateName} onChange={(e) => { setTemplateName(e.target.value); setTemplateSaved(false) }} /></label><button type="button" className="mini" disabled={!templateName.trim() || !x.title.trim() || templateSaved} onClick={() => { onTemplate(templateName.trim(), x); setTemplateSaved(true) }}>{templateSaved ? '✓' : c.saveTemplate}</button></details>}
+      {media && <Attachments media={media} items={x.attachments} onChange={(v) => set('attachments', v)} pasted={pasted} />}
 
       <div className="grid2">
         <div className="field">

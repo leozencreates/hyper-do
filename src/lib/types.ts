@@ -43,7 +43,17 @@ export interface Subtask {
   done: boolean
 }
 
+export interface TaskRevision {
+  at: number
+  content: Pick<Task, 'title' | 'notes' | 'priority' | 'tags' | 'dueAt' | 'subtasks' | 'estimateMin' | 'energy' | 'firstStep' | 'dependsOn' | 'followUpAt' | 'archived' | 'status' | 'remindEveryMin'>
+}
+export interface TaskTemplate { id: string; name: string; task: Task }
 export interface Task {
+  firstStep: string
+  dependsOn: string[]
+  followUpAt: number | null
+  archived: boolean
+  history: TaskRevision[]
   id: string
   title: string
   notes: string
@@ -86,10 +96,41 @@ export interface Task {
   /** Routine (docs/2026-10-20-routines-design.md): the subtasks are steps, run one at a time with ▶ (RoutineRunner). */
   routine: boolean
   /**
+   * Photos / videos attached to the notes (docs/2026-10-24-attachments-design.md). Metadata only: the bytes live in
+   * the device's media store (`HyperDoApi.media`), so other devices see the entry but not the file.
+   */
+  attachments: Attachment[]
+  /**
    * Last change (epoch ms), bumped by every mutation path (#16): the newer copy wins when two devices
    * sync. `touchTask` keeps it strictly increasing even when another device's clock runs ahead. Default: `createdAt`.
    */
   updatedAt: number
+}
+
+export type AttachmentKind = 'image' | 'video'
+
+/** One photo / video on a task; `id` is the key in the media store. */
+export interface Attachment {
+  id: string
+  kind: AttachmentKind
+  /** Original file name (may be empty, e.g. a pasted screenshot). */
+  name: string
+  mime: string
+  /** Bytes. */
+  size: number
+  addedAt: number
+}
+
+/**
+ * Device-local store for attachment bytes (IndexedDB on Electron, web and Android). Not part of AppData,
+ * backups or sync. Missing (Telegram Mini App) → the editor hides attachments.
+ */
+export interface MediaApi {
+  put(id: string, blob: Blob): Promise<void>
+  /** null when the file is not on this device (attached elsewhere, or the store was cleared). */
+  get(id: string): Promise<Blob | null>
+  /** Deletes every stored file whose id is not in `keep`; resolves with the number removed. */
+  gc(keep: Set<string>): Promise<number>
 }
 
 /** A deleted task (#16): other devices drop their copy unless they edited it after `at`. Pruned after `TOMBSTONE_TTL_MS`. */
@@ -126,6 +167,10 @@ export interface EscalationSettings {
 }
 
 export interface Settings {
+  taskTemplates: TaskTemplate[]
+  reminderProfile: 'gentle' | 'normal' | 'persistent'
+  reminderHourlyLimit: number
+  groupReminders: boolean
   language: Lang
   /** Gecikmiş görevlerde aralık ikiye bölünür */
   escalateOverdue: boolean
@@ -355,6 +400,10 @@ export interface AppData {
 export const FOCUS_LOG_MAX = 5000
 
 export const DEFAULT_SETTINGS: Settings = {
+  taskTemplates: [],
+  reminderProfile: 'normal',
+  reminderHourlyLimit: 0,
+  groupReminders: false,
   language: 'en',
   escalateOverdue: true,
   flashWindow: true,
@@ -527,6 +576,8 @@ export interface HyperDoApi {
   onShare?(cb: (payload: SharePayload) => void): () => void
   /** Remote data connection (Telegram Mini App). Missing → the data is local and always available. */
   connection?: ConnectionApi
+  /** Photo / video store for task attachments. Missing → attachments are hidden (the metadata is kept). */
+  media?: MediaApi
 }
 
 declare global {

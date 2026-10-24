@@ -4,6 +4,7 @@ import { formatDue, formatMinutes, isOverdue, recurrenceLabel, recurrenceText, r
 import { isStuck, startBy } from '../lib/tasks'
 import { isRunnable } from '../lib/routine'
 import { useLang, useT } from '../lib/useT'
+import { usePlanningCopy } from '../lib/planning-i18n'
 import AddToCalendar from './AddToCalendar'
 
 export interface DragHandlers {
@@ -33,11 +34,13 @@ interface Props {
   onStuck?(): void
   /** ▶ Run (routines with steps): opens the step-by-step runner. */
   onRun?(): void
+  onStart?(): void
   drag?: DragHandlers
 }
 
-export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, onStuck, onRun, drag }: Props) {
+export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, onStuck, onRun, onStart, drag }: Props) {
   const t = useT()
+  const c = usePlanningCopy()
   const lang = useLang()
   const [open, setOpen] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -160,6 +163,11 @@ export default function TaskItem({ task, highlighted, spentMin = 0, escalation =
               {subDone}/{task.subtasks.length}
             </span>
           )}
+          {task.attachments.length > 0 && (
+            <span className="chip att" title={t('att_chip_title', { n: task.attachments.length })}>
+              📎 {task.attachments.length}
+            </span>
+          )}
           {task.tags.map((x) => (
             <span key={x} className="tag">
               #{x}
@@ -169,6 +177,7 @@ export default function TaskItem({ task, highlighted, spentMin = 0, escalation =
 
         {open && (
           <div className="task-detail" onClick={(e) => e.stopPropagation()}>
+            {!done && !task.archived && onStart && <div className="row planning-row"><button className="mini" onClick={onStart}>{c.start}</button></div>}
             {task.notes && <p className="notes">{task.notes}</p>}
             {task.subtasks.length > 0 && (
               <ul className="subtasks">

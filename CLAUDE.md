@@ -76,6 +76,10 @@ electron/syncfolder.ts  FolderTransport (#16): <dir>/hyperdo-sync.json, token = 
 electron/updater.ts     Auto-update (electron-updater, GitHub Releases): packaged builds only, first check 30 s after
                         ready then every 6 h while settings.autoUpdate; IPC tidi:update-status|update-check|update-install|
                         app-version; install() sets `quitting` before quitAndInstall
+src/lib/attachments.ts  Pure: photo / video attachments (spec 2026-10-24-attachments-design.md): normalizeAttachments,
+                        attachmentKind, rejectReason (type / 200 MB / 20 per task), referencedMediaIds (gc keep-set), formatBytes.
+                        Bytes live in platform.media.ts (IndexedDB `hyperdo-media`, HyperDoApi.media put/get/gc; added in
+                        platform.ts to every adapter except the Mini App), never in AppData / backups / sync; main window gc once per start
 src/lib/share.ts        Pure: parseShareEvent (hyperdoShare window event from MainActivity.java), shareToTaskFields
 src/lib/platform.ts     Picks the adapter at startup: window.tidi (Electron) → Telegram Mini App (window.Telegram.WebApp.initData
                         non-empty) → Capacitor → web
@@ -180,9 +184,9 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
                         (`docs/YYYY-MM-DD-<area>-design.md`) before implementation; roadmap items link to it
 ```
 
-Tests: `src/lib/*.test.ts` (calendar-links, calsync, data, dates, deeplink, digest, gcal, ics, parse, reminder, share, sound, stats,
-routine, sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`, `electron/syncfolder.test.ts`,
-`electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 24 files, 486 tests.
+Tests: `src/lib/*.test.ts` (attachments, calendar-links, calsync, data, dates, deeplink, digest, full-backup, gcal, ics, parse,
+planning, reminder, share, sound, stats, routine, sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`,
+`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 27 files, 512 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.
@@ -237,6 +241,9 @@ process, the browser build and Vitest.
   (otherwise a `done:` button would edit the message twice: strike-through from B2 and the "✓ Done" line).
 - `npm run dist` writes to `%LOCALAPPDATA%\hyperdo-release\` because of a folder-naming restriction under Desktop.
   Do not run `dist` or anything Gradle/Android unless asked; both are slow and need the `.tools` JDK / Android SDK.
+- `build.files` excludes `node_modules/@capacitor/**`: those packages carry Android Gradle `build/` output whose paths
+  exceed 260 chars under `C:\Program Files\Hyper Do\resources\app.asar.unpacked`, which made the NSIS copy fail with
+  "Hyper Do kapatılamaz" (appCannotBeClosed). Electron never loads them (Vite bundles the web code).
 - `vite.config.ts` loads `vite-plugin-electron`; Vitest must use `vitest.config.ts` only.
 - `DEFAULT_SETTINGS` reads `import.meta.env.VITE_GOOGLE_CLIENT_ID/_SECRET` with optional chaining so it also works
   in Node (Electron main, Vitest).

@@ -5,6 +5,8 @@ import { platform } from '../lib/platform'
 import { useLang, useT } from '../lib/useT'
 import type { CalendarState } from '../lib/useCalendar'
 import { dateStamp, downloadJson } from '../lib/download'
+import FullBackup from './FullBackup'
+import { usePlanningCopy } from '../lib/planning-i18n'
 import CalendarSettings from './CalendarSettings'
 import SyncSettings from './SyncSettings'
 import Modal from './Modal'
@@ -22,6 +24,7 @@ interface Props {
 export default function SettingsPanel({ settings, data, cal, onChange, onImport, onClose }: Props) {
   const t = useT()
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...settings, [k]: v })
+  const c = usePlanningCopy()
   const isElectron = platform.kind === 'electron'
 
   return (
@@ -86,6 +89,9 @@ export default function SettingsPanel({ settings, data, cal, onChange, onImport,
       </div>
       <Toggle checked={settings.focusSuppressOthers} onChange={(v) => set('focusSuppressOthers', v)} label={t('s_focus_suppress')} desc={t('s_focus_suppress_d')} />
 
+      <label className="field"><span>{c.profile}</span><select value={settings.reminderProfile} onChange={(e) => set('reminderProfile', e.target.value as Settings['reminderProfile'])}>{(['gentle', 'normal', 'persistent'] as const).map((p) => <option key={p} value={p}>{c[p]}</option>)}</select><small className="hint">{c.reminderHint}</small></label>
+      <label className="field"><span>{c.hourly}</span><input type="number" min={0} max={60} value={settings.reminderHourlyLimit} onChange={(e) => set('reminderHourlyLimit', Math.max(0, Math.min(60, Math.floor(Number(e.target.value) || 0))))} /></label>
+      <Toggle checked={settings.groupReminders} onChange={(v) => set('groupReminders', v)} label={c.group} desc="" />
       <Toggle checked={settings.funTitles} onChange={(v) => set('funTitles', v)} label={t('s_fun')} desc={t('s_fun_d')} />
       <Toggle checked={settings.escalateOverdue} onChange={(v) => set('escalateOverdue', v)} label={t('s_escalate')} desc={t('s_escalate_d')} />
       <Toggle
@@ -163,6 +169,7 @@ export default function SettingsPanel({ settings, data, cal, onChange, onImport,
       {platform.sync && <SyncSettings api={platform.sync} settings={settings} onChange={onChange} />}
 
       <BackupSection data={data} onImport={onImport} />
+      {platform.media && <FullBackup data={data} media={platform.media} onImport={onImport} />}
       {platform.desktop && <AutoBackupSection desktop={platform.desktop} settings={settings} onChange={onChange} />}
 
       <div className="field">

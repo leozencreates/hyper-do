@@ -9,6 +9,7 @@ import type { Energy, Task } from './types'
 import { translate, type Lang } from './i18n'
 import { endOfDay, formatMinutes } from './dates'
 import { startBy } from './tasks'
+import { isBlocked } from './planning'
 
 export interface NextContext {
   /** Energy the user has right now (null = any). */
@@ -48,7 +49,7 @@ const H = 3_600_000
 
 /** Open, not snoozed into the future, not waiting on someone else. */
 export function isNextCandidate(t: Task, nowMs: number): boolean {
-  return t.completedAt === null && !(t.snoozedUntil !== null && t.snoozedUntil > nowMs) && t.status !== 'waiting'
+  return !t.archived && t.completedAt === null && !(t.snoozedUntil !== null && t.snoozedUntil > nowMs) && t.status !== 'waiting'
 }
 
 function scoreTask(t: Task, ctx: NextContext, nowMs: number): { score: number; reasons: NextReason[] } {
@@ -117,7 +118,7 @@ function scoreTask(t: Task, ctx: NextContext, nowMs: number): { score: number; r
 /** Every candidate, best first (ties: earlier due date, no date last, then list order). */
 export function rankNext(tasks: Task[], ctx: NextContext = ANY_CONTEXT, nowMs = Date.now()): NextPick[] {
   return tasks
-    .filter((t) => isNextCandidate(t, nowMs))
+    .filter((t) => isNextCandidate(t, nowMs) && !isBlocked(t, tasks))
     .map((task) => ({ task, ...scoreTask(task, ctx, nowMs) }))
     .sort((a, b) => b.score - a.score || (a.task.dueAt ?? Infinity) - (b.task.dueAt ?? Infinity) || a.task.order - b.task.order)
 }

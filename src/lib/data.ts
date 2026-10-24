@@ -144,6 +144,10 @@ export function normalizeData(d: Partial<AppData> | null | undefined, base: Sett
   const settings: Settings = {
     ...base,
     ...s,
+    reminderProfile: s?.reminderProfile === 'gentle' || s?.reminderProfile === 'persistent' ? s.reminderProfile : 'normal',
+    reminderHourlyLimit: typeof s?.reminderHourlyLimit === 'number' && Number.isFinite(s.reminderHourlyLimit) ? Math.max(0, Math.min(60, Math.floor(s.reminderHourlyLimit))) : 0,
+    groupReminders: s?.groupReminders === true,
+    taskTemplates: Array.isArray(s?.taskTemplates) ? s.taskTemplates.filter((x) => x && typeof x.id === 'string' && typeof x.name === 'string' && x.task && typeof x.task.id === 'string').map((x) => ({ id: x.id, name: x.name, task: normalizeTask(x.task) })) : [],
     quietHours: { ...base.quietHours, ...s?.quietHours },
     telegram: {
       ...base.telegram,

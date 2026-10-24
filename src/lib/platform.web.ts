@@ -3,7 +3,7 @@
  * Hatırlatmalar yalnızca sekme ya da ana ekrana eklenmiş uygulama açıkken gelir.
  */
 import type { AppData, HyperDoApi, NotifyPermission } from './types'
-import { activeFocusTaskId, buildNotification, collectDueReminders, markNagged, syncCounters } from './reminder'
+import { activeFocusTaskId, reminderSummary, buildNotification, collectDueReminders, markNagged, syncCounters } from './reminder'
 import { translate } from './i18n'
 import { browserDefaultSettings, parseAppData, DATA_STORAGE_KEY } from './data'
 import { bumpChanged } from './tasks'
@@ -72,9 +72,12 @@ export function createWebApi(): HyperDoApi {
     const now = Date.now()
     const hits = collectDueReminders(data.tasks, data.settings, lastNotified, now, activeFocusTaskId(data, now))
     if (hits.length === 0) return
+    if (data.settings.groupReminders && hits.length > 1) {
+      const summary = reminderSummary(hits); show(summary.title, summary.body, 'hyperdo-summary')
+    }
     for (const h of hits) {
       const { title, body } = buildNotification(h.task, h.overdue, data.settings)
-      show(title, body, 'hyperdo-' + h.task.id, () => focus.emit(h.task.id))
+      if (!data.settings.groupReminders || hits.length === 1) show(title, body, 'hyperdo-' + h.task.id, () => focus.emit(h.task.id))
       reminded.emit(h.task.id)
       document.title = `🔔 ${h.task.title} – Hyper Do`
       setTimeout(() => (document.title = 'Hyper Do'), 15_000)

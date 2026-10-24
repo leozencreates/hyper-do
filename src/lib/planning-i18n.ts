@@ -1,0 +1,61 @@
+import { useLang } from './useT'
+
+const en = {
+  inbox: 'Inbox', archive: 'Archive',
+  start: 'Start for 2 minutes', first: 'Smallest first step', firstHint: 'For example: open the file and write the heading',
+  go: 'Start', stop: 'Stop for now', keep: 'Continue with Hyper Focus', finished: 'Two minutes done. Continue or stop — your choice.',
+  dependencies: 'Start after these tasks', missing: 'Missing task — remove this dependency if no longer needed', follow: 'Follow up at',
+  history: 'Previous versions', restore: 'Restore this version', historyEmpty: 'Future edits and sync versions will appear here.',
+  templates: 'My templates', saveTemplate: 'Save as template', templateName: 'Template name', use: 'Use', delete: 'Delete',
+  templateHint: 'Templates are saved on this device and included in backups.',
+  suggestion: 'Suggested minutes from similar completed tasks', samples: 'tracked tasks; focus time only',
+  review: 'Weekly review', reviewHint: 'Overdue, repeatedly postponed, and unfinished earlier plans.', reviewEmpty: 'Nothing needs replanning.',
+  split: 'Break into steps', replan: 'Replan', archived: 'Archive task', unarchive: 'Restore from archive',
+  completed: 'Completed in the last 7 days', focus: 'Focus minutes in the last 7 days',
+  profile: 'Reminder style', gentle: 'Gentle', normal: 'Normal', persistent: 'Persistent',
+  hourly: 'Task reminder limit per hour (0 = unlimited)', group: 'Combine simultaneous task reminders',
+  reminderHint: 'Gentle doubles intervals; persistent halves them (minimum 5 minutes). Limits apply per device; digests are separate.',
+  fullBackup: 'Backup including photos and videos', export: 'Export full backup', import: 'Import full backup',
+  backupHint: 'Includes tasks and available media. Automatic JSON backups still exclude media.',
+  busy: 'Working…', error: 'Could not complete the operation', missingMedia: 'Some attachment files are missing on this device. Download cancelled; restore the files first.',
+  confirmImport: 'Replace tasks and settings with this backup?', cancel: 'Cancel', backupReady: 'Backup ready',
+  combined: 'Tasks waiting for you', reminderSummary: 'Open Hyper Do to act on these tasks.',
+}
+type Copy = Record<keyof typeof en, string>
+const tr: Copy = {
+  inbox: 'Gelen kutusu', archive: 'Arşiv',
+  start: '2 dakika başla', first: 'En küçük ilk adım', firstHint: 'Örneğin: dosyayı aç ve başlığı yaz',
+  go: 'Başla', stop: 'Şimdilik dur', keep: 'Hyper Focus ile devam et', finished: 'İki dakika tamam. Devam etmek veya durmak sana bağlı.',
+  dependencies: 'Bu görevler bittikten sonra başla', missing: 'Görev bulunamadı — artık gerekmiyorsa bu bağımlılığı kaldır', follow: 'Tekrar takip zamanı',
+  history: 'Önceki sürümler', restore: 'Bu sürümü geri yükle', historyEmpty: 'Sonraki düzenlemeler ve senkronizasyon sürümleri burada görünecek.',
+  templates: 'Şablonlarım', saveTemplate: 'Şablon olarak kaydet', templateName: 'Şablon adı', use: 'Kullan', delete: 'Sil',
+  templateHint: 'Şablonlar bu cihazda saklanır ve yedeklere dahil edilir.',
+  suggestion: 'Benzer tamamlanan işlere göre önerilen dakika', samples: 'takip edilmiş iş; yalnızca odak süresi',
+  review: 'Haftalık değerlendirme', reviewHint: 'Gecikmiş, sürekli ertelenen ve önceki planlarda kalan işler.', reviewEmpty: 'Yeniden planlanması gereken iş yok.',
+  split: 'Adımlara böl', replan: 'Yeniden planla', archived: 'Görevi arşivle', unarchive: 'Arşivden çıkar',
+  completed: 'Son 7 günde tamamlanan', focus: 'Son 7 gündeki odak dakikası',
+  profile: 'Hatırlatma tarzı', gentle: 'Nazik', normal: 'Normal', persistent: 'Israrcı',
+  hourly: 'Saatlik görev hatırlatma sınırı (0 = sınırsız)', group: 'Aynı anda gelen görevleri tek bildirimde topla',
+  reminderHint: 'Nazik mod aralığı iki katına çıkarır; ısrarcı mod yarıya indirir (en az 5 dakika). Sınırlar cihaz başınadır; özetler ayrıdır.',
+  fullBackup: 'Fotoğraf ve videolar dahil yedek', export: 'Tam yedeği dışa aktar', import: 'Tam yedeği içe aktar',
+  backupHint: 'Görevler ve mevcut medya dosyaları dahildir. Otomatik JSON yedekleri hâlâ medyayı içermez.',
+  busy: 'İşleniyor…', error: 'İşlem tamamlanamadı', missingMedia: 'Bazı ek dosyalar bu cihazda yok. İndirme iptal edildi; önce eksik dosyaları geri yükle.',
+  confirmImport: 'Görevler ve ayarlar bu yedekle değiştirilsin mi?', cancel: 'Vazgeç', backupReady: 'Yedek hazır',
+  combined: 'Seni bekleyen işler', reminderSummary: 'Bu görevlerle ilgilenmek için Hyper Do’yu aç.',
+}
+const ru: Copy = {
+  inbox: 'Входящие', archive: 'Архив',
+  start: 'Начать на 2 минуты', first: 'Самый маленький первый шаг', firstHint: 'Например: открыть файл и написать заголовок', go: 'Начать', stop: 'Пока остановиться', keep: 'Продолжить с Hyper Focus', finished: 'Две минуты прошли. Продолжать или остановиться — ваш выбор.',
+  dependencies: 'Начать после этих задач', missing: 'Задача не найдена — удалите ненужную зависимость', follow: 'Напомнить о проверке',
+  history: 'Предыдущие версии', restore: 'Восстановить версию', historyEmpty: 'Здесь появятся будущие изменения и версии синхронизации.',
+  templates: 'Мои шаблоны', saveTemplate: 'Сохранить шаблон', templateName: 'Название шаблона', use: 'Использовать', delete: 'Удалить', templateHint: 'Шаблоны хранятся на устройстве и входят в резервную копию.',
+  suggestion: 'Рекомендуемые минуты по похожим задачам', samples: 'задач с учётом времени; только время фокуса',
+  review: 'Обзор недели', reviewHint: 'Просроченные, отложенные и оставшиеся в прошлых планах задачи.', reviewEmpty: 'Нет задач для пересмотра.', split: 'Разбить на шаги', replan: 'Перепланировать', archived: 'В архив', unarchive: 'Из архива',
+  completed: 'Выполнено за 7 дней', focus: 'Минуты фокуса за 7 дней',
+  profile: 'Стиль напоминаний', gentle: 'Мягкий', normal: 'Обычный', persistent: 'Настойчивый', hourly: 'Напоминаний о задачах в час (0 = без ограничений)', group: 'Объединять одновременные напоминания',
+  reminderHint: 'Мягкий режим удваивает интервал; настойчивый сокращает вдвое (минимум 5 минут). Лимит на устройство, обзоры отдельно.',
+  fullBackup: 'Резервная копия с фото и видео', export: 'Экспорт полной копии', import: 'Импорт полной копии', backupHint: 'Задачи и доступные медиа. Автоматические JSON-копии по-прежнему без медиа.', busy: 'Обработка…', error: 'Не удалось завершить операцию', missingMedia: 'Некоторых файлов нет на устройстве. Экспорт отменён; сначала восстановите их.', confirmImport: 'Заменить задачи и настройки этой копией?', cancel: 'Отмена', backupReady: 'Копия готова',
+  combined: 'Задачи ждут вас', reminderSummary: 'Откройте Hyper Do для работы с задачами.',
+}
+export const planningCopy = { en, tr, ru }
+export function usePlanningCopy() { return planningCopy[useLang()] }

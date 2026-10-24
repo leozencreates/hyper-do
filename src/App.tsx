@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppData, type AppStore } from './lib/store'
-import { matchesQuery, newTask, pickEasyTask, sortTasks } from './lib/tasks'
+import { matchesQuery, newTask, pickEasyTask, sortTasks, uid } from './lib/tasks'
 import { ENERGIES, ENERGY_ICON, SORT_MODES, type AppData, type ConnectionStatus, type Energy, type SortMode, type Task, type UpdateStatus } from './lib/types'
-import { dayKey, endOfDay, isOverdue, isToday, isThisWeek } from './lib/dates'
+import { dayKey, isOverdue, isToday, isThisWeek } from './lib/dates'
 import { escalationLevel } from './lib/reminder'
 import { spentMinByTask, streak } from './lib/stats'
 import { shareToTaskFields } from './lib/share'
+import { referencedMediaIds } from './lib/attachments'
 import { platform } from './lib/platform'
 import { LangContext, useT } from './lib/useT'
 import { LANGS, LOCALE, translate, type Lang } from './lib/i18n'
@@ -15,6 +16,10 @@ import { useTaskActions } from './lib/useTaskActions'
 import { useSounds } from './lib/useSounds'
 import { inFocusWork } from './lib/sound'
 import { useCalendar } from './lib/useCalendar'
+import TwoMinuteStart from './components/TwoMinuteStart'
+import { WeeklyReview, Templates } from './components/PlanningTools'
+import { usePlanningCopy } from './lib/planning-i18n'
+import { isBlocked } from './lib/planning'
 import TaskItem from './components/TaskItem'
 import TaskEditor from './components/TaskEditor'
 import FocusBanner from './components/FocusBanner'
@@ -34,8 +39,8 @@ import ConnectionPanel from './components/ConnectionPanel'
 import { HyperFocusBar, useHyperFocus } from './components/HyperFocus'
 import { useCelebration } from './components/Celebration'
 
-type View = 'today' | 'week' | 'all' | 'board' | 'done'
-const VIEW_KEYS: View[] = ['today', 'week', 'all', 'board', 'done']
+type View = 'today' | 'week' | 'all' | 'board' | 'done' | 'inbox' | 'archive'
+const VIEW_KEYS: View[] = ['today', 'week', 'all', 'board', 'done', 'inbox', 'archive']
 
 /**
  * `?view=` is read once at startup. Besides the list views it selects the renderer *window kind*:
@@ -88,6 +93,7 @@ type MainProps = AppStore & { data: AppData }
 
 function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFocusEntry, replaceData }: MainProps) {
   const t = useT()
+  const c = usePlanningCopy()
   const { tasks, settings } = data
   // The Mini App only shows a Hyper Focus session running on the PC; the desktop drives the phases.
   // Sound effects: the master switch lives in settings, a Hyper Focus work round silences everything by itself.
@@ -118,6 +124,9 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const [energy, setEnergy] = useState<Energy | null>(null)
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Task | null>(null)
+  const [startId, setStartId] = useState<string | null>(null)
+  const [showReview, setShowReview] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showBrain, setShowBrain] = useState(false)
@@ -197,6 +206,12 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Attachments: files no task points at any more (removed in the editor, task deleted) are dropped once per start
+  useEffect(() => {
+    void platform.media?.gc(referencedMediaIds(tasks)).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-update (#18): a downloaded update shows a toast until "Restart now" / "Later"
   useEffect(() => {
     if (!desktop) return
@@ -223,11 +238,12 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const hasEnergy = useMemo(() => tasks.some((x) => x.completedAt === null && x.energy !== null), [tasks])
 
   const filtered = useMemo(() => {
-    let list = tasks
+    let list = tasks.filter((x) => view === 'archive' ? x.archived : !x.archived)
     if (view === 'done') list = list.filter((x) => x.completedAt !== null)
-    else if (view !== 'board') {
-      list = list.filter((x) => x.completedAt === null)
-      if (view === 'today') list = list.filter((x) => x.dueAt === null || isToday(x.dueAt, now) || isOverdue(x.dueAt, now))
+    else if (view !== 'board' && view !== 'archive') {
+      list = list.filter((x) => !x.archived && x.completedAt === null)
+      if (view === 'today') list = list.filter((x) => x.dueAt !== null && (isToday(x.dueAt, now) || isOverdue(x.dueAt, now)))
+      if (view === 'inbox') list = list.filter((x) => x.dueAt === null)
       if (view === 'week') list = list.filter((x) => x.dueAt !== null && (isThisWeek(x.dueAt, now) || isOverdue(x.dueAt, now)))
     }
     if (tag) list = list.filter((x) => x.tags.includes(tag))
@@ -244,25 +260,25 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const spentByTask = useMemo(() => spentMinByTask(data.focusLog), [data.focusLog])
   const currentStreak = useMemo(() => streak(data.dailyDone, dayKey(now)), [data.dailyDone, now])
 
-  const focusTask = tasks.find((x) => x.focused && x.completedAt === null) ?? null
+  const focusTask = tasks.find((x) => x.focused && !x.archived && x.completedAt === null) ?? null
   const hfTask = hf.session?.taskId ? (tasks.find((x) => x.id === hf.session!.taskId) ?? null) : focusTask
-  const openCount = tasks.filter((x) => x.completedAt === null).length
-  const overdueCount = tasks.filter((x) => x.completedAt === null && isOverdue(x.dueAt, now)).length
+  const openCount = tasks.filter((x) => !x.archived && x.completedAt === null).length
+  const overdueCount = tasks.filter((x) => !x.archived && x.completedAt === null && isOverdue(x.dueAt, now)).length
   const doneToday = tasks.filter((x) => x.completedAt !== null && isToday(x.completedAt, now)).length
-  const doneCount = tasks.length - openCount
-  const runTask = runId ? (tasks.find((x) => x.id === runId && x.completedAt === null) ?? null) : null
-  const routines = tasks.filter((x) => x.routine && x.completedAt === null)
+  const doneCount = tasks.filter((x) => !x.archived && x.completedAt !== null).length
+  const runTask = runId ? (tasks.find((x) => x.id === runId && !x.archived && x.completedAt === null) ?? null) : null
+  const routines = tasks.filter((x) => x.routine && !x.archived && x.completedAt === null)
   /** "+ Routine": the editor opens prefilled (template steps in the current language); nothing is saved before Save. */
   const newRoutine = (kind: RoutineTemplate | null) => {
     setRtMenu(false)
     setEditing(newTask(kind ? { ...routineFromTemplate(kind, settings.language, Date.now()), status: 'todo' } : { routine: true, recurrence: 'daily', status: 'todo' }, settings))
   }
-  const stuckTask = stuckId ? (tasks.find((x) => x.id === stuckId && x.completedAt === null) ?? null) : null
-  const easyTask = easy?.id ? (tasks.find((x) => x.id === easy.id && x.completedAt === null) ?? null) : null
+  const stuckTask = stuckId ? (tasks.find((x) => x.id === stuckId && !x.archived && x.completedAt === null) ?? null) : null
+  const easyTask = easy?.id ? (tasks.find((x) => x.id === easy.id && !x.archived && x.completedAt === null) ?? null) : null
 
   /** 🎲 Easy one (#10): suggest a low-effort open task, bring it into view and highlight it. */
   const pickEasy = (exclude: string | null = null) => {
-    const open = tasks.filter((x) => x.completedAt === null)
+    const open = tasks.filter((x) => !x.archived && x.completedAt === null)
     const pick = pickEasyTask(open.filter((x) => x.id !== exclude)) ?? pickEasyTask(open)
     setEasy({ id: pick?.id ?? null })
     if (!pick) return
@@ -286,7 +302,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   }, [easy])
 
   // Klavye kısayolları (bir alan yazılırken ya da pencere açıkken devre dışı)
-  const modalOpen = !!editing || showSettings || showStats || showBrain || showNext || stuckId !== null || runId !== null
+  const modalOpen = startId !== null || showReview || showTemplates || !!editing || showSettings || showStats || showBrain || showNext || stuckId !== null || runId !== null
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (modalOpen || e.ctrlKey || e.metaKey || e.altKey) return
@@ -311,7 +327,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
       } else if (k === 'm' && desktop) {
         e.preventDefault()
         void desktop.toggleMini()
-      } else if (e.key >= '1' && e.key <= '5') {
+      } else if (e.key >= '1' && e.key <= '7') {
         setView(VIEW_KEYS[Number(e.key) - 1])
       }
     }
@@ -325,13 +341,15 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   }
 
   /** Liste görünümünde sürükleyerek sıralama. */
+  const startTask = tasks.find((x) => x.id === startId && x.completedAt === null && !x.archived)
+
   const dropOn = (beforeId: string | null) => {
     if (!dragId) return
     actions.reorder(dragId, beforeId)
     setDragId(null)
   }
 
-  const viewLabel = (v: View) => t(`view_${v}` as const)
+  const viewLabel = (v: View) => v === 'inbox' ? c.inbox : v === 'archive' ? c.archive : t(`view_${v}` as const)
 
   /** ＋ tab of the Mini App: the quick-add box, focused (it only exists in the list views). */
   const addFromTab = () => {
@@ -478,6 +496,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
             onHyperFocus={hf.session || IS_TG ? undefined : () => hf.start(focusTask.id)}
           />
         )}
+        <div className="planning-toolbar"><button className="ghost small" onClick={() => setShowReview(true)}>{c.review}</button><button className="ghost small" onClick={() => setShowTemplates(true)}>{c.templates}</button>{<button className="ghost small" onClick={() => setView('inbox')}>{c.inbox} ({tasks.filter((x) => !x.archived && x.completedAt === null && x.dueAt === null).length})</button>}</div>
 
         <header className="content-head">
           <h1>{viewLabel(view)}</h1>
@@ -572,8 +591,8 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
         {view !== 'done' && view !== 'board' && (
           <QuickAdd
             ref={quickRef}
-            onAdd={(text) => actions.quickAdd(text, { defaultDueAt: view === 'today' ? endOfDay(now) : null })}
-            onAddMany={(lines) => actions.quickAddMany(lines, { defaultDueAt: view === 'today' ? endOfDay(now) : null })}
+            onAdd={(text) => actions.quickAdd(text, {})}
+            onAddMany={(lines) => actions.quickAddMany(lines, {})}
           />
         )}
 
@@ -618,6 +637,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 onPostpone={() => actions.postpone(x)}
                 onStuck={() => setStuckId(x.id)}
                 onRun={() => setRunId(x.id)}
+                onStart={isBlocked(x, tasks) ? undefined : () => setStartId(x.id)}
                 drag={
                   view !== 'done' && !IS_TG
                     ? {
@@ -703,6 +723,9 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
         <TaskEditor
           task={editing}
           allTags={allTags}
+          tasks={tasks}
+          focusLog={data.focusLog}
+          onTemplate={(name, task) => setSettings((s) => ({ ...s, taskTemplates: [...s.taskTemplates, { id: uid(), name, task: { ...task, attachments: [], history: [] } }] }))}
           onCancel={() => setEditing(null)}
           onSave={(nt) => {
             actions.save(nt)
@@ -774,8 +797,11 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
           onClose={() => setShowNext(false)}
         />
       )}
-      {showBrain && <BrainDump onAdd={(lines) => actions.quickAddMany(lines, { defaultDueAt: view === 'today' ? endOfDay(now) : null })} onClose={() => setShowBrain(false)} />}
+      {showBrain && <BrainDump onAdd={(lines) => actions.quickAddMany(lines, {})} onClose={() => setShowBrain(false)} />}
 
+      {startTask && <TwoMinuteStart key={startTask.id} task={startTask} onStep={(firstStep) => { actions.update(startTask.id, { firstStep }); actions.setFocus(startTask.id, true) }} onClose={() => setStartId(null)} onContinue={hf.session || IS_TG ? undefined : () => { hf.start(startTask.id); setStartId(null) }} />}
+      {showReview && <WeeklyReview data={data} now={now} onEdit={(task) => { setShowReview(false); setEditing(task) }} onArchive={(task) => actions.update(task.id, { archived: true, focused: false })} onClose={() => setShowReview(false)} />}
+      {showTemplates && <Templates settings={settings} onChange={(s) => setSettings(() => s)} onUse={(task) => { setShowTemplates(false); setEditing(task) }} onClose={() => setShowTemplates(false)} />}
       {showStats && <StatsModal data={data} now={now} onClose={() => setShowStats(false)} />}
 
       {showSettings && (

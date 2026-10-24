@@ -3,7 +3,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { AppData, BackupInfo, MiniAppMode, MiniAppStatus, Task } from '../src/lib/types'
-import { activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, markNagged, resetNag, syncCounters } from '../src/lib/reminder'
+import { activeFocusTaskId, reminderSummary, buildNotification, collectDueReminders, escalationLevel, markNagged, resetNag, syncCounters } from '../src/lib/reminder'
 import { bumpChanged, snoozeTask, taskFromQuickAdd, touchTask } from '../src/lib/tasks'
 import { SyncEngine } from '../src/lib/syncengine'
 import { WebDavTransport } from '../src/lib/synctransport'
@@ -691,11 +691,21 @@ function tick() {
   const hits = collectDueReminders(data.tasks, data.settings, lastNotified, now, activeFocusTaskId(data, now))
   if (hits.length === 0) return
   let popup = false
+  const grouped = data.settings.groupReminders && hits.length > 1
+  if (grouped) {
+    const summary = reminderSummary(hits)
+    const notification = new Notification(summary)
+    notification.on('click', () => showWindow())
+    notification.show()
+    void telegram.remindGroup(hits.map((h) => h.task))
+  }
   for (const { task, overdue } of hits) {
     const level = escalationLevel(task, data.settings)
     const { title, body } = buildNotification(task, overdue, data.settings, now)
-    showReminder(task, title, body, overdue || task.priority === 'high' || level >= 2)
-    void telegram.remind(task, title, body)
+    if (!grouped) {
+      showReminder(task, title, body, overdue || task.priority === 'high' || level >= 2)
+      void telegram.remind(task, title, body)
+    }
     if (level >= 2) popup = true
 
     if (data.settings.flashWindow && win) win.flashFrame(true)
