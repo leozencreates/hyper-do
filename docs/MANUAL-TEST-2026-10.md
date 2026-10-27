@@ -333,6 +333,10 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 11. `/mute 2sa` → "🔇 Susturuldu, 14:30 itibarıyla tekrar açık"; PC üst çubuğunda "🔇 14:30 açılır" çipi; PC'ye de
     Telegram'a da hatırlatma gelmez. `/mute` → 1 sa; `/mute off` → "🔔 Hatırlatmalar geri geldi". `/mute 45dk`,
     `/mute 2ч` de çalışır.
+11b. Tek tuşla 4 saat susturma (📁 `src/App.tsx`, `electron/main.ts` → `buildTrayMenu`; `reminder.ts` → `quickMute`):
+    üst çubukta **🔕 4 sa** → düğme kaybolur, yerine "🔇 HH:MM açılır" çipi (şimdi + 4 sa); çipe tıklayınca susturma
+    kalkar, düğme geri gelir. Tepsi menüsü: "4 saat sustur" → menü "Susturmayı kaldır (HH:MM)" olur ve tersi; süre
+    dolunca menü en geç 30 sn içinde "4 saat sustur"a döner. Mini App'te düğme görünmez.
 12. `/quiet` → sessiz saatler açılır/kapanır, yanıt pencereyi söyler; `/quiet on|off`.
 13. `/help` → Görevler · Görünümler · Hatırlatmalar · Diğer başlıklarıyla 22 komut, takma adlar parantezde, sonda
     düz yazı ve yanıt ipuçları. Bilinmeyen komut → aynı yardım.

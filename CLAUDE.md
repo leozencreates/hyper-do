@@ -186,7 +186,7 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 
 Tests: `src/lib/*.test.ts` (attachments, calendar-links, calsync, data, dates, deeplink, digest, full-backup, gcal, ics, parse,
 planning, reminder, share, sound, stats, routine, sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`,
-`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 27 files, 512 tests.
+`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 27 files, 513 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.

@@ -3,7 +3,7 @@ import { useAppData, type AppStore } from './lib/store'
 import { matchesQuery, newTask, pickEasyTask, sortTasks, uid } from './lib/tasks'
 import { ENERGIES, ENERGY_ICON, SORT_MODES, type AppData, type ConnectionStatus, type Energy, type SortMode, type Task, type UpdateStatus } from './lib/types'
 import { dayKey, isOverdue, isToday, isThisWeek } from './lib/dates'
-import { escalationLevel } from './lib/reminder'
+import { escalationLevel, isMuted, quickMute } from './lib/reminder'
 import { spentMinByTask, streak } from './lib/stats'
 import { shareToTaskFields } from './lib/share'
 import { referencedMediaIds } from './lib/attachments'
@@ -535,6 +535,11 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
             >
               {settings.sounds && !inFocusWork(data.hyperFocus) ? '🔊' : '🔇'}
             </button>
+            {!isMuted(settings, now) && !IS_TG && (
+              <button className="ghost small" title={t('mute_quick_title')} onClick={() => setSettings((s) => quickMute(s, Date.now()))}>
+                {t('mute_quick')}
+              </button>
+            )}
             {settings.mutedUntil !== null && settings.mutedUntil > now && (
               // Settings are never saved from the Mini App, so there the chip only informs (unmute on the PC or with /mute off)
               <button className="ghost small" title={t('tg_unmuted')} disabled={IS_TG} onClick={() => setSettings((s) => ({ ...s, mutedUntil: null }))}>

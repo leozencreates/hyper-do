@@ -53,6 +53,14 @@ export function isMuted(s: Pick<Settings, 'mutedUntil'>, nowMs: number): boolean
   return typeof until === 'number' && until > nowMs
 }
 
+/** One-tap mute (header button, tray menu): this long from now. */
+export const QUICK_MUTE_MS = 4 * 60 * 60_000
+
+/** Settings muted for `QUICK_MUTE_MS` from `nowMs`. */
+export function quickMute<S extends Pick<Settings, 'mutedUntil'>>(s: S, nowMs: number): S {
+  return { ...s, mutedUntil: nowMs + QUICK_MUTE_MS }
+}
+
 export function inQuietHours(s: Settings, now: Date): boolean {
   if (!s.quietHours.enabled) return false
   const [fh, fm] = s.quietHours.from.split(':').map(Number)

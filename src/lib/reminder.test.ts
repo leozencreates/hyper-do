@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { translate } from './i18n'
-import { FOCUS_NO_TASK, activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, focusSuppressedUntil, inQuietHours, deliveredNags, isMuted, markNagged, markNaggedBy, parseNagPlan, planReminderTimes, plannedEscalation, resetNag, syncCounters } from './reminder'
+import { FOCUS_NO_TASK, activeFocusTaskId, buildNotification, collectDueReminders, escalationLevel, focusSuppressedUntil, inQuietHours, deliveredNags, isMuted, markNagged, markNaggedBy, parseNagPlan, planReminderTimes, plannedEscalation, quickMute, resetNag, syncCounters } from './reminder'
 import { normalizeTask } from './tasks'
 import { DEFAULT_SETTINGS, type HfSession, type Settings, type Task } from './types'
 
@@ -151,6 +151,15 @@ describe('collectDueReminders', () => {
     expect(isMuted(muted, NOW + 30 * MIN)).toBe(false)
     expect(isMuted(settings({ mutedUntil: null }), NOW)).toBe(false)
     expect(isMuted({ mutedUntil: undefined as unknown as null }, NOW)).toBe(false) // pre-B5 settings objects
+  })
+
+  it('quickMute mutes for exactly 4 hours from now, replacing an earlier mute, and keeps the other settings', () => {
+    const s = quickMute(settings({ mutedUntil: NOW - H, sounds: false }), NOW)
+    expect(s.mutedUntil).toBe(NOW + 4 * H)
+    expect(s.sounds).toBe(false)
+    expect(isMuted(s, NOW + 4 * H - 1)).toBe(true)
+    expect(isMuted(s, NOW + 4 * H)).toBe(false)
+    expect(collectDueReminders([task()], s, new Map(), NOW + 2 * H)).toEqual([])
   })
 })
 

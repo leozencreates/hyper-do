@@ -3,7 +3,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { AppData, BackupInfo, MiniAppMode, MiniAppStatus, Task } from '../src/lib/types'
-import { activeFocusTaskId, reminderSummary, buildNotification, collectDueReminders, escalationLevel, markNagged, resetNag, syncCounters } from '../src/lib/reminder'
+import { activeFocusTaskId, reminderSummary, buildNotification, collectDueReminders, escalationLevel, isMuted, markNagged, quickMute, resetNag, syncCounters } from '../src/lib/reminder'
 import { bumpChanged, snoozeTask, taskFromQuickAdd, touchTask } from '../src/lib/tasks'
 import { SyncEngine } from '../src/lib/syncengine'
 import { WebDavTransport } from '../src/lib/synctransport'
@@ -11,7 +11,7 @@ import { FolderTransport } from './syncfolder'
 import { completeInData } from '../src/lib/stats'
 import { splitBrainDump } from '../src/lib/parse'
 import { DEEP_LINK_SCHEME, deepLinkUrl, findDeepLinkArg, parseDeepLink, reminderToastXml } from '../src/lib/deeplink'
-import { translate } from '../src/lib/i18n'
+import { LOCALE, translate } from '../src/lib/i18n'
 import { normalizeData, parseAppData } from '../src/lib/data'
 import { buildDigest, digestDue, markDigestSent, parseDigestState, type DigestState } from '../src/lib/digest'
 import { CalendarSync } from '../src/lib/calsync'
@@ -158,7 +158,7 @@ function commit(next: AppData, opts: { senderId?: number; bump?: boolean } = {})
   rev++
   if (next.settings.autoBackup) maybeBackup()
   saveData(data)
-  if (prev.settings.language !== next.settings.language) buildTrayMenu()
+  if (prev.settings.language !== next.settings.language || prev.settings.mutedUntil !== next.settings.mutedUntil) buildTrayMenu()
   if (prev.settings.launchAtLogin !== next.settings.launchAtLogin) applyLoginItem(next.settings.launchAtLogin)
   if (prev.settings.quickAddShortcut !== next.settings.quickAddShortcut) quick.registerShortcut(next.settings.quickAddShortcut)
   if (prev.settings.autoUpdate !== next.settings.autoUpdate) updater.setEnabled(next.settings.autoUpdate)
@@ -587,13 +587,30 @@ function trayIcon() {
   return nativeImage.createFromBitmap(buf, { width: size, height: size })
 }
 
+/** Mute state the tray menu was last built with; commit() and tick() rebuild it when this flips (incl. expiry). */
+let trayMuted = false
+
+function refreshTrayMute(now = Date.now()) {
+  if (isMuted(data.settings, now) !== trayMuted) buildTrayMenu()
+}
+
 function buildTrayMenu() {
   const lang = data.settings.language
+  trayMuted = isMuted(data.settings, Date.now())
   tray?.setContextMenu(
     Menu.buildFromTemplate([
       { label: translate(lang, 'tray_open'), click: showWindow },
       { label: translate(lang, 'tray_quick'), click: () => quick.show() },
       { label: translate(lang, 'tray_mini'), type: 'checkbox', checked: mini.visible, click: () => mini.toggle() },
+      { type: 'separator' },
+      trayMuted
+        ? {
+            label: translate(lang, 'tray_unmute', {
+              t: new Date(data.settings.mutedUntil!).toLocaleTimeString(LOCALE[lang], { hour: '2-digit', minute: '2-digit' }),
+            }),
+            click: () => commit({ ...data, settings: { ...data.settings, mutedUntil: null } }),
+          }
+        : { label: translate(lang, 'tray_mute'), click: () => commit({ ...data, settings: quickMute(data.settings, Date.now()) }) },
       { type: 'separator' },
       {
         label: translate(lang, 'tray_quit'),
@@ -687,6 +704,7 @@ function showReminder(task: Task, title: string, body: string, critical: boolean
 //      Bildirim mevcut nagCount ile kurulur ("3 kez görmezden geldin"), sonra sayaç artar.
 function tick() {
   const now = Date.now()
+  refreshTrayMute(now)
   checkDigest(now)
   const hits = collectDueReminders(data.tasks, data.settings, lastNotified, now, activeFocusTaskId(data, now))
   if (hits.length === 0) return
