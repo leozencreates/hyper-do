@@ -152,7 +152,7 @@ desktop app serve the Mini App itself.
 
 - [x] **B5 Global mute** `settings.mutedUntil: number | null` (default `null`). `collectDueReminders` and
   `planReminderTimes` return nothing / skip times while `mutedUntil > now` (tested). Telegram: `/mute 2h`,
-  `/mute 90m`, `/mute 2sa`, `/mute 45dk`, `/mute 2ч`, bare `/mute` = 1 h, `/mute off` → `null`; reply
+  `/mute 90m`, `/mute 2sa`, `/mute 45dk`, `/mute 2ч`, bare `/mute` = 4 h (`QUICK_MUTE_MS`, same as the PC's one-tap mute; was 1 h before 0.3.5), `/mute off` → `null`; reply
   `🔇 Muted until 16:30` / `🔔 Unmuted`. App header shows a small `🔇 until 16:30` chip while muted; clicking it
   unmutes. `/quiet on|off` toggles `settings.quietHours.enabled` and answers with the current window.
 

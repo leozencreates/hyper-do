@@ -331,7 +331,7 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 10. `/del 2` → "… silinsin mi?" + **🗑 Sil / Vazgeç**; Sil → "🗑 Silindi: …", PC'den de kalkar (geri alınamaz,
     tombstone yazılır); Vazgeç → düğmeler kalkar, görev durur.
 11. `/mute 2sa` → "🔇 Susturuldu, 14:30 itibarıyla tekrar açık"; PC üst çubuğunda "🔇 14:30 açılır" çipi; PC'ye de
-    Telegram'a da hatırlatma gelmez. `/mute` → 1 sa; `/mute off` → "🔔 Hatırlatmalar geri geldi". `/mute 45dk`,
+    Telegram'a da hatırlatma gelmez. `/mute` (argümansız) → 4 sa, PC'deki 🔕 düğmesiyle aynı; `/mute off` → "🔔 Hatırlatmalar geri geldi". `/mute 45dk`,
     `/mute 2ч` de çalışır.
 11b. Tek tuşla 4 saat susturma (📁 `src/App.tsx`, `electron/main.ts` → `buildTrayMenu`; `reminder.ts` → `quickMute`):
     üst çubukta **🔕 4 sa** → düğme kaybolur, yerine "🔇 HH:MM açılır" çipi (şimdi + 4 sa); çipe tıklayınca susturma

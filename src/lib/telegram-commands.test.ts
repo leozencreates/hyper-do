@@ -212,8 +212,8 @@ describe('pure decisions (B3 / B4 / B5)', () => {
     expect(tomorrowMorning(NOW, settings({ quietHours: { enabled: true, from: '23:00', to: 'x' } }))).toBe(new Date(2026, 9, 14, 9, 0).getTime())
   })
 
-  it('parseMuteArg understands hours / minutes in EN, TR and RU, bare = 60, off, garbage → null', () => {
-    expect(parseMuteArg('')).toEqual({ minutes: 60 })
+  it('parseMuteArg understands hours / minutes in EN, TR and RU, bare = 4 h, off, garbage → null', () => {
+    expect(parseMuteArg('')).toEqual({ minutes: 240 })
     expect(parseMuteArg('2h')).toEqual({ minutes: 120 })
     expect(parseMuteArg('90m')).toEqual({ minutes: 90 })
     expect(parseMuteArg('2sa')).toEqual({ minutes: 120 })
@@ -515,13 +515,13 @@ describe('inline button callbacks', () => {
 })
 
 describe('/mute and /quiet (B5)', () => {
-  it('/mute 2h mutes until the given time and answers with the local time; /mute off unmutes; bare = 1 h', () => {
+  it('/mute 2h mutes until the given time and answers with the local time; /mute off unmutes; bare = 4 h', () => {
     const d = SAMPLE()
     const r = handleMessage('/mute 2h', ctx(d))
     const next = apply(d, r)
     expect(next.settings.mutedUntil).toBe(NOW + 2 * H)
     expect(r.replies[0].text).toBe(translate('en', 'tg_muted', { t: new Date(NOW + 2 * H).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }))
-    expect(apply(d, handleMessage('/mute', ctx(d))).settings.mutedUntil).toBe(NOW + H)
+    expect(apply(d, handleMessage('/mute', ctx(d))).settings.mutedUntil).toBe(NOW + 4 * H)
     const off = handleMessage('/mute off', ctx(next))
     expect(apply(next, off).settings.mutedUntil).toBeNull()
     expect(off.replies[0].text).toBe(translate('en', 'tg_unmuted'))

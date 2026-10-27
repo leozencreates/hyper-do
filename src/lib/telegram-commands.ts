@@ -23,7 +23,7 @@ import { LOCALE, translate, type Key, type Lang } from './i18n'
 import { matchesQuery, openTasksSorted, priorityIcon, snoozeTask, taskFromQuickAdd, uid } from './tasks'
 import { parseQuickAdd } from './parse'
 import { addDays, dayKey, endOfDay, formatDue, formatMinutes, isThisWeek, isToday, recurrenceText, startOfDay } from './dates'
-import { escalationLevel, resetNag } from './reminder'
+import { QUICK_MUTE_MS, escalationLevel, resetNag } from './reminder'
 import { completeInData, doneInLastDays, focusMinutes, recordReopen, streak } from './stats'
 import { buildDigest, type DigestKind } from './digest'
 import { ANY_CONTEXT, reasonText, suggestNext } from './whatnow'
@@ -288,10 +288,10 @@ const HOUR_UNITS = /^(h|hr|hrs|hour|hours|sa|saat|s|ч|час|часа|часо�
 const MIN_UNITS = /^(m|min|mins|minute|minutes|dk|dak|dakika|мин|минут|минута|минуты|минуту)$/
 const DURATION = /^(\d+(?:[.,]\d+)?)\s*([a-zçğıöşüа-яё]*)$/i
 
-/** `2h 90m 2sa 45dk 2ч 45мин 1.5h 90` → minutes; bare → 60; `off` → 'off'; unreadable → null. */
+/** `2h 90m 2sa 45dk 2ч 45мин 1.5h 90` → minutes; bare → 240 (QUICK_MUTE_MS, same as the PC's 🔕 button); `off` → 'off'; unreadable → null. */
 export function parseMuteArg(arg: string): { minutes: number } | 'off' | null {
   const s = arg.trim().toLowerCase()
-  if (!s) return { minutes: 60 }
+  if (!s) return { minutes: QUICK_MUTE_MS / 60_000 }
   if (OFF_WORDS.has(s)) return 'off'
   const m = DURATION.exec(s)
   if (!m) return null
