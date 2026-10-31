@@ -22,6 +22,15 @@ Request: every task that gets a date should land in Google Calendar on its own, 
 - [x] The offsets are part of the push fingerprint (`fp|r60,1440,4320`) and of `settingsFp`, so changing them in
   Settings re-patches every pushed event; existing events pick up the reminders on the first sync after the update.
 
+## Missing calendar permission (found while testing, 1 Nov 2026)
+
+- [x] Google's consent screen lets the user untick the calendar box; the tokens then only cover openid / email, the
+  app showed "Connected" and every push failed with 403 "insufficient authentication scopes" (no "Hyper Do" calendar,
+  nothing pushed). Now: `GoogleTokens.scope` is read from the token response; `hasCalendarScope` false at login →
+  the token is revoked and the login fails with `calendar_scope`; false on a refresh (older connection) or a 403
+  `insufficientPermissions` from the API → status error `calendar_scope`. UI text `cal_err_scope`: disconnect →
+  connect and tick the calendar box.
+
 ## UI
 
 - [x] Settings → Calendars → Google, under "Send tasks to Google Calendar": "Google Calendar notifications" with

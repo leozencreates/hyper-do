@@ -556,6 +556,8 @@ geçirmesi test edilmedi.
 8. Ayarlarda "2 saat önce"yi ekle → mevcut etkinlikler bir sonraki senkronda güncellenir. 5 seçim dolunca diğer
    çipler pasif. Hepsini kaldır → etkinlikler takvimin varsayılan bildirimlerine döner. Gönderimi kapat → kapalı kalır
    (yeniden başlatınca açılmaz).
+9. Bağlan → Google onay ekranında takvim kutusunun işaretini kaldır → uygulamada "Google Takvim izni verilmedi…"
+   hatası, "Bağlı" görünmez. Kutuyu işaretleyerek yeniden bağlan → "Hyper Do" takvimi oluşur, görevler gelir.
 
 ### D4. Genel
 

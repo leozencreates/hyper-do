@@ -43,10 +43,10 @@ export default function CalendarSettings({ settings, tasks, cal, onChange }: Pro
     setLocalError(null)
     const r = await cal.api.connectGoogle()
     setBusy(false)
-    if (!r.ok) setLocalError(r.error === 'client_id' ? t('cal_err_client_id') : r.error === 'timeout' ? t('cal_err_timeout') : r.error === 'busy' ? t('cal_err_busy') : r.error === 'unsupported' ? t('cal_unsupported') : t('cal_error', { e: r.error ?? '?' }))
+    if (!r.ok) setLocalError(r.error === 'client_id' ? t('cal_err_client_id') : r.error === 'timeout' ? t('cal_err_timeout') : r.error === 'busy' ? t('cal_err_busy') : r.error === 'unsupported' ? t('cal_unsupported') : r.error === 'calendar_scope' ? t('cal_err_scope') : t('cal_error', { e: r.error ?? '?' }))
   }
 
-  const googleError = g?.error === 'reconnect' ? t('cal_reconnect') : g?.error ? t('cal_error', { e: g.error }) : null
+  const googleError = g?.error === 'reconnect' ? t('cal_reconnect') : g?.error === 'calendar_scope' ? t('cal_err_scope') : g?.error ? t('cal_error', { e: g.error }) : null
   const syncLine = status?.syncing ? t('cal_syncing') : status?.syncedAt ? t('cal_synced', { t: relativeMinutes(now - status.syncedAt, lang) }) : t('cal_never')
 
   return (

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { ANDROID_REDIRECT_URI, buildAuthUrl, exchangeCode, parseOAuthRedirect, refreshAccessToken } from './gcal'
+import { ANDROID_REDIRECT_URI, CALENDAR_SCOPE_ERROR, GoogleCalendarClient, buildAuthUrl, exchangeCode, hasCalendarScope, parseOAuthRedirect, refreshAccessToken } from './gcal'
 
 /** Captures the form body of the next token request and answers with a valid token. */
 function stubToken() {
@@ -63,5 +63,27 @@ describe('parseOAuthRedirect', () => {
   it('returns null without a query or without code/error', () => {
     expect(parseOAuthRedirect('com.hyperdo.app:/oauth2redirect')).toBeNull()
     expect(parseOAuthRedirect('com.hyperdo.app:/oauth2redirect?foo=bar')).toBeNull()
+  })
+})
+
+describe('calendar scope (consent screen box left unticked)', () => {
+  it('hasCalendarScope: missing calendar scope is detected, an absent list counts as granted', () => {
+    expect(hasCalendarScope('openid https://www.googleapis.com/auth/userinfo.email')).toBe(false)
+    expect(hasCalendarScope('openid https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email')).toBe(true)
+    expect(hasCalendarScope('https://www.googleapis.com/auth/calendar.readonly')).toBe(false)
+    expect(hasCalendarScope(undefined)).toBe(true)
+    expect(hasCalendarScope('')).toBe(true)
+  })
+
+  it('token responses carry the granted scope', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ access_token: 'at', expires_in: 3600, scope: 'openid email' }), { status: 200 })))
+    expect((await refreshAccessToken({ clientId: 'id', refreshToken: 'rt' })).scope).toBe('openid email')
+  })
+
+  it('a 403 "insufficient authentication scopes" becomes the calendar_scope error', async () => {
+    const body = { error: { code: 403, message: 'Request had insufficient authentication scopes.', errors: [{ reason: 'insufficientPermissions' }] } }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 403 })))
+    const api = new GoogleCalendarClient(async () => 'at')
+    await expect(api.listCalendars()).rejects.toMatchObject({ code: CALENDAR_SCOPE_ERROR })
   })
 })

@@ -11,6 +11,22 @@ const API = 'https://www.googleapis.com/calendar/v3'
 
 /** openid+email only to show which account is connected; calendar for read + the "Hyper Do" task calendar. */
 export const GOOGLE_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar']
+export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar'
+
+/**
+ * Error code (and message) when the account did not grant calendar access: Google's consent screen lets the user
+ * untick "See, edit… your calendars" and still returns tokens, which then only work for openid / email.
+ */
+export const CALENDAR_SCOPE_ERROR = 'calendar_scope'
+
+/**
+ * False when the token response's `scope` list lacks calendar access. An absent / empty list (some responses omit
+ * it) counts as granted; the API's 403 "insufficient scopes" is mapped to the same error later.
+ */
+export function hasCalendarScope(scope: string | undefined): boolean {
+  if (!scope || !scope.trim()) return true
+  return scope.split(/\s+/).includes(CALENDAR_SCOPE)
+}
 
 export class GoogleAuthError extends Error {
   constructor(
@@ -26,6 +42,8 @@ export interface GoogleTokens {
   expiresAt: number
   refreshToken?: string
   idToken?: string
+  /** Space-separated scopes actually granted (the user may untick some on the consent screen). */
+  scope?: string
 }
 
 export interface GCalendar {
@@ -97,9 +115,9 @@ async function tokenRequest(body: Record<string, string>): Promise<GoogleTokens>
   const params = new URLSearchParams()
   for (const [k, v] of Object.entries(body)) if (v) params.set(k, v)
   const res = await fetch(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: params })
-  const json = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; refresh_token?: string; id_token?: string; error?: string; error_description?: string }
+  const json = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; refresh_token?: string; id_token?: string; scope?: string; error?: string; error_description?: string }
   if (!res.ok || !json.access_token) throw new GoogleAuthError(json.error ?? `http_${res.status}`, json.error_description ?? json.error ?? `HTTP ${res.status}`)
-  return { accessToken: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000, refreshToken: json.refresh_token, idToken: json.id_token }
+  return { accessToken: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000, refreshToken: json.refresh_token, idToken: json.id_token, scope: json.scope }
 }
 
 /** Public clients (Android OAuth client type) have no secret: an empty `clientSecret` is simply left out of the request. */
@@ -166,8 +184,10 @@ export class GoogleCalendarClient {
     })
     if (res.status === 401 && retry) return this.call<T>(method, path, body, query, false) // cached token revoked → refresh once
     if (res.status === 204) return undefined as T
-    const json = (await res.json().catch(() => ({}))) as T & { error?: { code?: number; message?: string; status?: string } }
+    const json = (await res.json().catch(() => ({}))) as T & { error?: { code?: number; message?: string; status?: string; errors?: { reason?: string }[] } }
     if (!res.ok) {
+      if (res.status === 403 && (json.error?.errors?.some((x) => x.reason === 'insufficientPermissions') || /insufficient authentication scopes/i.test(json.error?.message ?? '')))
+        throw new GoogleAuthError(CALENDAR_SCOPE_ERROR, CALENDAR_SCOPE_ERROR)
       const code = res.status === 401 ? 'unauthorized' : res.status === 404 || res.status === 410 ? 'not_found' : `http_${res.status}`
       throw new GoogleAuthError(code, json.error?.message ?? `HTTP ${res.status}`)
     }

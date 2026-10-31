@@ -8,7 +8,7 @@
  * Tokens and the task→event map live in the platform's state store, NOT in the backup-able app data.
  */
 import type { AppData, CalendarEvent, CalendarSettings, CalendarStatus, GoogleCalendarInfo, Task } from './types'
-import { GoogleAuthError, GoogleCalendarClient, emailFromIdToken, refreshAccessToken, revokeToken, type GCalendar, type GEvent, type GoogleTokens } from './gcal'
+import { CALENDAR_SCOPE_ERROR, GoogleAuthError, GoogleCalendarClient, emailFromIdToken, hasCalendarScope, refreshAccessToken, revokeToken, type GCalendar, type GEvent, type GoogleTokens } from './gcal'
 import { parseIcs } from './ics'
 import { googleEventBody, recurrenceRrule, taskDescription } from './calendar-links'
 import { startOfDay, endOfDay, DAY } from './dates'
@@ -261,6 +261,12 @@ export class CalendarSync {
 
   async completeGoogleLogin(tokens: GoogleTokens) {
     if (!tokens.refreshToken) throw new GoogleAuthError('no_refresh_token', 'Google did not return a refresh token. Remove Hyper Do from your Google account permissions and connect again.')
+    if (!hasCalendarScope(tokens.scope)) {
+      // Calendar box unticked on the consent screen: the token is useless here. Revoke it so the next attempt shows
+      // the full consent screen again instead of silently reusing the partial grant.
+      await revokeToken(tokens.refreshToken)
+      throw new GoogleAuthError(CALENDAR_SCOPE_ERROR, CALENDAR_SCOPE_ERROR)
+    }
     this.state.google = { ...this.state.google, refreshToken: tokens.refreshToken, email: emailFromIdToken(tokens.idToken) || this.state.google.email }
     this.access = { token: tokens.accessToken, expiresAt: tokens.expiresAt }
     this.googleError = null
@@ -296,6 +302,8 @@ export class CalendarSync {
     if (!force && this.access && this.access.expiresAt - Date.now() > 60_000) return this.access.token
     const { clientId, clientSecret } = this.googleClient()
     const t = await refreshAccessToken({ clientId, clientSecret, refreshToken: this.state.google.refreshToken })
+    // An older connection made without the calendar box: say so instead of failing every call with a 403.
+    if (!hasCalendarScope(t.scope)) throw new GoogleAuthError(CALENDAR_SCOPE_ERROR, CALENDAR_SCOPE_ERROR)
     this.access = { token: t.accessToken, expiresAt: t.expiresAt }
     return t.accessToken
   }
