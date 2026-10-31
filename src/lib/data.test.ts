@@ -230,10 +230,19 @@ describe('normalizeCalendarSettings', () => {
   })
 
   it('keeps only string ids in hiddenCalendarIds and carries over the Google client', () => {
-    const c = normalizeCalendarSettings({ showEvents: false, google: { clientId: 'id1', clientSecret: 'sec', androidClientId: '', pushTasks: true, hiddenCalendarIds: ['x', 3, null] as never } })
+    const c = normalizeCalendarSettings({ showEvents: false, google: { clientId: 'id1', clientSecret: 'sec', androidClientId: '', pushTasks: true, eventReminders: [1440, 60, 60, -5, 'x'] as never, hiddenCalendarIds: ['x', 3, null] as never } })
     expect(c.showEvents).toBe(false)
     expect(c.autoImport).toBe(true)
-    expect(c.google).toEqual({ clientId: 'id1', clientSecret: 'sec', androidClientId: '', pushTasks: true, hiddenCalendarIds: ['x'] })
+    expect(c.google).toEqual({ clientId: 'id1', clientSecret: 'sec', androidClientId: '', pushTasks: true, eventReminders: [60, 1440], hiddenCalendarIds: ['x'] })
+  })
+
+  it('turns the Google push on once for data from before eventReminders, then respects the stored choice', () => {
+    const old = normalizeCalendarSettings({ google: { pushTasks: false } as never })
+    expect(old.google.pushTasks).toBe(true)
+    expect(old.google.eventReminders).toEqual([60, 1440, 4320])
+    const off = normalizeCalendarSettings({ google: { pushTasks: false, eventReminders: [] } as never })
+    expect(off.google.pushTasks).toBe(false)
+    expect(off.google.eventReminders).toEqual([])
   })
 })
 

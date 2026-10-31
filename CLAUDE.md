@@ -76,8 +76,10 @@ electron/syncfolder.ts  FolderTransport (#16): <dir>/hyperdo-sync.json, token = 
 electron/updater.ts     Auto-update (electron-updater, GitHub Releases): packaged builds only, first check 30 s after
                         ready then every 6 h while settings.autoUpdate; IPC tidi:update-status|update-check|update-install|
                         app-version; install() sets `quitting` before quitAndInstall
-src/lib/attachments.ts  Pure: photo / video attachments (spec 2026-10-24-attachments-design.md): normalizeAttachments,
-                        attachmentKind, rejectReason (type / 200 MB / 20 per task), referencedMediaIds (gc keep-set), formatBytes.
+src/lib/attachments.ts  Pure: photo / video / document attachments (spec 2026-10-24-attachments-design.md): normalizeAttachments,
+                        attachmentKind(mime, name) (documents by MIME or DOCUMENT_EXTENSIONS), rejectReason (type / 200 MB /
+                        20 per task), referencedMediaIds (gc keep-set), formatBytes, documentBadge, safeOpenName (desktop
+                        tidi:open-file → temp copy + shell.openPath, documents only).
                         Bytes live in platform.media.ts (IndexedDB `hyperdo-media`, HyperDoApi.media put/get/gc; added in
                         platform.ts to every adapter except the Mini App), never in AppData / backups / sync; main window gc once per start
 src/lib/share.ts        Pure: parseShareEvent (hyperdoShare window event from MainActivity.java), shareToTaskFields
@@ -116,6 +118,8 @@ src/lib/platform.sync.ts  createBrowserSync(getData, mutate, store) → HyperDoA
                         (Preferences key `hyperdo-sync`); WebDAV only
 src/lib/calsync.ts      Calendar sync engine (pure): Google pull/push + ICS feeds → CalendarEvent[], auto-import tasks
 src/lib/gcal.ts, ics.ts, calendar-links.ts   Google client, iCalendar parser/writer, "add to calendar" links, googleEventBody
+                        (+ reminders from settings.calendar.google.eventReminders via eventReminders(); spec
+                        2026-11-01-calendar-reminders-design.md; push on by default)
 src/lib/reminder.ts     Reminder engine (pure): collectDueReminders, planReminderTimes, buildNotification, quiet hours, isMuted
                         (settings.mutedUntil — global mute, B5; both engines honour it),
                         activeFocusTaskId / focusSuppressedUntil (Hyper Focus suppression), escalation ladder
@@ -186,7 +190,7 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 
 Tests: `src/lib/*.test.ts` (attachments, calendar-links, calsync, data, dates, deeplink, digest, full-backup, gcal, ics, parse,
 planning, reminder, share, sound, stats, routine, sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`,
-`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 27 files, 513 tests.
+`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 27 files, 521 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.

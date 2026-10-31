@@ -298,3 +298,8 @@ General rules for every item:
 - [x] **📎 Photos and videos on notes** (24 Oct 2026, spec `docs/2026-10-24-attachments-design.md`): `Task.attachments`
   (metadata), bytes in IndexedDB (`platform.media.ts`, `HyperDoApi.media`, not in backups / sync / Mini App), editor
   strip with picker / drop / paste, full-screen viewer, row `📎 N` chip, orphan cleanup once per start.
+- [x] **📄 Documents on notes** (1 Nov 2026, same spec, § Documents): PDF / Office / text / archive files as
+  `kind: 'document'`, 📄 tiles, desktop opens them with the default app (`DesktopApi.openFile`), web downloads.
+- [x] **Google Calendar auto-push + reminders** (1 Nov 2026, spec `docs/2026-11-01-calendar-reminders-design.md`):
+  push on by default (one-off switch-on for older settings), `google.eventReminders` (default 1 h / 1 day / 3 days,
+  max 5) sent as popup overrides; all-day tasks ring at 09:00 / the evening before at 20:00.

@@ -83,7 +83,7 @@ export default function TaskEditor({ task, allTags, tasks = [], focusLog = [], o
           onChange={(e) => set('notes', e.target.value)}
           onPaste={(e) => {
             // a pasted screenshot / copied photo becomes an attachment; text pastes stay untouched
-            const files = media ? [...e.clipboardData.files].filter((f) => attachmentKind(f.type)) : []
+            const files = media ? [...e.clipboardData.files].filter((f) => attachmentKind(f.type, f.name)) : []
             if (!files.length) return
             e.preventDefault()
             setPasted(files)
@@ -106,7 +106,7 @@ export default function TaskEditor({ task, allTags, tasks = [], focusLog = [], o
         {task.history.map((h, i) => <div className="revision" key={i}><small>{new Date(h.at).toLocaleString()}</small><b>{h.content.title}</b><p className="notes">{h.content.notes}</p><button type="button" className="mini" onClick={() => setX((v) => ({ ...v, ...h.content }))}>{c.restore}</button></div>)}
       </details>
       {onTemplate && <details className="planning-details"><summary>{c.saveTemplate}</summary><label className="field"><span>{c.templateName}</span><input value={templateName} onChange={(e) => { setTemplateName(e.target.value); setTemplateSaved(false) }} /></label><button type="button" className="mini" disabled={!templateName.trim() || !x.title.trim() || templateSaved} onClick={() => { onTemplate(templateName.trim(), x); setTemplateSaved(true) }}>{templateSaved ? '✓' : c.saveTemplate}</button></details>}
-      {media && <Attachments media={media} items={x.attachments} onChange={(v) => set('attachments', v)} pasted={pasted} />}
+      {media && <Attachments media={media} items={x.attachments} onChange={(v) => set('attachments', v)} pasted={pasted} openFile={platform.desktop?.openFile} />}
 
       <div className="grid2">
         <div className="field">

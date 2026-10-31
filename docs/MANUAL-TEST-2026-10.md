@@ -237,18 +237,23 @@ Hızlı test için eşikleri düşür: Ayarlar → Tırmanma merdiveni → "Uyar
 6. 🌙 Akşam rutini (21:30) ve **Boş rutin** (adım yok → ▶ görünmez, adım ekleyince görünür). Herhangi bir görevi
    düzenleyicide **Rutin** yapınca da ▶ gelir. Mini App'te kenar çubuğu yok; satırdaki ▶ çalışır.
 
-### A18. 📎 Fotoğraf ve video ekleri  (📁 `src/components/Attachments.tsx`; `src/lib/platform.media.ts`; `src/lib/attachments.ts`; `TaskEditor.tsx`)
+### A18. 📎 Fotoğraf, video ve belge ekleri  (📁 `src/components/Attachments.tsx`; `src/lib/platform.media.ts`; `src/lib/attachments.ts`; `TaskEditor.tsx`)
 
-1. Bir görevi aç → Not alanının altında **📎 Fotoğraf / video** → bir fotoğraf ve bir video seç → küçük resimler
+1. Bir görevi aç → Not alanının altında **📎 Fotoğraf / video / belge** → bir fotoğraf ve bir video seç → küçük resimler
    görünür (videoda ▶), altında "yalnızca bu cihazda" ipucu. Kaydet → satırda `📎 2` çipi.
 2. Küçük resme tıkla → tam ekran; video oynar. Esc / dışarı tıkla → yalnızca görüntüleyici kapanır, düzenleyici açık kalır.
 3. Ekran görüntüsü al (Win+Shift+S) → Not alanına Ctrl+V → ek olarak eklenir, nota metin gelmez. Metin yapıştırma
    normal çalışır. Gezginden dosyayı şeride sürükle-bırak → eklenir.
-4. PDF seç / 200 MB'tan büyük video → satır altında hata metni, ek eklenmez.
+4. `.exe` seç / 200 MB'tan büyük video → satır altında hata metni, ek eklenmez.
+4b. Belge: bir PDF, bir `.docx` ve bir `.md` seç → 📄 kutucukları (PDF / DOCX / MD rozeti, dosya adı). Masaüstünde
+   tıkla → varsayılan uygulamada açılır (PDF okuyucu, Word…; `%TEMP%\hyperdo-open-*` kopyası). Web'de tıkla → dosya
+   orijinal adıyla iner. Not alanına gezginden bir PDF sürükle-bırak → eklenir.
 5. × ile bir eki kaldır → Kaydet. Uygulamayı yeniden başlat → ek geri gelmez; diğeri hâlâ açılır (dosya silinmedi).
 6. Android: 📎 → sistem seçicisi kamera / galeri sunar; çekilen fotoğraf eklenir. Uygulamayı kapat-aç → ek duruyor.
 7. Senkron açıkken diğer cihazda aynı görev: `📎` çipi var, küçük resim yerine "Bu cihazda yok". Mini App'te ek
    şeridi görünmez; Mini App'ten görevi düzenleyip kaydedince masaüstündeki ekler kaybolmaz.
+8. Android: belge kutucuğuna dokunma Capacitor WebView'da indirme başlatmayabilir (blob indirmesi desteklenmiyor);
+   bu bilinen sınırdır, ek saklanır ve masaüstü / web'de açılır.
 
 ### A13. Ses efektleri ve susturma  (📁 `src/lib/sound.ts` → `soundAllowed`; `src/lib/useSounds.ts`; `src/App.tsx` → `snd-btn`; `src/lib/useTaskActions.ts` → `onSound`)
 
@@ -542,6 +547,15 @@ geçirmesi test edilmedi.
 5. Tekrarı kaldır → takvimde tek etkinlik kalır (seri silinip yeniden oluşturulur). Tekrar ekle → tekrar seri olur.
 6. 31 Ekim tarihli aylık görev → Kasım'da 30'unda, Şubat'ta 28'inde görünür (atlanmaz). "Bitince tekrarla" → tek
    etkinlik. Gün boyu (23:59) günlük görev → gün boyu seri.
+
+7. *(2026-11-01, `docs/2026-11-01-calendar-reminders-design.md`)* Yeni kurulum veya güncelleme sonrası Google bağlıyken
+   "Görevleri Google Takvim'e gönder" **açık**; altında "Google Takvim bildirimleri": **1 saat · 1 gün · 3 gün önce**
+   seçili. Yarın 18:00 tarihli görev ekle → birkaç saniye içinde "Hyper Do" takviminde; etkinliği Google'da aç →
+   bildirimler 17:00, 1 gün önce, 3 gün önce. Gün boyu görev (sadece tarih) → 3 gün önce 09:00, 1 gün önce 09:00,
+   önceki akşam 20:00.
+8. Ayarlarda "2 saat önce"yi ekle → mevcut etkinlikler bir sonraki senkronda güncellenir. 5 seçim dolunca diğer
+   çipler pasif. Hepsini kaldır → etkinlikler takvimin varsayılan bildirimlerine döner. Gönderimi kapat → kapalı kalır
+   (yeniden başlatınca açılmaz).
 
 ### D4. Genel
 

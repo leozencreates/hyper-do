@@ -13,6 +13,8 @@ import { splitBrainDump } from '../src/lib/parse'
 import { DEEP_LINK_SCHEME, deepLinkUrl, findDeepLinkArg, parseDeepLink, reminderToastXml } from '../src/lib/deeplink'
 import { LOCALE, translate } from '../src/lib/i18n'
 import { normalizeData, parseAppData } from '../src/lib/data'
+import { safeOpenName } from '../src/lib/attachments'
+import os from 'node:os'
 import { buildDigest, digestDue, markDigestSent, parseDigestState, type DigestState } from '../src/lib/digest'
 import { CalendarSync } from '../src/lib/calsync'
 import { TelegramBot } from './telegram'
@@ -779,6 +781,19 @@ ipcMain.handle('tidi:app-version', () => app.getVersion())
 // Telegram Mini App (HyperDoApi.desktop)
 ipcMain.handle('tidi:miniapp-status', () => miniStatus)
 ipcMain.handle('tidi:miniapp-restart', () => restartMiniApp())
+// Document attachments: a temp copy opened with the system's default app (PDF reader, Word…). Documents only.
+ipcMain.handle('tidi:open-file', async (_e, name: unknown, data: unknown) => {
+  const safe = typeof name === 'string' ? safeOpenName(name) : null
+  if (!safe || !(data instanceof ArrayBuffer || ArrayBuffer.isView(data))) return false
+  try {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hyperdo-open-'))
+    const file = path.join(dir, safe)
+    fs.writeFileSync(file, Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array((data as ArrayBufferView).buffer)))
+    return (await shell.openPath(file)) === ''
+  } catch {
+    return false
+  }
+})
 
 // ---- Eşitleme IPC (HyperDoApi.sync) ----
 ipcMain.handle('tidi:sync-status', () => sync.status())

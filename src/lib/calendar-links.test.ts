@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calendarLink, googleEventBody, recurrenceRrule, taskToIcsEvent, tasksToIcs } from './calendar-links'
+import { calendarLink, eventReminders, googleEventBody, normalizeEventReminders, recurrenceRrule, reminderUnit, taskToIcsEvent, tasksToIcs } from './calendar-links'
 import { normalizeTask } from './tasks'
 import type { Task } from './types'
 
@@ -98,6 +98,37 @@ describe('googleEventBody (push to the Hyper Do calendar)', () => {
     expect('recurrence' in after).toBe(false)
     expect(after.start).not.toHaveProperty('timeZone')
     expect(googleEventBody(task({ id: 'n', dueAt: null }), TZ)).toBeNull()
+  })
+
+  it('reminders: calendar default without offsets, popup overrides with them (timed vs all-day)', () => {
+    expect(googleEventBody(task({ id: 'p' }), TZ)!.reminders).toEqual({ useDefault: true })
+    expect(googleEventBody(task({ id: 'p' }), TZ, [4320, 60, 1440])!.reminders).toEqual({
+      useDefault: false,
+      overrides: [60, 1440, 4320].map((minutes) => ({ method: 'popup', minutes })),
+    })
+    // all-day: whole days ring at 09:00, 1 hour -> 20:00 the evening before
+    expect(googleEventBody(task({ id: 'd', dueAt: local(14, 23, 59) }), TZ, [60, 1440, 4320])!.reminders).toEqual({
+      useDefault: false,
+      overrides: [240, 900, 3780].map((minutes) => ({ method: 'popup', minutes })),
+    })
+    expect(googleEventBody(task({ id: 'p' }), TZ, [])!.reminders).toEqual({ useDefault: true })
+  })
+})
+
+describe('event reminder helpers', () => {
+  it('normalizeEventReminders: unique, sorted, in range, at most 5', () => {
+    expect(normalizeEventReminders([60, 60, -1, 50000, 'x', 10.4, 1440, 30, 120, 4320, 10080])).toEqual([10, 30, 60, 120, 1440])
+    expect(normalizeEventReminders(null)).toEqual([])
+  })
+  it('reminderUnit picks the largest even unit', () => {
+    expect(reminderUnit(30)).toEqual({ n: 30, unit: 'min' })
+    expect(reminderUnit(120)).toEqual({ n: 2, unit: 'hour' })
+    expect(reminderUnit(4320)).toEqual({ n: 3, unit: 'day' })
+    expect(reminderUnit(10080)).toEqual({ n: 1, unit: 'week' })
+    expect(reminderUnit(90)).toEqual({ n: 90, unit: 'min' })
+  })
+  it('all-day short offsets collapse into one evening reminder', () => {
+    expect(eventReminders([10, 60], true)).toEqual({ useDefault: false, overrides: [{ method: 'popup', minutes: 240 }] })
   })
 })
 

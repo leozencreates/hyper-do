@@ -9,6 +9,42 @@ import { DAY, isEndOfDay, startOfDay } from './dates'
 
 export const TASK_EVENT_MIN = 30
 
+/** Default Google reminders on pushed task events: 1 hour, 1 day and 3 days before (minutes). */
+export const DEFAULT_EVENT_REMINDERS = [60, 1440, 4320]
+/** Offsets offered in Settings → Calendar (minutes before the event). */
+export const EVENT_REMINDER_PRESETS = [10, 30, 60, 120, 1440, 2880, 4320, 10080]
+/** Google accepts at most 5 reminder overrides per event, each 0…40320 minutes (4 weeks). */
+export const MAX_EVENT_REMINDERS = 5
+const MAX_REMINDER_MIN = 40320
+
+/** Unique, sorted, in-range minute offsets (at most 5); garbage → []. */
+export function normalizeEventReminders(v: unknown): number[] {
+  if (!Array.isArray(v)) return []
+  const ok = v.filter((m): m is number => typeof m === 'number' && Number.isFinite(m) && m >= 0 && m <= MAX_REMINDER_MIN).map(Math.round)
+  return [...new Set(ok)].sort((a, b) => a - b).slice(0, MAX_EVENT_REMINDERS)
+}
+
+/** "1 hour" style parts for a reminder offset: the largest unit that divides it evenly. */
+export function reminderUnit(min: number): { n: number; unit: 'min' | 'hour' | 'day' | 'week' } {
+  if (min >= 10080 && min % 10080 === 0) return { n: min / 10080, unit: 'week' }
+  if (min >= 1440 && min % 1440 === 0) return { n: min / 1440, unit: 'day' }
+  if (min >= 60 && min % 60 === 0) return { n: min / 60, unit: 'hour' }
+  return { n: min, unit: 'min' }
+}
+
+/**
+ * Google `reminders` for a pushed event. Timed events use the offsets as they are. All-day events count from
+ * midnight, so "1 day before" would ring at 00:00: whole-day offsets ring at 09:00 that many days before, shorter
+ * ones at 20:00 the evening before. No offsets → the calendar's own defaults.
+ */
+export function eventReminders(minutes: number[], allDay: boolean): { useDefault: boolean; overrides?: { method: 'popup'; minutes: number }[] } {
+  const list = normalizeEventReminders(minutes)
+  if (!list.length) return { useDefault: true }
+  const mapped = allDay ? list.map((m) => (m >= 1440 ? Math.ceil(m / 1440) * 1440 - 9 * 60 : 4 * 60)) : list
+  const unique = [...new Set(mapped.map((m) => Math.min(MAX_REMINDER_MIN, Math.max(0, m))))].sort((a, b) => a - b)
+  return { useDefault: false, overrides: unique.map((m) => ({ method: 'popup' as const, minutes: m })) }
+}
+
 const RRULE_FREQ: Record<RecurrenceRule['unit'], string> = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' }
 const RRULE_DAY = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
 
@@ -79,7 +115,7 @@ function isoLocalDate(ts: number): string {
  * `recurrence: ['RRULE:…']` (same mapping as the .ics export; "repeat after completion" stays a single event), and
  * timed recurring events name `timeZone`, which Google requires to expand a series. Null without a due date.
  */
-export function googleEventBody(task: Task, timeZone: string) {
+export function googleEventBody(task: Task, timeZone: string, reminderMinutes?: number[]) {
   const w = taskEventWindow(task)
   if (!w) return null
   const rrule = recurrenceRrule(task.recurrence, task.recurrenceRule, task.dueAt)
@@ -92,7 +128,7 @@ export function googleEventBody(task: Task, timeZone: string) {
     ...(rrule ? { recurrence: [`RRULE:${rrule}`] } : {}),
     colorId: task.priority === 'high' ? '11' : task.priority === 'medium' ? '6' : '7',
     extendedProperties: { private: { hyperdoId: task.id } },
-    reminders: { useDefault: true },
+    reminders: reminderMinutes ? eventReminders(reminderMinutes, w.allDay) : { useDefault: true },
   }
 }
 

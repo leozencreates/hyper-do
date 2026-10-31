@@ -96,7 +96,7 @@ export interface Task {
   /** Routine (docs/2026-10-20-routines-design.md): the subtasks are steps, run one at a time with ▶ (RoutineRunner). */
   routine: boolean
   /**
-   * Photos / videos attached to the notes (docs/2026-10-24-attachments-design.md). Metadata only: the bytes live in
+   * Photos / videos / documents attached to the notes (docs/2026-10-24-attachments-design.md). Metadata only: the bytes live in
    * the device's media store (`HyperDoApi.media`), so other devices see the entry but not the file.
    */
   attachments: Attachment[]
@@ -107,9 +107,9 @@ export interface Task {
   updatedAt: number
 }
 
-export type AttachmentKind = 'image' | 'video'
+export type AttachmentKind = 'image' | 'video' | 'document'
 
-/** One photo / video on a task; `id` is the key in the media store. */
+/** One photo / video / document (PDF, Office, text…) on a task; `id` is the key in the media store. */
 export interface Attachment {
   id: string
   kind: AttachmentKind
@@ -282,8 +282,13 @@ export interface GoogleCalendarSettings {
    * Used by the Android app only; empty = Google sign-in is not offered there.
    */
   androidClientId: string
-  /** Mirror open tasks with a due date into a dedicated "Hyper Do" calendar on Google. */
+  /** Mirror open tasks with a due date into a dedicated "Hyper Do" calendar on Google. Default on. */
   pushTasks: boolean
+  /**
+   * Google reminders on every pushed task event, minutes before the start (max 5). Default 1 h, 1 day, 3 days;
+   * [] = the calendar's own default reminders. docs/2026-11-01-calendar-reminders-design.md
+   */
+  eventReminders: number[]
   /** Google calendars the user does NOT want to see in Today / This week (default: show all). */
   hiddenCalendarIds: string[]
 }
@@ -423,7 +428,8 @@ export const DEFAULT_SETTINGS: Settings = {
       clientId: import.meta.env?.VITE_GOOGLE_CLIENT_ID ?? '',
       clientSecret: import.meta.env?.VITE_GOOGLE_CLIENT_SECRET ?? '',
       androidClientId: '',
-      pushTasks: false,
+      pushTasks: true,
+      eventReminders: [60, 1440, 4320],
       hiddenCalendarIds: [],
     },
     feeds: [],
@@ -502,6 +508,8 @@ export interface DesktopApi {
   miniAppStatus(): Promise<MiniAppStatus>
   onMiniAppStatus(cb: (s: MiniAppStatus) => void): () => void
   miniAppRestart(): Promise<void>
+  /** Opens a document attachment with the system's default app (temp copy). false = not a document / failed. */
+  openFile?(name: string, data: ArrayBuffer): Promise<boolean>
 }
 
 /** Connection to the data owner for adapters that do not hold the data themselves (the Telegram Mini App talks to the PC). */

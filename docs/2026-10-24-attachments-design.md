@@ -28,7 +28,20 @@ compressing images.
   `media` → the editor hides attachments; the metadata is kept untouched by its saves).
 - [x] Why not AppData: a single phone video is larger than years of tasks; the JSON file, daily backups, WebDAV
   uploads and the Mini App `PUT` would all grow with it.
-- [x] Limits (`attachments.ts`): images and videos only, 200 MB per file, 20 per task.
+- [x] Limits (`attachments.ts`): images, videos and documents, 200 MB per file, 20 per task.
+
+## Documents (1 Nov 2026)
+
+- [x] `AttachmentKind` gains `'document'`. `attachmentKind(mime, name)` accepts PDF / Office / OpenDocument / text /
+  CSV / JSON / XML / EPUB / iWork / zip-rar-7z by MIME type or, because browsers often leave `type` empty (.md, .docx
+  on Windows), by extension (`DOCUMENT_EXTENSIONS`). Executables and scripts are never accepted.
+- [x] Editor: a 📄 tile with an extension badge (`documentBadge`) and the file name; the picker's `accept` lists the
+  document extensions; drop and paste use the same check.
+- [x] Opening: desktop → `DesktopApi.openFile(name, bytes)` (`tidi:open-file`) writes a temp copy
+  (`%TEMP%/hyperdo-open-*/<safeOpenName>`) and calls `shell.openPath`; `safeOpenName` strips folders and characters
+  Windows rejects and refuses non-document extensions, so the shell never receives an executable. Web / PWA → download
+  under the original name. Android WebView: blob downloads are not supported, the tile may do nothing there (known gap).
+- [x] Storage, backups (full backup carries the bytes), sync and gc are unchanged: documents are just another kind.
 
 ## Lifecycle
 

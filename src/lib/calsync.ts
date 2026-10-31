@@ -88,7 +88,7 @@ function taskFp(t: Task): string {
 }
 
 function settingsFp(s: CalendarSettings): string {
-  return JSON.stringify([s.feeds.map((f) => [f.id, f.url, f.enabled, f.name, f.color]), s.google.hiddenCalendarIds, s.google.pushTasks, s.autoImport])
+  return JSON.stringify([s.feeds.map((f) => [f.id, f.url, f.enabled, f.name, f.color]), s.google.hiddenCalendarIds, s.google.pushTasks, s.google.eventReminders, s.autoImport])
 }
 
 function parseGDate(v?: { date?: string; dateTime?: string }): { t: number; allDay: boolean } | null {
@@ -545,7 +545,7 @@ export class CalendarSync {
   }
 
   private eventBody(task: Task) {
-    return googleEventBody(task, Intl.DateTimeFormat().resolvedOptions().timeZone)!
+    return googleEventBody(task, Intl.DateTimeFormat().resolvedOptions().timeZone, this.settings.google.eventReminders)!
   }
 
   private async pushTasks() {
@@ -573,7 +573,8 @@ export class CalendarSync {
       }
 
       for (const [taskId, task] of desired) {
-        const fp = taskFp(task)
+        // the reminder offsets are part of the fingerprint: changing them in Settings re-patches every event
+        const fp = `${taskFp(task)}|r${this.settings.google.eventReminders.join(',')}`
         const rrule = taskRrule(task)
         const p = g.pushed[taskId]
         const action = pushAction(p, fp, rrule)

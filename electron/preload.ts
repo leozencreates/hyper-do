@@ -66,5 +66,6 @@ contextBridge.exposeInMainWorld('tidi', {
     miniAppStatus: () => ipcRenderer.invoke('tidi:miniapp-status'),
     onMiniAppStatus: listen<unknown>('tidi:miniapp-status'),
     miniAppRestart: () => ipcRenderer.invoke('tidi:miniapp-restart'),
+    openFile: (name: string, data: ArrayBuffer) => ipcRenderer.invoke('tidi:open-file', name, data),
   },
 })

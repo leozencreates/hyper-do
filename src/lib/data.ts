@@ -7,6 +7,7 @@
 import { DEFAULT_SETTINGS, FOCUS_LOG_MAX, MINI_APP_MODES, SYNC_MODES, TOMBSTONE_TTL_MS, type AppData, type CalendarSettings, type DigestSettings, type FocusEntry, type HfSession, type MiniAppMode, type MiniAppSettings, type Settings, type SyncMode, type SyncSettings, type Tombstone } from './types'
 import { normalizeTask, uid } from './tasks'
 import { detectLang } from './i18n'
+import { normalizeEventReminders } from './calendar-links'
 
 /** Key under which the browser-based platforms (web / PWA / Android) store the app data. */
 export const DATA_STORAGE_KEY = 'hyperdo-data'
@@ -25,7 +26,10 @@ export function normalizeCalendarSettings(c?: Partial<CalendarSettings> | null):
       clientId: typeof g.clientId === 'string' && g.clientId ? g.clientId : d.google.clientId,
       clientSecret: typeof g.clientSecret === 'string' && g.clientSecret ? g.clientSecret : d.google.clientSecret,
       androidClientId: typeof g.androidClientId === 'string' ? g.androidClientId : d.google.androidClientId,
-      pushTasks: g.pushTasks ?? false,
+      // Data from before eventReminders existed: tasks with a date now go to Google automatically (2026-11-01),
+      // so the old off-by-default switch is turned on once; afterwards the stored choice is respected.
+      pushTasks: g.eventReminders === undefined ? true : (g.pushTasks ?? d.google.pushTasks),
+      eventReminders: g.eventReminders === undefined ? [...d.google.eventReminders] : normalizeEventReminders(g.eventReminders),
       hiddenCalendarIds: Array.isArray(g.hiddenCalendarIds) ? g.hiddenCalendarIds.filter((x): x is string => typeof x === 'string') : [],
     },
     feeds: Array.isArray(c?.feeds)

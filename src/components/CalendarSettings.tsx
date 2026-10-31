@@ -9,6 +9,7 @@ import { webRedirectUri } from '../lib/platform.calendar'
 import { useNow } from '../lib/hooks'
 import { useLang, useT } from '../lib/useT'
 import Toggle from './Toggle'
+import { EVENT_REMINDER_PRESETS, MAX_EVENT_REMINDERS, reminderUnit } from '../lib/calendar-links'
 
 interface Props {
   settings: Settings
@@ -100,6 +101,32 @@ export default function CalendarSettings({ settings, tasks, cal, onChange }: Pro
               </div>
             )}
             <Toggle checked={c.google.pushTasks} onChange={(v) => setGoogle({ pushTasks: v })} label={t('cal_push')} desc={t('cal_push_d')} />
+            {c.google.pushTasks && (
+              <div className="field">
+                <span>{t('cal_rem_title')}</span>
+                <div className="row wrap">
+                  {EVENT_REMINDER_PRESETS.map((m) => {
+                    const on = c.google.eventReminders.includes(m)
+                    const full = !on && c.google.eventReminders.length >= MAX_EVENT_REMINDERS
+                    const u = reminderUnit(m)
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        className={on ? 'mini active' : 'mini'}
+                        disabled={full}
+                        onClick={() =>
+                          setGoogle({ eventReminders: on ? c.google.eventReminders.filter((x) => x !== m) : [...c.google.eventReminders, m].sort((a, b) => a - b) })
+                        }
+                      >
+                        {t(`cal_rem_${u.unit}` as const, { n: u.n })}
+                      </button>
+                    )
+                  })}
+                </div>
+                <small className="hint">{t('cal_rem_d')}</small>
+              </div>
+            )}
             <div className="row">
               <button type="button" className="ghost small" disabled={status?.syncing} onClick={() => void cal.api?.syncNow()}>
                 ⟳ {t('cal_sync_now')}

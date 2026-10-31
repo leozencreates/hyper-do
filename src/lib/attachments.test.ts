@@ -1,20 +1,31 @@
 import { describe, it, expect } from 'vitest'
-import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, attachmentKind, formatBytes, normalizeAttachments, referencedMediaIds, rejectReason } from './attachments'
+import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, attachmentKind, documentBadge, fileExtension, formatBytes, normalizeAttachments, referencedMediaIds, rejectReason, safeOpenName } from './attachments'
 import { duplicateTask, normalizeTask } from './tasks'
 
 const NOW = new Date(2026, 9, 24, 10, 0).getTime()
 const att = (id: string, kind: 'image' | 'video' = 'image') => ({ id, kind, name: `${id}.jpg`, mime: kind === 'image' ? 'image/jpeg' : 'video/mp4', size: 1000, addedAt: NOW })
 
 describe('attachmentKind / rejectReason', () => {
-  it('accepts images and videos only', () => {
+  it('accepts images, videos and documents', () => {
     expect(attachmentKind('image/png')).toBe('image')
     expect(attachmentKind('VIDEO/MP4')).toBe('video')
-    expect(attachmentKind('application/pdf')).toBeNull()
+    expect(attachmentKind('application/pdf')).toBe('document')
+    expect(attachmentKind('application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe('document')
+    expect(attachmentKind('application/vnd.oasis.opendocument.spreadsheet')).toBe('document')
+    expect(attachmentKind('text/plain')).toBe('document')
     expect(attachmentKind('')).toBeNull()
+  })
+  it('falls back to the extension when the browser leaves the type empty', () => {
+    expect(attachmentKind('', 'Notlar.MD')).toBe('document')
+    expect(attachmentKind('', 'rapor.docx')).toBe('document')
+    expect(attachmentKind('application/octet-stream', 'tablo.xlsx')).toBe('document')
+    expect(attachmentKind('', 'setup.exe')).toBeNull()
+    expect(attachmentKind('application/x-msdownload', 'run.bat')).toBeNull()
   })
   it('rejects by type, size and count', () => {
     expect(rejectReason({ type: 'image/jpeg', size: 10 }, 0)).toBeNull()
-    expect(rejectReason({ type: 'text/plain', size: 10 }, 0)).toBe('type')
+    expect(rejectReason({ type: 'application/pdf', size: 10, name: 'a.pdf' }, 0)).toBeNull()
+    expect(rejectReason({ type: 'application/x-msdownload', size: 10, name: 'a.exe' }, 0)).toBe('type')
     expect(rejectReason({ type: 'video/mp4', size: MAX_ATTACHMENT_BYTES + 1 }, 0)).toBe('size')
     expect(rejectReason({ type: 'image/jpeg', size: 10 }, MAX_ATTACHMENTS)).toBe('count')
   })
@@ -22,10 +33,11 @@ describe('attachmentKind / rejectReason', () => {
 
 describe('normalizeAttachments', () => {
   it('drops garbage, duplicates and unknown kinds; infers kind from mime', () => {
-    const out = normalizeAttachments([att('a'), att('a'), null, { id: '' }, { id: 'x', mime: 'text/plain' }, { id: 'v', mime: 'video/webm' }])
+    const out = normalizeAttachments([att('a'), att('a'), null, { id: '' }, { id: 'x', mime: 'application/x-msdownload' }, { id: 'v', mime: 'video/webm' }, { id: 'd', kind: 'document', name: 'a.pdf' }])
     expect(out.map((a) => [a.id, a.kind])).toEqual([
       ['a', 'image'],
       ['v', 'video'],
+      ['d', 'document'],
     ])
     expect(out[1]).toEqual({ id: 'v', kind: 'video', name: '', mime: 'video/webm', size: 0, addedAt: 0 })
   })
@@ -54,5 +66,24 @@ describe('formatBytes', () => {
     expect(formatBytes(500)).toBe('500 B')
     expect(formatBytes(2048)).toBe('2 KB')
     expect(formatBytes(2.5 * 1024 * 1024)).toBe('2.5 MB')
+  })
+})
+
+describe('document helpers', () => {
+  it('fileExtension / documentBadge', () => {
+    expect(fileExtension('C:\\x\\Rapor.Final.PDF')).toBe('pdf')
+    expect(fileExtension('.bashrc')).toBe('')
+    expect(fileExtension('noext')).toBe('')
+    expect(documentBadge('a.docx')).toBe('DOCX')
+    expect(documentBadge('noext')).toBe('FILE')
+  })
+  it('safeOpenName keeps documents only and strips folders / forbidden characters', () => {
+    expect(safeOpenName('rapor.pdf')).toBe('rapor.pdf')
+    expect(safeOpenName('../../evil/x:y?.docx')).toBe('x_y_.docx')
+    expect(safeOpenName('..\\a.txt')).toBe('a.txt')
+    expect(safeOpenName('.pdf')).toBeNull()
+    expect(safeOpenName('setup.exe')).toBeNull()
+    expect(safeOpenName('x.pdf.exe')).toBeNull()
+    expect(safeOpenName('a'.repeat(300) + '.md')).toBe('a'.repeat(110) + '.md')
   })
 })
