@@ -691,6 +691,14 @@ button.stuck-opt:not(.primary):hover { border-color: var(--text-3); }
 .revision { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .revision .mini { justify-self: start; }
 .revision .notes { max-height: 120px; overflow: auto; margin: 0; }
+.date-list { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 13px; }
+.date-list dt { color: var(--text-2); }
+.date-list dd { margin: 0; }
+.note-log { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow: auto; }
+.note-log li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.note-log li small { color: var(--text-3); white-space: nowrap; }
+.note-log .note-added span { color: var(--sky); }
+.note-log .note-removed span { color: var(--danger); }
 .review-list { list-style: none; padding: 0; }
 .review-list li { padding: 12px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .review-list li small { margin-left: 10px; color: var(--text-2); }

@@ -792,7 +792,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
           allTags={allTags}
           tasks={tasks}
           focusLog={data.focusLog}
-          onTemplate={(name, task) => setSettings((s) => ({ ...s, taskTemplates: [...s.taskTemplates, { id: uid(), name, task: { ...task, attachments: [], history: [] } }] }))}
+          onTemplate={(name, task) => setSettings((s) => ({ ...s, taskTemplates: [...s.taskTemplates, { id: uid(), name, task: { ...task, attachments: [], history: [], noteLog: [] } }] }))}
           onCancel={() => setEditing(null)}
           onSave={(nt) => {
             actions.save(nt)

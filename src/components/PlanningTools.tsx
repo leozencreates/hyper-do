@@ -28,7 +28,7 @@ export function Templates({ settings, onChange, onUse, onClose }: { settings: Se
   return <Modal title={c.templates} onClose={onClose}><p className="hint">{c.templateHint}</p>
     <button className="primary" onClick={() => onUse(newTask({}, settings))}>＋ {c.saveTemplate}</button>
     <ul className="review-list">{settings.taskTemplates.map((template) => <li key={template.id}><b>{template.name}</b><div className="row">
-      <button className="mini" onClick={() => onUse(newTask({ ...template.task, id: uid(), createdAt: Date.now(), updatedAt: Date.now(), dueAt: null, completedAt: null, followUpAt: null, dependsOn: [], focused: false, archived: false, status: 'todo', snoozedUntil: null, snoozeCount: 0, nagCount: 0, history: [], attachments: [], subtasks: template.task.subtasks.map((s) => ({ ...s, id: uid(), done: false })) }, settings))}>{c.use}</button>
+      <button className="mini" onClick={() => onUse(newTask({ ...template.task, id: uid(), createdAt: Date.now(), updatedAt: Date.now(), dueAt: null, completedAt: null, followUpAt: null, dependsOn: [], focused: false, archived: false, status: 'todo', snoozedUntil: null, snoozeCount: 0, nagCount: 0, history: [], noteLog: [], attachments: [], subtasks: template.task.subtasks.map((s) => ({ ...s, id: uid(), done: false })) }, settings))}>{c.use}</button>
       <button className="mini" onClick={() => { if (confirm !== template.id) setConfirm(template.id); else { onChange({ ...settings, taskTemplates: settings.taskTemplates.filter((x) => x.id !== template.id) }); setConfirm(null) } }}>{confirm === template.id ? `${c.delete}?` : c.delete}</button>
     </div></li>)}</ul>
   </Modal>

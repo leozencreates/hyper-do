@@ -52,7 +52,7 @@ describe('normalizeTask', () => {
       snoozeCount: 0,
       routine: false,
       attachments: [],
-      firstStep: '', dependsOn: [], followUpAt: null, archived: false, history: [],
+      firstStep: '', dependsOn: [], followUpAt: null, archived: false, history: [], noteLog: [],
       updatedAt: 123,
     })
     expect('calendarEventId' in t).toBe(false)

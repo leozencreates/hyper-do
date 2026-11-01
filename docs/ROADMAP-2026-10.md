@@ -306,3 +306,6 @@ General rules for every item:
 - [x] **🖨 Print / ⬇ PDF of all tasks, ▲▼ ordering, "All" first** (1 Nov 2026, spec `docs/2026-11-01-print-pdf-design.md`):
   one-click PDF (desktop: real file via printToPDF; web: print dialog) and print, ▲ / ▼ per row, sidebar
   All · This week · Today, the app opens on All.
+- [x] **🕓 Note dates** (2 Nov 2026, spec `docs/2026-11-02-note-dates-design.md`): `Task.noteLog` records when the notes
+  were added / edited / removed (stamped in `bumpChanged`, merged on sync); editor section 🕓 Dates also shows
+  created / last change / completed.

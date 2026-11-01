@@ -47,6 +47,12 @@ export interface TaskRevision {
   at: number
   content: Pick<Task, 'title' | 'notes' | 'priority' | 'tags' | 'dueAt' | 'subtasks' | 'estimateMin' | 'energy' | 'firstStep' | 'dependsOn' | 'followUpAt' | 'archived' | 'status' | 'remindEveryMin'>
 }
+/** What happened to a task's notes (docs/2026-11-02-note-dates-design.md): empty → text, text → other text, text → empty. */
+export type NoteEventKind = 'added' | 'edited' | 'removed'
+export interface NoteEvent {
+  at: number
+  kind: NoteEventKind
+}
 export interface TaskTemplate { id: string; name: string; task: Task }
 export interface Task {
   firstStep: string
@@ -54,6 +60,11 @@ export interface Task {
   followUpAt: number | null
   archived: boolean
   history: TaskRevision[]
+  /**
+   * When the notes were added / edited / removed, newest first (at most `NOTE_LOG_LIMIT`, history.ts). Written by
+   * `bumpChanged` (tasks.ts) at the moment of the change, merged from both copies on sync. Default: `[]`.
+   */
+  noteLog: NoteEvent[]
   id: string
   title: string
   notes: string

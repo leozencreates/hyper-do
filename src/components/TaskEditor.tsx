@@ -9,6 +9,7 @@ import { usePlanningCopy } from '../lib/planning-i18n'
 import { attachmentKind } from '../lib/attachments'
 import { platform } from '../lib/platform'
 import { useLang, useT } from '../lib/useT'
+import { LOCALE } from '../lib/i18n'
 import Attachments from './Attachments'
 import Modal from './Modal'
 import Toggle from './Toggle'
@@ -67,6 +68,7 @@ export default function TaskEditor({ task, allTags, tasks = [], focusLog = [], o
 
   const suggested = estimateSuggestion(x, tasks, focusLog)
   const canSave = x.title.trim().length > 0
+  const fmt = (ms: number) => new Date(ms).toLocaleString(LOCALE[lang], { dateStyle: 'medium', timeStyle: 'short' })
 
   return (
     <Modal title={task.title ? t('edit_task') : t('new_task_title')} onClose={onCancel}>
@@ -101,6 +103,28 @@ export default function TaskEditor({ task, allTags, tasks = [], focusLog = [], o
         <button type="button" className="ghost" onClick={() => set('archived', !x.archived)}>{x.archived ? c.unarchive : c.archived}{x.archived ? ' ✓' : ''}</button>
       </details>
       {suggested && <div className="field"><button type="button" className="ghost" onClick={() => set('estimateMin', suggested.minutes)}>{c.suggestion}: {suggested.minutes}</button><small className="hint">{suggested.samples} {c.samples}</small></div>}
+      {task.title && (
+        <details className="planning-details note-dates">
+          <summary>{t('note_dates')}{task.noteLog.length > 0 ? ` (${task.noteLog.length})` : ''}</summary>
+          <dl className="date-list">
+            <dt>{t('task_created_at')}</dt><dd>{fmt(task.createdAt)}</dd>
+            <dt>{t('task_updated_at')}</dt><dd>{fmt(task.updatedAt)}</dd>
+            {task.completedAt !== null && <><dt>{t('task_completed_at')}</dt><dd>{fmt(task.completedAt)}</dd></>}
+          </dl>
+          {task.noteLog.length === 0 ? (
+            <p className="hint">{t('note_log_empty')}</p>
+          ) : (
+            <ul className="note-log">
+              {task.noteLog.map((e) => (
+                <li key={`${e.at}-${e.kind}`} className={`note-${e.kind}`}>
+                  <span>{e.kind === 'added' ? '＋' : e.kind === 'removed' ? '−' : '✎'} {t(`note_${e.kind}` as const)}</span>
+                  <small>{fmt(e.at)}</small>
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
+      )}
       <details className="planning-details"><summary>{c.history} ({task.history.length})</summary>
         {!task.history.length && <p className="hint">{c.historyEmpty}</p>}
         {task.history.map((h, i) => <div className="revision" key={i}><small>{new Date(h.at).toLocaleString()}</small><b>{h.content.title}</b><p className="notes">{h.content.notes}</p><button type="button" className="mini" onClick={() => setX((v) => ({ ...v, ...h.content }))}>{c.restore}</button></div>)}

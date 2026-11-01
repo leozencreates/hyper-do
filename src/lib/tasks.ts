@@ -6,7 +6,7 @@ import { DEFAULT_RECURRENCE_RULE, ENERGIES, RECURRENCES, RECURRENCE_UNITS, STATU
 import { isEndOfDay, nextOccurrence } from './dates'
 import { parseQuickAdd } from './parse'
 import { normalizeAttachments } from './attachments'
-import { rememberChange, mergeHistory, revisionContent } from './history'
+import { rememberChange, mergeHistory, revisionContent, logNoteChange, normalizeNoteLog } from './history'
 import { isBlocked } from './planning'
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
@@ -20,7 +20,7 @@ export function newTask(partial: Partial<Task>, settings: Settings): Task {
   const now = Date.now()
   return {
     id: uid(),
-    firstStep: '', dependsOn: [], followUpAt: null, archived: false, history: [],
+    firstStep: '', dependsOn: [], followUpAt: null, archived: false, history: [], noteLog: [],
     title: '',
     notes: '',
     priority: 'medium',
@@ -80,7 +80,11 @@ export function bumpChanged(prev: Task[], next: Task[], nowMs = Date.now()): Tas
   const out = next.map((t) => {
     const p = before.get(t.id)
     if (p === t || (p && onlyNagChanged(p, t))) return t
-    const touched = touchTask(p ? rememberChange(p, t) : t, nowMs)
+    let touched = touchTask(p ? rememberChange(p, t) : t, nowMs)
+    // note dates: a change is stamped now; a new task without a log (fresh, recurring copy, imported from an old
+    // backup) gets "added" at its creation time
+    if (p) touched = logNoteChange(p, touched, touched.updatedAt)
+    else if (!touched.noteLog?.length) touched = logNoteChange(undefined, touched, Math.min(touched.createdAt, touched.updatedAt))
     if (touched !== t) changed = true
     return touched
   })
@@ -156,6 +160,7 @@ export function normalizeTask(t: Partial<Task> & { id: string }): Task {
     followUpAt: typeof t.followUpAt === 'number' && Number.isFinite(t.followUpAt) ? t.followUpAt : null,
     archived: t.archived === true,
     history: Array.isArray(t.history) ? mergeHistory(t.history.slice(0, 100).filter((h) => h && Number.isFinite(h.at) && h.content && typeof h.content.title === 'string').map((h) => ({ at: h.at, content: revisionContent(normalizeTask({ ...h.content, id: t.id, history: [] })) }))) : [],
+    noteLog: normalizeNoteLog(t.noteLog),
     title: t.title ?? '',
     notes: t.notes ?? '',
     priority: t.priority ?? 'medium',
@@ -195,7 +200,7 @@ export function completeTask(tasks: Task[], id: string): Task[] {
     out.unshift({
       ...t,
       id: uid(),
-      history: [], dependsOn: [], followUpAt: null,
+      history: [], noteLog: [], dependsOn: [], followUpAt: null,
       dueAt: nextOccurrence(base, t.recurrence, now, t.recurrenceRule),
       subtasks: t.subtasks.map((s) => ({ ...s, done: false })),
       completedAt: null,
@@ -286,7 +291,7 @@ export function duplicateTask(tasks: Task[], id: string, suffix: string): Task[]
     ...t,
     id: uid(),
     title: `${t.title} ${suffix}`.trim(),
-    history: [], archived: false,
+    history: [], noteLog: [], archived: false,
     subtasks: t.subtasks.map((s) => ({ ...s, id: uid(), done: false })),
     completedAt: null,
     snoozedUntil: null,

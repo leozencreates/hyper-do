@@ -61,7 +61,7 @@ describe('parseAppData: old-version documents', () => {
       snoozeCount: 0,
       routine: false,
       attachments: [],
-      firstStep: '', dependsOn: [], followUpAt: null, archived: false, history: [],
+      firstStep: '', dependsOn: [], followUpAt: null, archived: false, history: [], noteLog: [],
       updatedAt: 1000,
     })
     expect(d.tasks[1]).toMatchObject({ id: 'b', priority: 'high', dueAt: 5000, status: 'doing', order: 7 })
