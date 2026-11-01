@@ -7,3 +7,6 @@ release
 android/app/build
 android/.gradle
 android/build
+
+# Claude Code personal settings
+.claude/settings.local.json
