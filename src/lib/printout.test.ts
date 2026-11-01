@@ -18,7 +18,7 @@ describe('printSections', () => {
     task({ id: 'done', completedAt: NOW - 1000 }),
     task({ id: 'arch', archived: true }),
   ]
-  it('groups open tasks by due date, then done; archived tasks are left out', () => {
+  it('groups open tasks by due date; done and archived tasks are left out', () => {
     const s = printSections(tasks, NOW)
     expect(s.map((x) => [x.key, x.tasks.map((t) => t.id)])).toEqual([
       ['overdue', ['late']],
@@ -26,7 +26,6 @@ describe('printSections', () => {
       ['week', ['week']],
       ['later', ['later']],
       ['nodate', ['high', 'low']],
-      ['done', ['done']],
     ])
   })
   it('drops empty sections', () => {
@@ -50,8 +49,11 @@ describe('buildPrintHtml', () => {
     expect(html).toContain('step &lt;1&gt;')
     expect(html).not.toMatch(/<script/i)
   })
-  it('shows an empty note when there are no tasks', () => {
-    expect(buildPrintHtml([], 'en', NOW)).toContain('No tasks yet.')
+  it('shows an empty note when there are no open tasks', () => {
+    expect(buildPrintHtml([], 'en', NOW)).toContain('No open tasks.')
+    const html = buildPrintHtml([task({ id: 'finished', completedAt: NOW - 1000 })], 'en', NOW)
+    expect(html).toContain('No open tasks.')
+    expect(html).not.toContain('finished')
   })
 })
 

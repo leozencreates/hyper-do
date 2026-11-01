@@ -619,7 +619,7 @@ web sürümünü kullan.
 
 1. Uygulamayı aç → "Hepsi" görünümü açık; sol menü sırası Hepsi · Bu hafta · Bugün · Pano · Bitenler. 1 = Hepsi.
 2. Başlıktaki **⬇ PDF** → kaydet penceresi İndirilenler'de `hyperdo-tasks-<tarih>.pdf` önerir → kaydet → PDF
-   açılır: başlık, sayılar, Gecikmiş/Bugün/Bu hafta/Sonra/Tarihsiz/Bitenler bölümleri, öncelik renkleri,
+   açılır: başlık, sayılar, Gecikmiş/Bugün/Bu hafta/Sonra/Tarihsiz bölümleri (biten görevler yok), öncelik renkleri,
    notlar, alt görevler, Türkçe karakterler düzgün. İptal → mesaj yok.
 3. **🖨** → sistem yazdırma penceresi açılır, önizleme PDF ile aynı.
 4. Web (`npm run dev:web`): ⬇ PDF → "PDF olarak kaydet" ipucu + yazdırma penceresi; 🖨 → yazdırma penceresi.

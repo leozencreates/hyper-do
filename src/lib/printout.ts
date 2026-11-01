@@ -7,7 +7,7 @@ import type { Task } from './types'
 import { LOCALE, translate, type Lang } from './i18n'
 import { endOfDay, formatDue, formatMinutes, recurrenceText, startOfDay } from './dates'
 
-export type PrintSectionKey = 'overdue' | 'today' | 'week' | 'later' | 'nodate' | 'done'
+export type PrintSectionKey = 'overdue' | 'today' | 'week' | 'later' | 'nodate'
 
 export interface PrintSection {
   key: PrintSectionKey
@@ -20,10 +20,9 @@ const PRIO_RANK: Record<Task['priority'], number> = { high: 0, medium: 1, low: 2
 const byDue = (a: Task, b: Task) => (a.dueAt ?? 0) - (b.dueAt ?? 0) || PRIO_RANK[a.priority] - PRIO_RANK[b.priority] || a.order - b.order
 const byPrio = (a: Task, b: Task) => PRIO_RANK[a.priority] - PRIO_RANK[b.priority] || a.order - b.order
 
-/** Groups every non-archived task: open ones by due date (overdue → today → next 7 days → later → no date), then done. Empty sections are dropped. */
+/** Groups the open (not done, not archived) tasks by due date: overdue → today → next 7 days → later → no date. Done tasks are left out. Empty sections are dropped. */
 export function printSections(tasks: Task[], now: number): PrintSection[] {
-  const live = tasks.filter((x) => !x.archived)
-  const open = live.filter((x) => x.completedAt === null)
+  const open = tasks.filter((x) => !x.archived && x.completedAt === null)
   const todayEnd = endOfDay(now)
   const weekEnd = startOfDay(now) + 7 * DAY
   const sections: PrintSection[] = [
@@ -32,7 +31,6 @@ export function printSections(tasks: Task[], now: number): PrintSection[] {
     { key: 'week', tasks: open.filter((x) => x.dueAt !== null && x.dueAt > todayEnd && x.dueAt < weekEnd).sort(byDue) },
     { key: 'later', tasks: open.filter((x) => x.dueAt !== null && x.dueAt >= weekEnd && x.dueAt > todayEnd).sort(byDue) },
     { key: 'nodate', tasks: open.filter((x) => x.dueAt === null).sort(byPrio) },
-    { key: 'done', tasks: live.filter((x) => x.completedAt !== null).sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)) },
   ]
   return sections.filter((s) => s.tasks.length > 0)
 }
@@ -45,15 +43,12 @@ const SECTION_LABEL: Record<PrintSectionKey, Parameters<typeof translate>[1]> = 
   week: 'view_week',
   later: 'tg_sec_later',
   nodate: 'tg_sec_nodate',
-  done: 'view_done',
 }
 
 function taskHtml(task: Task, lang: Lang, now: number): string {
-  const done = task.completedAt !== null
   const loc = LOCALE[lang]
   const meta: string[] = []
-  if (done) meta.push(`✓ ${escapeHtml(new Date(task.completedAt!).toLocaleDateString(loc, { day: 'numeric', month: 'short', year: 'numeric' }))}`)
-  else if (task.dueAt !== null) {
+  if (task.dueAt !== null) {
     const abs = new Date(task.dueAt).toLocaleString(loc, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
     meta.push(`<span class="due${task.dueAt < now ? ' late' : ''}">📅 ${escapeHtml(abs)} · ${escapeHtml(formatDue(task.dueAt, lang, now))}</span>`)
   }
@@ -67,8 +62,8 @@ function taskHtml(task: Task, lang: Lang, now: number): string {
     : ''
   const notes = task.notes.trim() ? `<div class="notes">${escapeHtml(task.notes.trim())}</div>` : ''
   return (
-    `<li class="task p-${task.priority}${done ? ' done' : ''}">` +
-    `<span class="box">${done ? '✓' : ''}</span>` +
+    `<li class="task p-${task.priority}">` +
+    `<span class="box"></span>` +
     `<div class="body"><div class="title-row"><span class="title">${escapeHtml(task.title)}</span>` +
     `<span class="prio">${escapeHtml(translate(lang, `p_${task.priority}` as const))}</span></div>` +
     (meta.length ? `<div class="meta">${meta.join('<span class="dot">·</span>')}</div>` : '') +
@@ -95,7 +90,6 @@ h2 { font-size: 11.5pt; margin: 0 0 6px; padding: 4px 10px; border-radius: 6px; 
 h2 .n { color: #8a91a3; font-weight: 600; }
 section.overdue h2 { background: #fdecec; color: #b03024; }
 section.today h2 { background: #eaf3ff; color: #1d5fb8; }
-section.done h2 { background: #eaf7ef; color: #23784a; }
 ul { list-style: none; margin: 0; padding: 0; }
 .task { display: flex; gap: 9px; padding: 7px 10px 7px 8px; border-left: 3.5px solid #c9cdd8; border-bottom: 1px solid #eceef3; break-inside: avoid; }
 .task.p-high { border-left-color: #e5534b; }
@@ -118,8 +112,6 @@ ul { list-style: none; margin: 0; padding: 0; }
 .subs li { display: flex; gap: 7px; font-size: 9.5pt; padding: 1px 0; }
 .subs .box { width: 11px; height: 11px; margin-top: 3px; font-size: 8px; line-height: 8px; }
 .subs .sdone { color: #8a91a3; text-decoration: line-through; }
-.task.done .title { color: #8a91a3; text-decoration: line-through; }
-.task.done { border-left-color: #c9cdd8; }
 .empty { color: #8a91a3; text-align: center; padding: 40px 0; }
 footer { margin-top: 18px; font-size: 8pt; color: #a0a6b4; text-align: center; }
 `
@@ -127,9 +119,7 @@ footer { margin-top: 18px; font-size: 8pt; color: #a0a6b4; text-align: center; }
 /** The whole printable document. `now` decides overdue / today and the "created" stamp. */
 export function buildPrintHtml(tasks: Task[], lang: Lang, now: number): string {
   const sections = printSections(tasks, now)
-  const live = tasks.filter((x) => !x.archived)
-  const openN = live.filter((x) => x.completedAt === null).length
-  const doneN = live.length - openN
+  const openN = tasks.filter((x) => !x.archived && x.completedAt === null).length
   const lateN = sections.find((s) => s.key === 'overdue')?.tasks.length ?? 0
   const title = translate(lang, 'pr_title')
   const stamp = new Date(now).toLocaleString(LOCALE[lang], { dateStyle: 'long', timeStyle: 'short' })
@@ -148,7 +138,7 @@ export function buildPrintHtml(tasks: Task[], lang: Lang, now: number): string {
     `<div class="stamp">${escapeHtml(translate(lang, 'pr_created', { d: stamp }))}<div class="stats">` +
     `<span class="stat">${escapeHtml(translate(lang, 'pr_open_n', { n: openN }))}</span>` +
     (lateN ? `<span class="stat late">${escapeHtml(translate(lang, 'pr_late_n', { n: lateN }))}</span>` : '') +
-    `<span class="stat">${escapeHtml(translate(lang, 'pr_done_n', { n: doneN }))}</span></div></div></header>` +
+    `</div></div></header>` +
     body +
     `<footer>Hyper Do · ${escapeHtml(stamp)}</footer></body></html>`
   )

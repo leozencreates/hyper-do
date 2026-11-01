@@ -11,9 +11,9 @@ Status: [x] implemented (1 Nov 2026)
 ## Print document (`src/lib/printout.ts`, pure)
 
 - `buildPrintHtml(tasks, lang, now)` → one self-contained HTML document (inline CSS, no script, no external
-  asset, A4 via `@page`). Header: "Hyper Do", title, creation stamp, open / overdue / done counts.
-- `printSections(tasks, now)`: archived tasks are left out; open tasks grouped Overdue → Today → next 7 days →
-  Later (by due, then priority) → No date (by priority, then manual order) → Done (newest first). Empty
+  asset, A4 via `@page`). Header: "Hyper Do", title, creation stamp, open / overdue counts.
+- `printSections(tasks, now)`: only open tasks (done and archived ones are left out, 0.3.8), grouped Overdue →
+  Today → next 7 days → Later (by due, then priority) → No date (by priority, then manual order). Empty
   sections are dropped.
 - Each task: checkbox, title, priority pill + coloured left border, due (absolute + relative), recurrence,
   estimate, subtask progress, tags, notes (pre-wrap), subtasks. Every user string goes through `escapeHtml`.
