@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppData, type AppStore } from './lib/store'
-import { matchesQuery, newTask, pickEasyTask, sortTasks, uid } from './lib/tasks'
+import { matchesQuery, moveInList, newTask, pickEasyTask, sortTasks, uid } from './lib/tasks'
+import { buildPrintHtml, printFileName } from './lib/printout'
+import { printHtmlDocument } from './lib/download'
 import { ENERGIES, ENERGY_ICON, SORT_MODES, type AppData, type ConnectionStatus, type Energy, type SortMode, type Task, type UpdateStatus } from './lib/types'
 import { dayKey, isOverdue, isToday, isThisWeek } from './lib/dates'
 import { escalationLevel, isMuted, quickMute } from './lib/reminder'
@@ -40,7 +42,8 @@ import { HyperFocusBar, useHyperFocus } from './components/HyperFocus'
 import { useCelebration } from './components/Celebration'
 
 type View = 'today' | 'week' | 'all' | 'board' | 'done' | 'inbox' | 'archive'
-const VIEW_KEYS: View[] = ['today', 'week', 'all', 'board', 'done', 'inbox', 'archive']
+/** Sidebar order (and keys 1-7): "All" first, then this week, then today. */
+const VIEW_KEYS: View[] = ['all', 'week', 'today', 'board', 'done', 'inbox', 'archive']
 
 /**
  * `?view=` is read once at startup. Besides the list views it selects the renderer *window kind*:
@@ -118,7 +121,8 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   })
   const [view, setView] = useState<View>(() => {
     const v = VIEW_PARAM as View | null
-    return v && VIEW_KEYS.includes(v) ? v : 'today'
+    // The app always opens on "All" (the Mini App has no "All" tab, it keeps "Today")
+    return v && VIEW_KEYS.includes(v) ? v : IS_TG ? 'today' : 'all'
   })
   const [tag, setTag] = useState<string | null>(null)
   const [energy, setEnergy] = useState<Energy | null>(null)
@@ -256,6 +260,42 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
     if (view === 'done') return [...filtered].sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
     return sortTasks(filtered, settings.sort, now)
   }, [filtered, view, settings.sort, now])
+
+  /** ▲ / ▼ on a row: one place up / down in the list as shown; switches to manual sort (like drag and drop). */
+  const moveStep = (id: string, dir: -1 | 1) => {
+    const ids = visible.map((x) => x.id)
+    setTasks((ts) => moveInList(ts, ids, id, dir))
+    if (settings.sort !== 'manual') setSettings((s) => ({ ...s, sort: 'manual' }))
+  }
+
+  /** One-click PDF / print of every task (printout.ts). Desktop: real PDF file + system print; browser: print dialog. */
+  const [printMsg, setPrintMsg] = useState<string | null>(null)
+  useEffect(() => {
+    if (!printMsg) return
+    const id = setTimeout(() => setPrintMsg(null), 6000)
+    return () => clearTimeout(id)
+  }, [printMsg])
+  const canPrint = platform.kind === 'electron' || platform.kind === 'web'
+  const exportPdf = async () => {
+    const html = buildPrintHtml(tasks, settings.language, Date.now())
+    if (desktop?.exportPdf) {
+      const r = await desktop.exportPdf(html, printFileName(Date.now()))
+      if (r.ok) setPrintMsg(t('pr_pdf_saved', { f: r.path ?? '' }))
+      else if (!r.canceled) setPrintMsg(t('pr_pdf_fail'))
+      return
+    }
+    setPrintMsg(t('pr_web_hint'))
+    await printHtmlDocument(html).catch(() => setPrintMsg(t('pr_print_fail')))
+  }
+  const printAll = async () => {
+    const html = buildPrintHtml(tasks, settings.language, Date.now())
+    if (desktop?.printHtml) {
+      // false also means "cancelled in the dialog", so it stays silent
+      await desktop.printHtml(html).catch(() => setPrintMsg(t('pr_print_fail')))
+      return
+    }
+    await printHtmlDocument(html).catch(() => setPrintMsg(t('pr_print_fail')))
+  }
 
   const spentByTask = useMemo(() => spentMinByTask(data.focusLog), [data.focusLog])
   const currentStreak = useMemo(() => streak(data.dailyDone, dayKey(now)), [data.dailyDone, now])
@@ -520,6 +560,16 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
             <button className="ghost small" title="B" onClick={() => setShowBrain(true)}>
               {t('brain_btn')}
             </button>
+            {canPrint && (
+              <>
+                <button className="ghost small" title={t('pr_pdf_title')} onClick={() => void exportPdf()}>
+                  {t('pr_pdf_btn')}
+                </button>
+                <button className="ghost small" title={t('pr_print_title')} aria-label={t('pr_print_title')} onClick={() => void printAll()}>
+                  🖨
+                </button>
+              </>
+            )}
             {desktop && (
               <button className="ghost small" title={`${t('mini_window')} (M)`} onClick={() => void desktop.toggleMini()}>
                 ▣
@@ -624,7 +674,7 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
           <div className="empty">{view === 'done' ? t('empty_done') : t('empty_open')}</div>
         ) : (
           <ul className="task-list" onDragOver={(e) => dragId && e.preventDefault()} onDrop={() => dropOn(null)}>
-            {visible.map((x) => (
+            {visible.map((x, i) => (
               <TaskItem
                 key={x.id}
                 task={x}
@@ -643,6 +693,9 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
                 onStuck={() => setStuckId(x.id)}
                 onRun={() => setRunId(x.id)}
                 onStart={isBlocked(x, tasks) ? undefined : () => setStartId(x.id)}
+                onMove={view !== 'done' && !IS_TG ? (dir) => moveStep(x.id, dir) : undefined}
+                canMoveUp={i > 0}
+                canMoveDown={i < visible.length - 1}
                 drag={
                   view !== 'done' && !IS_TG
                     ? {
@@ -672,6 +725,15 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
             ＋
           </button>
         </nav>
+      )}
+
+      {printMsg && !actions.undo && (
+        <div className="toast print-toast">
+          <span>{printMsg}</span>
+          <button className="icon" title={t('dismiss')} onClick={() => setPrintMsg(null)}>
+            ✕
+          </button>
+        </div>
       )}
 
       {actions.undo && (

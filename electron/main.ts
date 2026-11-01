@@ -795,6 +795,48 @@ ipcMain.handle('tidi:open-file', async (_e, name: unknown, data: unknown) => {
   }
 })
 
+// Task list → PDF / printer (HyperDoApi.desktop.exportPdf / printHtml). The HTML comes from printout.ts in the
+// renderer; it is loaded from a temp file into a hidden, script-less window.
+async function withPrintWindow<T>(html: string, fn: (w: BrowserWindow) => Promise<T>): Promise<T> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hyperdo-print-'))
+  const file = path.join(dir, 'tasks.html')
+  fs.writeFileSync(file, html, 'utf8')
+  const w = new BrowserWindow({ show: false, width: 900, height: 1200, webPreferences: { javascript: false, sandbox: true, contextIsolation: true } })
+  try {
+    await w.loadFile(file)
+    return await fn(w)
+  } finally {
+    if (!w.isDestroyed()) w.destroy()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+}
+ipcMain.handle('tidi:export-pdf', async (_e, html: unknown, fileName: unknown) => {
+  if (typeof html !== 'string') return { ok: false, error: 'bad input' }
+  const name = typeof fileName === 'string' && /^[\w.-]+\.pdf$/.test(fileName) ? fileName : 'hyperdo-tasks.pdf'
+  const opts = { defaultPath: path.join(app.getPath('downloads'), name), filters: [{ name: 'PDF', extensions: ['pdf'] }] }
+  const pick = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+  if (pick.canceled || !pick.filePath) return { ok: false, canceled: true }
+  try {
+    const pdf = await withPrintWindow(html, (w) => w.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true }))
+    fs.writeFileSync(pick.filePath, pdf)
+    void shell.openPath(pick.filePath)
+    return { ok: true, path: pick.filePath }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+})
+ipcMain.handle('tidi:print-html', async (_e, html: unknown) => {
+  if (typeof html !== 'string') return false
+  try {
+    return await withPrintWindow(
+      html,
+      (w) => new Promise<boolean>((resolve) => w.webContents.print({ silent: false, printBackground: true }, (ok) => resolve(ok))),
+    )
+  } catch {
+    return false
+  }
+})
+
 // ---- Eşitleme IPC (HyperDoApi.sync) ----
 ipcMain.handle('tidi:sync-status', () => sync.status())
 ipcMain.handle('tidi:sync-now', () => sync.syncNow())

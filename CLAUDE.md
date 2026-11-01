@@ -82,6 +82,10 @@ src/lib/attachments.ts  Pure: photo / video / document attachments (spec 2026-10
                         tidi:open-file → temp copy + shell.openPath, documents only).
                         Bytes live in platform.media.ts (IndexedDB `hyperdo-media`, HyperDoApi.media put/get/gc; added in
                         platform.ts to every adapter except the Mini App), never in AppData / backups / sync; main window gc once per start
+src/lib/printout.ts     Pure: printable task list (spec 2026-11-01-print-pdf-design.md): buildPrintHtml(tasks, lang, now) →
+                        self-contained A4 HTML (no script), printSections, printFileName. Desktop: DesktopApi.exportPdf /
+                        printHtml (IPC tidi:export-pdf | tidi:print-html, hidden JS-off window, printToPDF + save dialog);
+                        web: printHtmlDocument (download.ts, srcdoc iframe). Header buttons ⬇ PDF / 🖨 (electron + web only)
 src/lib/share.ts        Pure: parseShareEvent (hyperdoShare window event from MainActivity.java), shareToTaskFields
 src/lib/platform.ts     Picks the adapter at startup: window.tidi (Electron) → Telegram Mini App (window.Telegram.WebApp.initData
                         non-empty) → Capacitor → web
@@ -189,8 +193,8 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 ```
 
 Tests: `src/lib/*.test.ts` (attachments, calendar-links, calsync, data, dates, deeplink, digest, full-backup, gcal, ics, parse,
-planning, reminder, share, sound, stats, routine, sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`,
-`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 27 files, 521 tests.
+planning, printout, reminder, share, sound, stats, routine, sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`,
+`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 28 files, 534 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.

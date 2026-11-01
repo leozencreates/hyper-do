@@ -160,6 +160,10 @@ h2 { margin: 0 0 14px; font-size: 20px; }
 .sub-title { flex: 1; padding: 5px 8px; }
 .snooze-row { display: flex; gap: 6px; align-items: center; margin-top: 10px; font-size: 13px; color: var(--text-2); }
 .task-actions { display: flex; gap: 2px; align-items: center; }
+.move-btns { display: inline-flex; flex-direction: column; margin-right: 2px; }
+.move-btns .icon.move { font-size: 9px; line-height: 1; padding: 2px 5px; min-height: 0; opacity: .55; }
+.move-btns .icon.move:hover:not(:disabled) { opacity: 1; }
+.move-btns .icon.move:disabled { opacity: .15; cursor: default; }
 
 /* --- Focus banner --- */
 .focus-banner {

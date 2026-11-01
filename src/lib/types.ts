@@ -510,6 +510,10 @@ export interface DesktopApi {
   miniAppRestart(): Promise<void>
   /** Opens a document attachment with the system's default app (temp copy). false = not a document / failed. */
   openFile?(name: string, data: ArrayBuffer): Promise<boolean>
+  /** Printable task list (printout.ts) → real PDF via printToPDF + save dialog (Downloads), opened afterwards. */
+  exportPdf?(html: string, fileName: string): Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>
+  /** Printable task list → the system print dialog. */
+  printHtml?(html: string): Promise<boolean>
 }
 
 /** Connection to the data owner for adapters that do not hold the data themselves (the Telegram Mini App talks to the PC). */

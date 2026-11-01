@@ -324,6 +324,31 @@ export function reorderTasks(tasks: Task[], draggedId: string, beforeId: string 
   })
 }
 
+/**
+ * ▲ / ▼ on a list row: moves `id` one place up (-1) or down (+1) inside `shownIds` (the list as displayed, in any
+ * sort mode). The shown tasks keep the `order` slots they already occupy, re-dealt in the new display order, so the
+ * list looks the same after switching to manual sort and tasks outside the list never move. Unchanged → same array.
+ */
+export function moveInList(tasks: Task[], shownIds: string[], id: string, dir: -1 | 1, nowMs = Date.now()): Task[] {
+  const at = shownIds.indexOf(id)
+  const to = at + dir
+  if (at < 0 || to < 0 || to >= shownIds.length) return tasks
+  const next = [...shownIds]
+  ;[next[at], next[to]] = [next[to], next[at]]
+  const byId = new Map(tasks.map((x) => [x.id, x]))
+  const slots = shownIds.map((x) => byId.get(x)?.order ?? 0).sort((a, b) => a - b)
+  for (let i = 1; i < slots.length; i++) if (slots[i] <= slots[i - 1]) slots[i] = slots[i - 1] + 1
+  const orderOf = new Map(next.map((x, i) => [x, slots[i]]))
+  let changed = false
+  const out = tasks.map((x) => {
+    const o = orderOf.get(x.id)
+    if (o === undefined || o === x.order) return x
+    changed = true
+    return touchTask({ ...x, order: o }, nowMs)
+  })
+  return changed ? out : tasks
+}
+
 export function sortTasks(tasks: Task[], mode: SortMode, nowMs = Date.now()): Task[] {
   const isOverdue = (t: Task) => t.dueAt !== null && t.dueAt < nowMs
   return [...tasks].sort((a, b) => {

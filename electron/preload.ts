@@ -67,5 +67,8 @@ contextBridge.exposeInMainWorld('tidi', {
     onMiniAppStatus: listen<unknown>('tidi:miniapp-status'),
     miniAppRestart: () => ipcRenderer.invoke('tidi:miniapp-restart'),
     openFile: (name: string, data: ArrayBuffer) => ipcRenderer.invoke('tidi:open-file', name, data),
+    // Task list as PDF / print (printout.ts builds the HTML in the renderer)
+    exportPdf: (html: string, fileName: string) => ipcRenderer.invoke('tidi:export-pdf', html, fileName),
+    printHtml: (html: string) => ipcRenderer.invoke('tidi:print-html', html),
   },
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { SNOOZE_NUDGE, completeTask, duplicateTask, isStuck, matchesQuery, newTask, normalizeRecurrenceRule, normalizeTask, openTasksSorted, pickEasyTask, priorityIcon, reorderTasks, snoozeTask, sortTasks, startBy, stuckDates, taskFromQuickAdd } from './tasks'
+import { SNOOZE_NUDGE, completeTask, duplicateTask, isStuck, matchesQuery, moveInList, newTask, normalizeRecurrenceRule, normalizeTask, openTasksSorted, pickEasyTask, priorityIcon, reorderTasks, snoozeTask, sortTasks, startBy, stuckDates, taskFromQuickAdd } from './tasks'
 import { DEFAULT_SETTINGS, type Task } from './types'
 
 // Tuesday, 13 October 2026, 10:00 local time
@@ -480,5 +480,30 @@ describe('startBy (time blindness)', () => {
     expect(startBy(task({ id: 'a', dueAt: due, estimateMin: 30, completedAt: NOW }), NOW)).toBeNull()
     expect(startBy(task({ id: 'a', dueAt: NOW + 14 * H, estimateMin: 60 }), NOW)).toBeNull()
     expect(startBy(task({ id: 'a', dueAt: NOW + 13 * H, estimateMin: 60 }), NOW)).toEqual({ at: NOW + 12 * H, late: false })
+  })
+})
+
+describe('moveInList', () => {
+  // Shown in a non-manual order: c, a, b (orders 3000, 1000, 2000); x is hidden
+  const ts = [task({ id: 'a', order: 1000 }), task({ id: 'b', order: 2000 }), task({ id: 'c', order: 3000 }), task({ id: 'x', order: 1500 })]
+  const shown = ['c', 'a', 'b']
+  const manual = (list: Task[]) => sortTasks(list.filter((t) => t.id !== 'x'), 'manual').map((t) => t.id)
+  it('moves up one place and keeps the shown order under manual sort', () => {
+    expect(manual(moveInList(ts, shown, 'a', -1, NOW + 1))).toEqual(['a', 'c', 'b'])
+  })
+  it('moves down one place', () => {
+    expect(manual(moveInList(ts, shown, 'c', 1, NOW + 1))).toEqual(['a', 'c', 'b'])
+    expect(manual(moveInList(ts, shown, 'a', 1, NOW + 1))).toEqual(['c', 'b', 'a'])
+  })
+  it('leaves hidden tasks alone and bumps updatedAt of moved ones', () => {
+    const out = moveInList(ts, shown, 'a', -1, NOW + 1)
+    expect(out.find((t) => t.id === 'x')).toBe(ts[3])
+    expect(out.find((t) => t.id === 'c')!.updatedAt).toBe(NOW + 1)
+    expect(out.find((t) => t.id === 'a')).toBe(ts[0])
+  })
+  it('returns the same array at the edges', () => {
+    expect(moveInList(ts, shown, 'c', -1)).toBe(ts)
+    expect(moveInList(ts, shown, 'b', 1)).toBe(ts)
+    expect(moveInList(ts, shown, 'nope', 1)).toBe(ts)
   })
 })

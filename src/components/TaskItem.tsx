@@ -35,10 +35,14 @@ interface Props {
   /** ▶ Run (routines with steps): opens the step-by-step runner. */
   onRun?(): void
   onStart?(): void
+  /** ▲ / ▼ buttons: move one place up (-1) / down (+1) in the list. Absent = no buttons (done view, Mini App). */
+  onMove?(dir: -1 | 1): void
+  canMoveUp?: boolean
+  canMoveDown?: boolean
   drag?: DragHandlers
 }
 
-export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, onStuck, onRun, onStart, drag }: Props) {
+export default function TaskItem({ task, highlighted, spentMin = 0, escalation = 0, onComplete, onReopen, onEdit, onFocus, onSnooze, onToggleSub, onDelete, onDuplicate, onPostpone, onStuck, onRun, onStart, onMove, canMoveUp = true, canMoveDown = true, drag }: Props) {
   const t = useT()
   const c = usePlanningCopy()
   const lang = useLang()
@@ -216,6 +220,16 @@ export default function TaskItem({ task, highlighted, spentMin = 0, escalation =
       </div>
 
       <div className="task-actions">
+        {onMove && (
+          <span className="move-btns">
+            <button className="icon move" title={t('mv_up')} aria-label={t('mv_up')} disabled={!canMoveUp} onClick={() => onMove(-1)}>
+              ▲
+            </button>
+            <button className="icon move" title={t('mv_down')} aria-label={t('mv_down')} disabled={!canMoveDown} onClick={() => onMove(1)}>
+              ▼
+            </button>
+          </span>
+        )}
         {onRun && isRunnable(task) && (
           <button className="mini rt-run" title={t('rt_run_title')} onClick={onRun}>
             {t('rt_run')}

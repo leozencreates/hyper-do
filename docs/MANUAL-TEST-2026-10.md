@@ -614,3 +614,14 @@ web sürümünü kullan.
 2. A'da Telegram bağlı → B'de Telegram ayarı boş kalır; dosyada token yok (E1 adım 9).
 3. A'da Hyper Focus çalışıyor → B'de seans başlamaz (yalnız biten turlar `focusLog` ile gelir, 📈'de dakikalar görünür).
 4. Takvim bağlantıları ve beslemeler cihaz başına.
+
+## F. Yazdırma / PDF, ▲▼ sıralama (spec `docs/2026-11-01-print-pdf-design.md`)
+
+1. Uygulamayı aç → "Hepsi" görünümü açık; sol menü sırası Hepsi · Bu hafta · Bugün · Pano · Bitenler. 1 = Hepsi.
+2. Başlıktaki **⬇ PDF** → kaydet penceresi İndirilenler'de `hyperdo-tasks-<tarih>.pdf` önerir → kaydet → PDF
+   açılır: başlık, sayılar, Gecikmiş/Bugün/Bu hafta/Sonra/Tarihsiz/Bitenler bölümleri, öncelik renkleri,
+   notlar, alt görevler, Türkçe karakterler düzgün. İptal → mesaj yok.
+3. **🖨** → sistem yazdırma penceresi açılır, önizleme PDF ile aynı.
+4. Web (`npm run dev:web`): ⬇ PDF → "PDF olarak kaydet" ipucu + yazdırma penceresi; 🖨 → yazdırma penceresi.
+5. Akıllı sıralamada bir görevin ▲'sine bas → görev bir üste çıkar, sıralama "Elle"ye geçer, liste başka
+   yerinde değişmez. İlk satırda ▲, son satırda ▼ pasif. Bitenler görünümünde ve Mini App'te ▲▼ yok.

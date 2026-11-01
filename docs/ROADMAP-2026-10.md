@@ -303,3 +303,6 @@ General rules for every item:
 - [x] **Google Calendar auto-push + reminders** (1 Nov 2026, spec `docs/2026-11-01-calendar-reminders-design.md`):
   push on by default (one-off switch-on for older settings), `google.eventReminders` (default 1 h / 1 day / 3 days,
   max 5) sent as popup overrides; all-day tasks ring at 09:00 / the evening before at 20:00.
+- [x] **🖨 Print / ⬇ PDF of all tasks, ▲▼ ordering, "All" first** (1 Nov 2026, spec `docs/2026-11-01-print-pdf-design.md`):
+  one-click PDF (desktop: real file via printToPDF; web: print dialog) and print, ▲ / ▼ per row, sidebar
+  All · This week · Today, the app opens on All.
