@@ -294,7 +294,7 @@ phone (Telegram client)                    PC (Electron main process)
     `button_text_color`) onto the app's CSS variables and react to `themeChanged`; `BackButton` shows while a modal
     (task editor, stats, brain dump) is open and closes it; `HapticFeedback.notificationOccurred('success')` on
     complete; `?task=<id>` opens that task's editor after load.
-  - Layout `html.tg`: bottom tab bar **Today · Week · Board · Done · ＋** (44 px targets, safe-area padding from
+  - Layout `html.tg`: bottom tab bar **All · Today · Week · Board · Done · ＋** (opens on All; 44 px targets, safe-area padding from
     `--tg-safe-area-inset-*` / `--tg-content-safe-area-inset-*`), header reduced to title + search + mute chip,
     sidebar hidden, desktop-only buttons hidden (mini, settings, calendar, backup). Reuse the existing ≤720 px
     rules; add only what the tab bar and the Telegram colours need. Lists keep the existing drag/drop disabled on

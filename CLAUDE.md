@@ -180,7 +180,7 @@ src/App.tsx             Shell; `?view=today|week|all|board|done` selects the ini
                         quick-add popup, `?view=mini` the mini window, `?task=<id>` opens that editor after load (Telegram
                         "Open in app"). Keyboard: N / W E B M 1-5 (Esc via Modal). Hosts the mute chip, the "easy one" toast,
                         the update toast and the share-target editor. `IS_TG` (platform.kind === 'telegram'): bottom tab bar
-                        Today · Week · Board · Done · ＋, no sidebar / sort / "+ New task" / Hyper Focus start, hf driver off,
+                        All · Today · Week · Board · Done · ＋ (opens on All), no sidebar / sort / "+ New task" / Hyper Focus start, hf driver off,
                         haptic on complete, "⚠ Not saved · Retry" chip from platform.connection
 tg.html                 Mini App entry next to index.html: CSP script-src 'self' https://telegram.org, SDK script tag before
                         the module script, no manifest / SW. vite.web.config.ts builds both (rolldownOptions.input index + tg)

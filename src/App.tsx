@@ -55,7 +55,7 @@ const TASK_PARAM = new URLSearchParams(location.search).get('task')
 /** Telegram Mini App: phone layout with the bottom tab bar, data on the PC, no desktop-only controls. */
 const IS_TG = platform.kind === 'telegram'
 /** Tabs of the Mini App's bottom bar (the ＋ tab is added separately). */
-const TG_TABS: View[] = ['today', 'week', 'board', 'done']
+const TG_TABS: View[] = ['all', 'today', 'week', 'board', 'done']
 
 /** Time-dependent UI (overdue, "today") refreshes this often without user interaction. */
 const CLOCK_MS = 30_000
@@ -121,8 +121,8 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   })
   const [view, setView] = useState<View>(() => {
     const v = VIEW_PARAM as View | null
-    // The app always opens on "All" (the Mini App has no "All" tab, it keeps "Today")
-    return v && VIEW_KEYS.includes(v) ? v : IS_TG ? 'today' : 'all'
+    // The app always opens on "All" (the Mini App too: undated / later tasks must not look missing)
+    return v && VIEW_KEYS.includes(v) ? v : 'all'
   })
   const [tag, setTag] = useState<string | null>(null)
   const [energy, setEnergy] = useState<Energy | null>(null)

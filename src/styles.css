@@ -600,11 +600,11 @@ html.tg body { background: var(--bg); background-attachment: scroll; overscroll-
 .tg .col { scroll-snap-align: start; }
 .tg .perm-banner { display: none; }
 
-/* bottom tab bar: Today · Week · Board · Done · ＋ */
+/* bottom tab bar: All · Today · Week · Board · Done · ＋ */
 .tg-tabs { display: none; }
 .tg .tg-tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 9;
-  display: grid; grid-template-columns: repeat(4, 1fr) 60px; gap: 2px; align-items: stretch;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) 52px; gap: 2px; align-items: stretch;
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom) + var(--tg-safe-area-inset-bottom, 0px));
   background: color-mix(in srgb, var(--bg-2) 94%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--border);
 }
@@ -612,6 +612,9 @@ html.tg body { background: var(--bg); background-attachment: scroll; overscroll-
 .tg-tab .tg-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); opacity: .45; transition: opacity .15s, box-shadow .15s; }
 .tg-tab.active { color: var(--text); background: color-mix(in srgb, var(--c) 16%, transparent); }
 .tg-tab.active .tg-tab-dot { opacity: 1; box-shadow: 0 0 8px var(--c); }
+.tg-tab { min-width: 0; font-size: 11px; }
+.tg-tab .tg-tab-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tg-tab.v-all { --c: var(--sky); }
 .tg-tab.v-week { --c: var(--violet); }
 .tg-tab.v-board { --c: var(--teal); }
 .tg-tab.v-done { --c: var(--ok); }
