@@ -112,9 +112,9 @@ describe('applyNotificationAction (Android notification buttons)', () => {
     expect(out.dailyDone).toEqual({ '2026-10-12': 1 })
   })
 
-  it('focus → only this task is focused, nag reset, the previous focus task is unfocused', () => {
+  it('focus → this task joins the focus next to the previous one, nag reset', () => {
     const out = applyNotificationAction(base(), 'a', 'focus', NOW)
-    expect(out.tasks.filter((t) => t.focused).map((t) => t.id)).toEqual(['a'])
+    expect(out.tasks.filter((t) => t.focused).map((t) => t.id)).toEqual(['a', 'f'])
     expect(out.tasks.find((t) => t.id === 'a')!.nagCount).toBe(0)
   })
 

@@ -179,6 +179,15 @@ h2 { margin: 0 0 14px; font-size: 20px; }
 .focus-meta { display: flex; gap: 14px; color: var(--text-2); font-size: 14px; }
 .focus-next { display: flex; gap: 10px; align-items: center; margin-top: 12px; padding: 10px 12px; background: rgba(0,0,0,.25); border-radius: 8px; cursor: pointer; }
 .focus-actions { display: flex; gap: 10px; margin-top: 14px; }
+/* 2–3 focused tasks: side by side, compact */
+.focus-stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.focus-stack .focus-banner { margin-bottom: 0; display: flex; flex-direction: column; }
+.focus-banner.compact { padding: 14px 16px; }
+.focus-banner.compact .focus-title { font-size: 18px; overflow-wrap: anywhere; }
+.focus-banner.compact .focus-meta { flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.focus-banner.compact .focus-next { margin-top: 10px; padding: 8px 10px; }
+.focus-banner.compact .focus-actions { flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 12px; }
+.focus-banner.compact .focus-actions button { padding: 6px 12px; font-size: 13px; }
 
 /* --- Modal --- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 10; }

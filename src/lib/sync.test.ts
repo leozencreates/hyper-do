@@ -156,13 +156,20 @@ describe('mergeData: counters, focus log, focused flag', () => {
     expect(big.merged.focusLog[FOCUS_LOG_MAX - 1].id).toBe('newest')
   })
 
-  it('only the most recently updated task stays focused; the demoted one becomes newer than both copies', () => {
-    const l = task({ id: 'a', focused: true, updatedAt: NOW - MIN })
-    const r = task({ id: 'b', focused: true, updatedAt: NOW })
-    const m = mergeData(doc({ tasks: [l] }), doc({ tasks: [r] }, 'B'), NOW)
+  it('up to three focused tasks survive a merge untouched', () => {
+    const l = [task({ id: 'a', focused: true, updatedAt: NOW - MIN }), task({ id: 'c', focused: true, updatedAt: NOW - 2 * MIN })]
+    const r = [task({ id: 'b', focused: true, updatedAt: NOW })]
+    const m = mergeData(doc({ tasks: l }), doc({ tasks: r }, 'B'), NOW)
+    expect(m.merged.tasks.filter((t) => t.focused).map((t) => t.id).sort()).toEqual(['a', 'b', 'c'])
+    expect(m.merged.tasks.find((t) => t.id === 'c')!.updatedAt).toBe(NOW - 2 * MIN)
+  })
+
+  it('only the three most recently updated tasks stay focused; the demoted one becomes newer than both copies', () => {
+    const l = [task({ id: 'a', focused: true, updatedAt: NOW - 3 * MIN }), task({ id: 'c', focused: true, updatedAt: NOW - MIN })]
+    const r = [task({ id: 'b', focused: true, updatedAt: NOW }), task({ id: 'd', focused: true, updatedAt: NOW - 2 * MIN })]
+    const m = mergeData(doc({ tasks: l }), doc({ tasks: r }, 'B'), NOW)
     const a = m.merged.tasks.find((t) => t.id === 'a')!
-    const b = m.merged.tasks.find((t) => t.id === 'b')!
-    expect(b.focused).toBe(true)
+    expect(m.merged.tasks.filter((t) => t.focused).map((t) => t.id).sort()).toEqual(['b', 'c', 'd'])
     expect(a.focused).toBe(false)
     expect(a.updatedAt).toBe(NOW + 1)
     expect(m.changedLocal).toBe(true)
@@ -338,7 +345,7 @@ describe('updatedAt bookkeeping', () => {
     const data = normalizeData({ tasks: [a, task({ id: 'f', focused: true })] }, DEFAULT_SETTINGS, NOW)
     const focused = applyNotificationAction(data, 'a', 'focus', NOW)
     expect(focused.tasks.find((t) => t.id === 'a')!.updatedAt).toBeGreaterThanOrEqual(NOW)
-    expect(focused.tasks.find((t) => t.id === 'f')!.updatedAt).toBe(NOW)
+    expect(focused.tasks.find((t) => t.id === 'f')).toBe(data.tasks.find((t) => t.id === 'f')) // still in focus, untouched
     expect(applyNotificationAction(data, 'a', 'snooze30', NOW).tasks[0].updatedAt).toBeGreaterThanOrEqual(NOW)
   })
 })

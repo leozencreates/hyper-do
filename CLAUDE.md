@@ -109,7 +109,7 @@ src/lib/platform.capacitor.ts  Android adapter: Capacitor Preferences + LocalNot
 src/lib/platform.calendar.ts   Browser-side calendar bridge (CalendarSync in the page, state in localStorage)
 src/lib/sync.ts         Pure sync merge (#16): SyncDoc {version, deviceId, savedAt, tasks, deleted, dailyDone, focusLog},
                         mergeData (newer task.updatedAt wins, tie → local; tombstone ≥ updatedAt deletes, later edit
-                        resurrects; dailyDone max; focusLog union/5000; one focused task), toSyncDoc / applySyncDoc
+                        resurrects; dailyDone max; focusLog union/5000; ≤ MAX_FOCUS focused tasks), toSyncDoc / applySyncDoc
                         (settings + hyperFocus untouched), parseSyncDoc, addTombstones / dropTombstones, syncFingerprint
 src/lib/syncengine.ts   SyncEngine({getData, mutate, transport(settings, creds), loadState, saveState, onStatus}):
                         pull → merge → mutate(applySyncDoc) if changedLocal → push with ETag/mtime if changedRemote,
@@ -142,7 +142,8 @@ src/lib/deeplink.ts     hyperdo://task/<id>/done|snooze/<min>|open: parse/build,
 src/lib/tasks.ts        Pure task helpers: newTask, taskFromQuickAdd (UI + popup + Telegram), normalizeTask,
                         completeTask (+recurrence), sort, reorder, search, pickEasyTask; snoozeTask (the only snooze /
                         postpone path: counts Task.snoozeCount, resets nags), isStuck / SNOOZE_NUDGE (3), stuckDates,
-                        startBy (due − estimate, timed tasks, ≤ 12 h ahead)
+                        startBy (due − estimate, timed tasks, ≤ 12 h ahead); setFocused (the only focus path: up to
+                        MAX_FOCUS = 3 focused tasks, the least recently updated one leaves), focusedTasks
 src/lib/parse.ts        Natural-language quick-add parser (TR/EN/RU) + splitBrainDump; phrase matcher looks 1–3 words
                         ahead (relative offsets, next week/weekday, month names, 12-hour times, *recurrence tokens)
 src/lib/dates.ts        Date helpers: startOfDay/endOfDay, nextOccurrence(dueAt, rec, now, rule) incl. custom rules
@@ -194,7 +195,7 @@ docs/                   ROADMAP-2026-10.md (feature roadmap with `[x]` status, "
 
 Tests: `src/lib/*.test.ts` (attachments, calendar-links, calsync, data, dates, deeplink, digest, full-backup, gcal, ics, parse,
 planning, history, printout, reminder, share, sound, stats, routine, sync, syncengine, tasks, telegram-commands, whatnow) and `electron/telegram.test.ts`,
-`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 29 files, 541 tests.
+`electron/syncfolder.test.ts`, `electron/miniapp-server.test.ts`, `electron/tg-auth.test.ts`, `electron/tunnel.test.ts` — 29 files, 546 tests.
 
 Data flow: renderer edits `AppData` → debounced `platform.save` → Electron main `commit()` writes the JSON file and
 syncs reminder counters. Platform-side changes (Telegram, calendar import) come back via `onDataChanged`.

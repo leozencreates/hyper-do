@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { SNOOZE_NUDGE, completeTask, duplicateTask, isStuck, matchesQuery, moveInList, newTask, normalizeRecurrenceRule, normalizeTask, openTasksSorted, pickEasyTask, priorityIcon, reorderTasks, snoozeTask, sortTasks, startBy, stuckDates, taskFromQuickAdd } from './tasks'
+import { MAX_FOCUS, SNOOZE_NUDGE, focusedTasks, setFocused, completeTask, duplicateTask, isStuck, matchesQuery, moveInList, newTask, normalizeRecurrenceRule, normalizeTask, openTasksSorted, pickEasyTask, priorityIcon, reorderTasks, snoozeTask, sortTasks, startBy, stuckDates, taskFromQuickAdd } from './tasks'
 import { DEFAULT_SETTINGS, type Task } from './types'
 
 // Tuesday, 13 October 2026, 10:00 local time
@@ -505,5 +505,39 @@ describe('moveInList', () => {
     expect(moveInList(ts, shown, 'c', -1)).toBe(ts)
     expect(moveInList(ts, shown, 'b', 1)).toBe(ts)
     expect(moveInList(ts, shown, 'nope', 1)).toBe(ts)
+  })
+})
+
+describe('setFocused / focusedTasks (up to MAX_FOCUS tasks in focus)', () => {
+  const ids = (ts: Task[]) => focusedTasks(ts).map((x) => x.id)
+
+  it('a second and a third task join the focus; nag resets and updatedAt is bumped only on the target', () => {
+    const tasks = [task({ id: 'a', focused: true, updatedAt: 1 }), task({ id: 'b', focused: true, updatedAt: 2 }), task({ id: 'c', nagCount: 4, updatedAt: 3 })]
+    const out = setFocused(tasks, 'c', true, NOW)
+    expect(MAX_FOCUS).toBe(3)
+    expect(ids(out)).toEqual(['a', 'b', 'c'])
+    expect(out[2]).toMatchObject({ nagCount: 0, updatedAt: NOW })
+    expect(out[0]).toBe(tasks[0])
+    expect(out[1]).toBe(tasks[1])
+  })
+
+  it('a fourth task pushes the least recently updated one out of focus', () => {
+    const tasks = [task({ id: 'a', focused: true, updatedAt: 5 }), task({ id: 'b', focused: true, updatedAt: 2 }), task({ id: 'c', focused: true, updatedAt: 9 }), task({ id: 'd', updatedAt: 1 })]
+    const out = setFocused(tasks, 'd', true, NOW)
+    expect(ids(out)).toEqual(['a', 'c', 'd'])
+    expect(out[1]).toMatchObject({ focused: false, updatedAt: NOW })
+  })
+
+  it('focusing an already focused task evicts nobody; unfocus touches only that task; unknown id → same array', () => {
+    const tasks = [task({ id: 'a', focused: true, updatedAt: 1 }), task({ id: 'b', focused: true, updatedAt: 2 }), task({ id: 'c', focused: true, updatedAt: 3 })]
+    expect(ids(setFocused(tasks, 'a', true, NOW))).toEqual(['a', 'b', 'c'])
+    const off = setFocused(tasks, 'b', false, NOW)
+    expect(ids(off)).toEqual(['a', 'c'])
+    expect(off[0]).toBe(tasks[0])
+    expect(setFocused(tasks, 'nope', true, NOW)).toBe(tasks)
+  })
+
+  it('focusedTasks skips finished and archived tasks', () => {
+    expect(ids([task({ id: 'a', focused: true, completedAt: NOW }), task({ id: 'b', focused: true, archived: true }), task({ id: 'c', focused: true })])).toEqual(['c'])
   })
 })

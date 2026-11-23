@@ -5,8 +5,7 @@
  */
 import { FOCUS_LOG_MAX, type AppData, type FocusEntry, type Task } from './types'
 import { DAY, addDays, dayKey, dayKeyToDate, startOfDay } from './dates'
-import { completeTask, snoozeTask, touchTask } from './tasks'
-import { resetNag } from './reminder'
+import { completeTask, setFocused, snoozeTask } from './tasks'
 
 const MIN = 60_000
 
@@ -75,7 +74,7 @@ export const SNOOZE_ACTION_MIN = 30
 
 /**
  * Applies a notification button to the data exactly like the UI would: `done` → `completeInData`
- * (recurrence + `dailyDone`), `snooze30` → quiet for 30 minutes, `focus` → this task becomes the only focused one.
+ * (recurrence + `dailyDone`), `snooze30` → quiet for 30 minutes, `focus` → this task joins the focus (at most `MAX_FOCUS`).
  * Every button is a reaction, so the escalation counter resets. `tap`, unknown actions, unknown or finished tasks
  * leave the data untouched (same object).
  */
@@ -88,7 +87,7 @@ export function applyNotificationAction(data: AppData, taskId: string, actionId:
     case 'snooze30':
       return { ...data, tasks: data.tasks.map((t) => (t.id === taskId ? snoozeTask(t, { snoozedUntil: nowMs + SNOOZE_ACTION_MIN * 60_000 }, nowMs) : t)) }
     case 'focus':
-      return { ...data, tasks: data.tasks.map((t) => (t.id === taskId ? touchTask(resetNag({ ...t, focused: true }, nowMs), nowMs) : t.focused ? touchTask({ ...t, focused: false }, nowMs) : t)) }
+      return { ...data, tasks: setFocused(data.tasks, taskId, true, nowMs) }
     default:
       return data
   }

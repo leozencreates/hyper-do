@@ -355,13 +355,13 @@ describe('/snooze and /focus', () => {
     expect(bad.replies[0].text).toBe(translate('en', 'tg_bad_index'))
   })
 
-  it('/focus 1 puts the task in focus and takes it from the previous one', () => {
+  it('/focus 1 puts the task in focus next to the previous one', () => {
     const d = SAMPLE()
     const r = handleMessage('/focus 1', ctx(d, ['a', 'b', 'c', 'd']))
     expect(r.replies[0].text).toBe(translate('en', 'tg_focused', { title: '<b>Pay bill</b>' }))
     const next = apply(d, r)
     expect(find(next, 'a').focused).toBe(true)
-    expect(find(next, 'd').focused).toBe(false)
+    expect(find(next, 'd').focused).toBe(true)
   })
 })
 
@@ -489,8 +489,8 @@ describe('inline button callbacks', () => {
     const f = handleCallback('focus:a', ctx(d))
     expect(f.keepButtons).toBe(true)
     const next = apply(d, f.effect)
-    expect(find(next, 'a').focused).toBe(true)
-    expect(find(next, 'b').focused).toBe(false)
+    expect(find(next, 'a')).toMatchObject({ focused: true, nagCount: 0 })
+    expect(find(next, 'b').focused).toBe(true)
   })
 
   it('unknown id toasts "no such number"; foreign chats and unknown actions are silently acknowledged', () => {

@@ -228,6 +228,27 @@ export function snoozeTask(task: Task, patch: Partial<Pick<Task, 'snoozedUntil' 
   return touchTask({ ...task, ...patch, nagCount: 0, snoozeCount: task.snoozeCount + 1 }, nowMs)
 }
 
+/** How many tasks may be in focus at once (banner on top of the list). */
+export const MAX_FOCUS = 3
+
+/** Open, non-archived focused tasks in list order: what the focus banner shows. */
+export const focusedTasks = (tasks: Task[]): Task[] => tasks.filter((x) => x.focused && !x.archived && x.completedAt === null)
+
+/**
+ * The one way to put a task in focus or take it out (every platform). Focusing is a reaction (nag reset) and keeps
+ * at most `MAX_FOCUS` focused tasks: when the limit is exceeded the least recently updated ones leave focus.
+ * Every changed task gets its `updatedAt` bumped. Unknown id → same array.
+ */
+export function setFocused(tasks: Task[], id: string, on: boolean, nowMs = Date.now()): Task[] {
+  if (!tasks.some((x) => x.id === id)) return tasks
+  const evict = new Set<string>()
+  if (on) {
+    const others = tasks.filter((x) => x.focused && x.id !== id).sort((a, b) => a.updatedAt - b.updatedAt)
+    for (const x of others.slice(0, Math.max(0, others.length - (MAX_FOCUS - 1)))) evict.add(x.id)
+  }
+  return tasks.map((x) => (x.id === id ? touchTask({ ...x, focused: on, nagCount: 0 }, nowMs) : evict.has(x.id) ? touchTask({ ...x, focused: false }, nowMs) : x))
+}
+
 /** True once a task was snoozed / postponed `SNOOZE_NUDGE` times without being finished or re-planned. */
 export const isStuck = (task: Pick<Task, 'snoozeCount' | 'completedAt'>) => task.completedAt === null && task.snoozeCount >= SNOOZE_NUDGE
 

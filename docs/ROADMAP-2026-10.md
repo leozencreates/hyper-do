@@ -309,3 +309,5 @@ General rules for every item:
 - [x] **🕓 Note dates** (2 Nov 2026, spec `docs/2026-11-02-note-dates-design.md`): `Task.noteLog` records when the notes
   were added / edited / removed (stamped in `bumpChanged`, merged on sync); editor section 🕓 Dates also shows
   created / last change / completed.
+- [x] **🎯 Up to three tasks in focus** (24 Nov 2026, spec `docs/2026-11-24-multi-focus-design.md`): `setFocused` /
+  `MAX_FOCUS` in tasks.ts, the focus banner shows 2–3 compact cards side by side above the list.

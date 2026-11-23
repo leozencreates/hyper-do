@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppData, type AppStore } from './lib/store'
-import { matchesQuery, moveInList, newTask, pickEasyTask, sortTasks, uid } from './lib/tasks'
+import { MAX_FOCUS, focusedTasks, matchesQuery, moveInList, newTask, pickEasyTask, sortTasks, uid } from './lib/tasks'
 import { buildPrintHtml, printFileName } from './lib/printout'
 import { printHtmlDocument } from './lib/download'
 import { ENERGIES, ENERGY_ICON, SORT_MODES, type AppData, type ConnectionStatus, type Energy, type SortMode, type Task, type UpdateStatus } from './lib/types'
@@ -300,7 +300,8 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
   const spentByTask = useMemo(() => spentMinByTask(data.focusLog), [data.focusLog])
   const currentStreak = useMemo(() => streak(data.dailyDone, dayKey(now)), [data.dailyDone, now])
 
-  const focusTask = tasks.find((x) => x.focused && !x.archived && x.completedAt === null) ?? null
+  const focusList = focusedTasks(tasks).slice(0, MAX_FOCUS)
+  const focusTask = focusList[0] ?? null
   const hfTask = hf.session?.taskId ? (tasks.find((x) => x.id === hf.session!.taskId) ?? null) : focusTask
   const openCount = tasks.filter((x) => !x.archived && x.completedAt === null).length
   const overdueCount = tasks.filter((x) => !x.archived && x.completedAt === null && isOverdue(x.dueAt, now)).length
@@ -527,14 +528,21 @@ function Main({ data, setTasks, setSettings, setHyperFocus, updateData, appendFo
 
         <HyperFocusBar hf={hf} task={hfTask} suppressOthers={settings.focusSuppressOthers} />
 
-        {focusTask && view !== 'board' && (
-          <FocusBanner
-            task={focusTask}
-            onComplete={() => actions.complete(focusTask.id)}
-            onUnfocus={() => actions.setFocus(focusTask.id, false)}
-            onToggleSub={(sid) => actions.toggleSub(focusTask, sid)}
-            onHyperFocus={hf.session || IS_TG ? undefined : () => hf.start(focusTask.id)}
-          />
+        {focusList.length > 0 && view !== 'board' && (
+          <div className={focusList.length > 1 ? 'focus-stack' : undefined}>
+            {focusList.map((ft, i) => (
+              <FocusBanner
+                key={ft.id}
+                task={ft}
+                index={i + 1}
+                count={focusList.length}
+                onComplete={() => actions.complete(ft.id)}
+                onUnfocus={() => actions.setFocus(ft.id, false)}
+                onToggleSub={(sid) => actions.toggleSub(ft, sid)}
+                onHyperFocus={hf.session || IS_TG ? undefined : () => hf.start(ft.id)}
+              />
+            ))}
+          </div>
         )}
         <div className="planning-toolbar"><button className="ghost small" onClick={() => setShowReview(true)}>{c.review}</button><button className="ghost small" onClick={() => setShowTemplates(true)}>{c.templates}</button>{<button className="ghost small" onClick={() => setView('inbox')}>{c.inbox} ({tasks.filter((x) => !x.archived && x.completedAt === null && x.dueAt === null).length})</button>}</div>
 

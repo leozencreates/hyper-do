@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { AppData, Settings, Status, Task } from './types'
-import { duplicateTask, reorderTasks, snoozeTask, taskFromQuickAdd, touchTask, type QuickAddOptions } from './tasks'
+import { duplicateTask, reorderTasks, setFocused, snoozeTask, taskFromQuickAdd, touchTask, type QuickAddOptions } from './tasks'
 import { resetNag } from './reminder'
 import { completeInData, recordReopen } from './stats'
 import { addTombstones, dropTombstones } from './sync'
@@ -85,7 +85,7 @@ export function useTaskActions({ tasks, settings, setTasks, setSettings, updateD
       return recordReopen({ ...d, tasks: d.tasks.map((x) => (x.id === id ? touchTask({ ...x, completedAt: null }) : x)) }, task.completedAt)
     })
   const setFocus = (id: string, on: boolean) => {
-    setTasks((ts) => ts.map((x) => (x.id === id ? touchTask({ ...x, focused: on, nagCount: 0 }) : x.focused ? touchTask({ ...x, focused: false }) : x)))
+    setTasks((ts) => setFocused(ts, id, on))
     if (on) sfx('focus')
   }
   /** Snoozes and postpones are counted (`snoozeTask`): from `SNOOZE_NUDGE` on the row asks "stuck?". */

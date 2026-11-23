@@ -9,12 +9,12 @@
  *    tombstone comes back (and the tombstone is dropped);
  *  - `deleted` = union of the tombstones, pruned after `TOMBSTONE_TTL_MS`;
  *  - `dailyDone` = per-day maximum; `focusLog` = union by id, sorted by `startedAt`, newest `FOCUS_LOG_MAX` kept;
- *  - at most one task stays `focused`: the most recently updated one.
+ *  - at most `MAX_FOCUS` tasks stay `focused`: the most recently updated ones.
  * Settings and the Hyper Focus session are device-local and never part of the document.
  */
 import { FOCUS_LOG_MAX, TOMBSTONE_TTL_MS, type AppData, type FocusEntry, type Task, type Tombstone } from './types'
 import { normalizeDailyDone, normalizeDeleted, normalizeFocusLog } from './data'
-import { normalizeTask } from './tasks'
+import { MAX_FOCUS, normalizeTask } from './tasks'
 import { preserveVersions } from './history'
 
 export const SYNC_DOC_VERSION = 1
@@ -176,14 +176,16 @@ export function mergeData(local: SyncDoc, remote: SyncDoc, nowMs: number): Merge
     merged.push(winner)
   }
 
-  // at most one focused task: the most recently updated one keeps the flag
+  // at most MAX_FOCUS focused tasks: the most recently updated ones keep the flag
   const focused = merged.filter((t) => t.focused)
-  if (focused.length > 1) {
-    const keep = focused.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a))
+  if (focused.length > MAX_FOCUS) {
+    const byNewest = [...focused].sort((a, b) => b.updatedAt - a.updatedAt)
+    const keep = new Set(byNewest.slice(0, MAX_FOCUS))
+    const newest = byNewest[0].updatedAt
     for (let i = 0; i < merged.length; i++) {
       const t = merged[i]
-      if (t.focused && t !== keep) {
-        merged[i] = { ...t, focused: false, updatedAt: keep.updatedAt + 1 }
+      if (t.focused && !keep.has(t)) {
+        merged[i] = { ...t, focused: false, updatedAt: newest + 1 }
         changedLocal = true
         changedRemote = true
       }
